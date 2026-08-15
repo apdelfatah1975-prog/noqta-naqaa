@@ -11,7 +11,7 @@ import {
   reminders,
   visits,
 } from "../../drizzle/schema";
-import { calculateCashBreakdown, calculateCashSummaries, cashCurrencies, cashTransactionTypes, matchesCashTransactionSearch } from "../../shared/cashBusiness";
+import { calculateCashBreakdown, calculateCashSummaries, calculatePurchaseBreakdown, cashCurrencies, cashTransactionTypes, matchesCashTransactionSearch } from "../../shared/cashBusiness";
 import {
   DEFAULT_ALERT_HOUR,
   DEFAULT_ALERT_LEAD_DAYS,
@@ -31,6 +31,8 @@ import { getDb } from "../db";
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
 import { COOKIE_NAME } from "../../shared/const";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
+import { createOwnerBackup, refreshOwnerBackup } from "../backup";
+import { storageGet } from "../storage";
 
 const customerInput = z.object({
   name: z.string().trim().min(2, "أدخل اسم العميل").max(160),
@@ -42,13 +44,23 @@ const customerInput = z.object({
   clientOperationId: z.string().uuid().optional(),
 });
 
+const customerCreateInput = customerInput.extend({
+  firstVisitType: z.enum(visitTypes).optional(),
+  firstVisitDate: z.date().optional(),
+  firstTechnicianName: z.string().trim().max(160).optional().nullable(),
+  firstVisitNotes: z.string().trim().max(2000).optional().nullable(),
+  firstCollectedAmount: z.number().int().nonnegative().optional().default(0),
+  firstCollectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
+});
+
 const visitInput = z.object({
   customerId: z.number().int().positive(),
   visitType: z.enum(visitTypes),
   visitDate: z.date(),
+  technicianName: z.string().trim().max(160).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
   collectedAmount: z.number().int().nonnegative().optional().default(0),
-  collectedCurrency: z.enum(cashCurrencies).optional().default("EGP"),
+  collectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
   clientOperationId: z.string().uuid().optional(),
 });
 
@@ -62,6 +74,8 @@ const inventoryMovementInput = z.object({
   inventoryItemId: z.number().int().positive(),
   movementType: z.enum(["incoming", "outgoing"]),
   quantity: z.number().int().positive("أدخل كمية أكبر من صفر"),
+  unitCost: z.number().int().nonnegative().optional().default(0),
+  currency: z.enum(cashCurrencies).optional().default("SAR"),
   movementDate: z.date(),
   technicianName: z.string().trim().max(160).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
@@ -69,7 +83,7 @@ const inventoryMovementInput = z.object({
 
 const cashTransactionInput = z.object({
   transactionType: z.enum(cashTransactionTypes),
-  currency: z.enum(cashCurrencies).optional().default("EGP"),
+  currency: z.enum(cashCurrencies).optional().default("SAR"),
   amount: z.number().int().positive("أدخل مبلغًا أكبر من صفر"),
   category: z.string().trim().min(2, "أدخل تصنيف العملية").max(100),
   transactionDate: z.date(),
@@ -161,8 +175,9 @@ async function inventorySummary(ownerId: number) {
   };
 }
 
-type CashIncomeFilter = "all" | "service";
+type CashIncomeFilter = "all" | "service" | "installation" | "maintenance";
 type CashDateFilter = { month?: string; startDate?: string; endDate?: string };
+type CashCategoryFilter = { category?: string; technician?: string; itemName?: string };
 
 function matchesCashDateFilter(date: Date, dateFilter?: CashDateFilter) {
   if (!dateFilter?.month && !dateFilter?.startDate && !dateFilter?.endDate) return true;
@@ -173,7 +188,7 @@ function matchesCashDateFilter(date: Date, dateFilter?: CashDateFilter) {
   return true;
 }
 
-async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "all", dateFilter?: CashDateFilter, search?: string) {
+async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "all", dateFilter?: CashDateFilter, search?: string, categoryFilter: CashCategoryFilter = {}) {
   const db = await databaseOrThrow();
   const filters = [eq(cashTransactions.ownerId, ownerId)];
   if (incomeFilter === "service") {
@@ -185,14 +200,36 @@ async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "al
     .where(and(...filters))
     .orderBy(desc(cashTransactions.transactionDate));
   const filteredTransactions = transactions.filter(transaction => {
-    const isServiceIncome = transaction.category === "تحصيل صيانة" || transaction.category === "تحصيل تركيب";
-    return (incomeFilter !== "service" || (transaction.transactionType === "income" && isServiceIncome))
+    const isInstallationIncome = transaction.category === "تحصيل تركيب";
+    const isMaintenanceIncome = transaction.category === "تحصيل صيانة";
+    const isServiceIncome = isInstallationIncome || isMaintenanceIncome;
+    const matchesIncome = incomeFilter === "all"
+      || (incomeFilter === "service" && transaction.transactionType === "income" && isServiceIncome)
+      || (incomeFilter === "installation" && transaction.transactionType === "income" && isInstallationIncome)
+      || (incomeFilter === "maintenance" && transaction.transactionType === "income" && isMaintenanceIncome);
+    const matchesCategory = !categoryFilter.category || transaction.category === categoryFilter.category;
+    const matchesTechnician = !categoryFilter.technician || transaction.recipientName === categoryFilter.technician;
+    return matchesIncome && matchesCategory && matchesTechnician
       && matchesCashDateFilter(new Date(transaction.transactionDate), dateFilter)
       && matchesCashTransactionSearch(transaction, search);
   });
+  const [purchaseItems, purchaseMovements] = await Promise.all([
+    db.select({ id: inventoryItems.id, name: inventoryItems.name }).from(inventoryItems).where(eq(inventoryItems.ownerId, ownerId)),
+    db.select().from(inventoryMovements).where(eq(inventoryMovements.ownerId, ownerId)),
+  ]);
+  const itemNames = new Map(purchaseItems.map(item => [item.id, item.name]));
+  const filteredPurchaseMovements = purchaseMovements
+    .map(movement => ({ ...movement, itemName: itemNames.get(movement.inventoryItemId) ?? "صنف غير معروف" }))
+    .filter(movement => !categoryFilter.itemName || movement.itemName === categoryFilter.itemName)
+    .filter(movement => matchesCashDateFilter(new Date(movement.movementDate), dateFilter))
+    .filter(movement => matchesCashTransactionSearch({ category: movement.itemName, notes: movement.notes, recipientName: movement.technicianName }, search));
   const summaries = calculateCashSummaries(filteredTransactions);
   const breakdown = calculateCashBreakdown(filteredTransactions);
-  return { transactions: filteredTransactions, ...summaries.EGP, summaries, breakdown, incomeFilter, search: search?.trim() ?? "" };
+  const purchases = calculatePurchaseBreakdown(filteredPurchaseMovements);
+  const availableCategories = Array.from(new Set(transactions.map(transaction => transaction.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ar"));
+  const availableTechnicians = Array.from(new Set(transactions.map(transaction => transaction.recipientName).filter((name): name is string => Boolean(name?.trim())))).sort((a, b) => a.localeCompare(b, "ar"));
+  const availableItemNames = Array.from(new Set(itemNames.values())).sort((a, b) => a.localeCompare(b, "ar"));
+  return { transactions: filteredTransactions, ...summaries.SAR, summaries, breakdown, purchases, incomeFilter, categoryFilter, availableCategories, availableTechnicians, availableItemNames, search: search?.trim() ?? "" };
 }
 
 async function remindersWithCustomers(ownerId: number, onlyDue: boolean, withinDays?: number) {
@@ -342,7 +379,7 @@ export const filterManagementRouter = router({
       ]);
       return { customer: withCustomerFollowUp(customer, customerVisits, customerNumbers.get(customer.id) ?? customer.id), visits: customerVisits, reminders: customerReminders };
     }),
-    create: protectedProcedure.input(customerInput).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(customerCreateInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       if (input.clientOperationId) {
         const existing = await db.select().from(customers).where(and(
@@ -351,15 +388,32 @@ export const filterManagementRouter = router({
         )).limit(1);
         if (existing[0]) return { id: existing[0].id, alreadySynced: true };
       }
-      const { clientOperationId, ...data } = input;
+      const { clientOperationId, firstVisitType, firstVisitDate, firstTechnicianName, firstVisitNotes, firstCollectedAmount, firstCollectedCurrency, ...data } = input;
       const result = await db.insert(customers).values({ ...data, clientOperationId, ownerId: ctx.user.id });
-      return { id: Number(result[0].insertId), alreadySynced: false };
+      const customerId = Number(result[0].insertId);
+      if (!firstVisitType) {
+        await refreshOwnerBackup(ctx.user.id);
+        return { id: customerId, alreadySynced: false, firstVisitCreated: false };
+      }
+      const visitDate = firstVisitDate ?? new Date();
+      const visitResult = await db.insert(visits).values({ customerId, ownerId: ctx.user.id, visitType: firstVisitType, visitDate, technicianName: firstTechnicianName ?? null, notes: firstVisitNotes ?? null });
+      const visitId = Number(visitResult[0].insertId);
+      if (needsAutomaticReminder(firstVisitType)) {
+        await db.insert(reminders).values({ customerId, visitId, ownerId: ctx.user.id, reminderDate: followUpDate(visitDate) });
+      }
+      if (firstCollectedAmount > 0) {
+        const category = firstVisitType === "installation" ? "تحصيل تركيب" : firstVisitType === "maintenance" ? "تحصيل صيانة" : firstVisitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
+        await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: firstCollectedCurrency, amount: firstCollectedAmount, category, transactionDate: visitDate, sourceVisitId: visitId, recipientName: input.name, notes: firstTechnicianName ? `إيراد أُنشئ تلقائيًا من أول زيارة بواسطة ${firstTechnicianName}` : "إيراد أُنشئ تلقائيًا من أول زيارة" });
+      }
+      await refreshOwnerBackup(ctx.user.id);
+      return { id: customerId, alreadySynced: false, firstVisitCreated: true, reminderCreated: needsAutomaticReminder(firstVisitType) };
     }),
     update: protectedProcedure.input(customerInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       await getOwnedCustomer(ctx.user.id, input.id);
       const { id, ...data } = input;
       await db.update(customers).set(data).where(and(eq(customers.id, id), eq(customers.ownerId, ctx.user.id)));
+      await refreshOwnerBackup(ctx.user.id);
       return { success: true };
     }),
   }),
@@ -407,6 +461,7 @@ export const filterManagementRouter = router({
           await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: collectedCurrency, amount: collectedAmount, category, transactionDate: input.visitDate, sourceVisitId: visitId, recipientName: customer.name, notes: "إيراد أُنشئ تلقائيًا من تسجيل الزيارة" });
         }
       }
+      await refreshOwnerBackup(ctx.user.id);
       return { id: visitId, reminderCreated: needsAutomaticReminder(input.visitType), alreadySynced: false };
     }),
   }),
@@ -427,6 +482,7 @@ export const filterManagementRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "لم يتم العثور على التذكير." });
       }
       await db.update(reminders).set({ status: input.status }).where(and(eq(reminders.id, input.id), eq(reminders.ownerId, ctx.user.id)));
+      await refreshOwnerBackup(ctx.user.id);
       return { success: true };
     }),
   }),
@@ -445,6 +501,7 @@ export const filterManagementRouter = router({
     saveSettings: protectedProcedure.input(notificationSettingsInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...input }).onDuplicateKeyUpdate({ set: input });
+      await refreshOwnerBackup(ctx.user.id);
       return getNotificationSettings(ctx.user.id);
     }),
     enableScheduledAlerts: protectedProcedure.input(notificationSettingsInput).mutation(async ({ ctx, input }) => {
@@ -476,6 +533,7 @@ export const filterManagementRouter = router({
     createItem: adminProcedure.input(inventoryItemInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const result = await db.insert(inventoryItems).values({ ...input, ownerId: ctx.user.id });
+      await refreshOwnerBackup(ctx.user.id);
       return { id: Number(result[0].insertId) };
     }),
     createMovement: adminProcedure.input(inventoryMovementInput).mutation(async ({ ctx, input }) => {
@@ -490,16 +548,49 @@ export const filterManagementRouter = router({
       if (input.movementType === "outgoing" && input.quantity > currentBalance) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `لا يمكن صرف ${input.quantity}؛ الرصيد المتاح هو ${currentBalance}.` });
       }
-      await db.insert(inventoryMovements).values({ ...input, ownerId: ctx.user.id });
-      return { success: true };
+      const movementResult = await db.insert(inventoryMovements).values({ ...input, ownerId: ctx.user.id });
+      const movementId = Number(movementResult[0].insertId);
+      if (input.movementType === "incoming" && input.unitCost > 0) {
+        const purchaseAmount = input.quantity * input.unitCost;
+        const existingPurchase = await db.select({ id: cashTransactions.id }).from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.sourceInventoryMovementId, movementId))).limit(1);
+        if (!existingPurchase[0]) {
+          await db.insert(cashTransactions).values({
+            ownerId: ctx.user.id,
+            transactionType: "expense",
+            currency: input.currency,
+            amount: purchaseAmount,
+            category: `شراء مخزون - ${item[0].name}`,
+            transactionDate: input.movementDate,
+            sourceInventoryMovementId: movementId,
+            recipientName: "مشتريات",
+            notes: input.notes || `شراء ${input.quantity} من ${item[0].name}`,
+          });
+        }
+      }
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true, movementId };
+    }),
+  }),
+
+  backup: router({
+    status: protectedProcedure.query(async ({ ctx }) => {
+      const settings = await getNotificationSettings(ctx.user.id);
+      const stored = settings.backupFileKey ? await storageGet(settings.backupFileKey) : null;
+      return { generatedAt: settings.backupGeneratedAt ?? null, downloadUrl: stored?.url ?? null };
+    }),
+    createNow: protectedProcedure.mutation(async ({ ctx }) => {
+      const backup = await createOwnerBackup(ctx.user.id);
+      if (!backup) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر إنشاء النسخة الاحتياطية الآن." });
+      return { generatedAt: backup.generatedAt, downloadUrl: backup.url, counts: backup.counts };
     }),
   }),
 
   cash: router({
-    summary: adminProcedure.input(z.object({ incomeFilter: z.enum(["all", "service"]).default("all"), month: z.string().regex(/^\d{4}-\d{2}$/).optional(), startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), search: z.string().max(160).optional() }).optional()).query(({ ctx, input }) => cashSummary(ctx.user.id, input?.incomeFilter ?? "all", input ? { month: input.month, startDate: input.startDate, endDate: input.endDate } : undefined, input?.search)),
+    summary: adminProcedure.input(z.object({ incomeFilter: z.enum(["all", "service", "installation", "maintenance"]).default("all"), category: z.string().max(100).optional(), technician: z.string().max(160).optional(), itemName: z.string().max(160).optional(), month: z.string().regex(/^\d{4}-\d{2}$/).optional(), startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), search: z.string().max(160).optional() }).optional()).query(({ ctx, input }) => cashSummary(ctx.user.id, input?.incomeFilter ?? "all", input ? { month: input.month, startDate: input.startDate, endDate: input.endDate } : undefined, input?.search, { category: input?.category, technician: input?.technician, itemName: input?.itemName })),
     create: adminProcedure.input(cashTransactionInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const result = await db.insert(cashTransactions).values({ ...input, ownerId: ctx.user.id });
+      await refreshOwnerBackup(ctx.user.id);
       return { id: Number(result[0].insertId) };
     }),
   }),

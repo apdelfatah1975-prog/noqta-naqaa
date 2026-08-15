@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
-import { ArrowLeft, BellRing, CalendarDays, ChevronLeft, CircleDollarSign, Info, PackageSearch, UsersRound } from "lucide-react";
+import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, Info, PackageSearch, RefreshCw, UsersRound } from "lucide-react";
 import React from "react";
 import { useLocation } from "wouter";
 
@@ -11,12 +11,15 @@ const statStyles = [
   { icon: CalendarDays, color: "bg-sky-600", label: "زيارات قادمة", key: "upcoming", href: "/visits" },
   { icon: BellRing, color: "bg-amber-500", label: "مستحقون للمتابعة", key: "due", href: "/reminders" },
   { icon: PackageSearch, color: "bg-violet-600", label: "أصناف بالمخزنة", key: "inventory", href: "/inventory" },
-  { icon: CircleDollarSign, color: "bg-slate-800", label: "رصيد الخزينة (ج.م)", key: "cash", href: "/cash" },
+  { icon: CircleDollarSign, color: "bg-slate-800", label: "رصيد الخزينة (ر.س)", key: "cash", href: "/cash" },
 ] as const;
 
 export default function Home() {
   const { data, isLoading } = trpc.filters.dashboard.useQuery();
   const { data: cash } = trpc.filters.cash.summary.useQuery();
+  const { data: backupStatus, isLoading: backupLoading } = trpc.filters.backup.status.useQuery();
+  const backupMutation = trpc.filters.backup.createNow.useMutation();
+  const backupUtils = trpc.useUtils();
   const [, setLocation] = useLocation();
   const counts = {
     today: data?.todayVisits.length ?? 0,
@@ -32,7 +35,7 @@ export default function Home() {
     upcoming: nextVisit ? `${nextVisit.customer?.name || "عميل"} · ${formatDateTime(nextVisit.reminderDate)}` : "لا توجد متابعات قريبة",
     due: nextDueReminder ? `${nextDueReminder.customer?.name || "عميل"} · متأخر ${nextDueReminder.daysOverdue} يوم` : "لا توجد متابعة متأخرة",
     inventory: "عدد الأصناف المسجلة",
-    cash: "الرصيد بالجنيه المصري",
+    cash: "الرصيد بالريال السعودي",
   };
 
   return (
@@ -108,6 +111,24 @@ export default function Home() {
           <Button variant="outline" onClick={() => setLocation("/inventory")} className="rounded-xl border-teal-700/20 text-teal-800 hover:bg-teal-50"><PackageSearch className="ml-2 h-4 w-4" />إدارة المخزنة</Button>
         </div>
         {isLoading ? <EmptyRow text="جارٍ تحميل أسماء الأصناف…" /> : data?.inventory.items?.length ? <div className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between gap-3"><p className="text-xs font-bold text-muted-foreground">الأصناف الموجودة داخل المخزن</p><span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-extrabold text-violet-700">{data.inventory.totalItems} صنف</span></div><div className="flex flex-wrap gap-2">{data.inventory.items.slice(0, 8).map(item => <span key={item.id} className="rounded-lg bg-teal-50 px-2.5 py-1.5 text-xs font-bold text-teal-800">{item.name}</span>)}{data.inventory.items.length > 8 ? <span className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-600">+{data.inventory.items.length - 8} أصناف أخرى</span> : null}</div></div> : <EmptyRow text="لا توجد أصناف مسجلة في المخزن." />}
+      </section>
+
+      <section className="soft-card overflow-hidden border border-sky-200/70 bg-gradient-to-l from-sky-50/80 to-white">
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div className="flex items-start gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-600/20"><CloudDownload className="h-5 w-5" /></div>
+            <div>
+              <h2 className="font-extrabold text-slate-900">النسخة الاحتياطية السحابية</h2>
+              <p className="mt-1 text-xs leading-6 text-slate-600">تتحدث تلقائيًا بعد حفظ أي بيان، وتضم العملاء والزيارات والتذكيرات والمخزون والخزينة.</p>
+              <p className="mt-1 text-[11px] font-bold text-sky-700">{backupLoading ? "جارٍ فحص آخر نسخة…" : backupStatus?.generatedAt ? `آخر مزامنة: ${formatDateTime(backupStatus.generatedAt)}` : "لم تُنشأ نسخة بعد"}</p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 sm:min-w-52 sm:flex-row">
+            {backupStatus?.downloadUrl ? <a href={backupStatus.downloadUrl} download="نقطة-نقاء-نسخة-احتياطية.xlsx" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-sky-700 px-4 text-sm font-extrabold text-white transition hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"><CloudDownload className="h-4 w-4" />تنزيل Excel</a> : null}
+            <button type="button" disabled={backupMutation.isPending} onClick={() => backupMutation.mutate(undefined, { onSuccess: () => backupUtils.filters.backup.status.invalidate() })} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sky-200 bg-white px-4 text-sm font-extrabold text-sky-800 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"><RefreshCw className={`h-4 w-4 ${backupMutation.isPending ? "animate-spin" : ""}`} />{backupStatus?.downloadUrl ? "تحديث النسخة" : "إنشاء النسخة الآن"}</button>
+          </div>
+        </div>
+        {backupMutation.isSuccess ? <div className="flex items-center gap-2 border-t border-sky-200/70 px-5 py-3 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-4 w-4" />تم تحديث النسخة ويمكن تنزيلها الآن.</div> : null}
       </section>
     </div>
   );

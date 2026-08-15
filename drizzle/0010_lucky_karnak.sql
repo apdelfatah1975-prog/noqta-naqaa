@@ -1,0 +1,1 @@
+ALTER TABLE `visits` ADD `technicianName` varchar(160);

@@ -14,6 +14,12 @@ export type OfflineCustomer = {
 };
 
 export type PendingCustomer = Omit<OfflineCustomer, "id"> & {
+  firstVisitType?: PendingVisit["visitType"];
+  firstVisitDate?: string;
+  firstTechnicianName?: string | null;
+  firstVisitNotes?: string | null;
+  firstCollectedAmount?: number;
+  firstCollectedCurrency?: "EGP" | "SAR";
   localId: number;
   clientOperationId: string;
   createdAt: string;
@@ -96,7 +102,7 @@ export function getPendingCustomers(ownerId: number) {
   return readJson<PendingCustomer[]>(queueKey(CUSTOMER_QUEUE_PREFIX, ownerId), []);
 }
 
-export function queueOfflineCustomer(ownerId: number, customer: Omit<OfflineCustomer, "id">) {
+export function queueOfflineCustomer(ownerId: number, customer: Omit<OfflineCustomer, "id"> & Partial<Omit<PendingCustomer, "localId" | "clientOperationId" | "createdAt">>) {
   const pending: PendingCustomer = {
     ...customer,
     localId: -Date.now(),

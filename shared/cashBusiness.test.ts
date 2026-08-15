@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateCashBreakdown, calculateCashSummaries, calculateCashSummary, matchesCashTransactionSearch } from "./cashBusiness";
+import { calculateCashBreakdown, calculateCashSummaries, calculateCashSummary, matchesCashTransactionSearch, primaryCashCurrency } from "./cashBusiness";
 
 describe("matchesCashTransactionSearch", () => {
   it("يبحث باسم العميل أو الملاحظات مع تجاهل حالة الأحرف والمسافات", () => {
@@ -8,6 +8,12 @@ describe("matchesCashTransactionSearch", () => {
     expect(matchesCashTransactionSearch(transaction, "دورية")).toBe(true);
     expect(matchesCashTransactionSearch(transaction, "تركيب")).toBe(false);
     expect(matchesCashTransactionSearch(transaction, "   ")).toBe(true);
+  });
+});
+
+describe("primaryCashCurrency", () => {
+  it("يعتمد الريال السعودي كعملة أساسية", () => {
+    expect(primaryCashCurrency).toBe("SAR");
   });
 });
 
@@ -43,10 +49,10 @@ describe("calculateCashBreakdown", () => {
       { transactionType: "income", amount: 80000, category: "تحصيل صيانة", currency: "EGP" },
       { transactionType: "expense", amount: 20000, category: "بنزين", currency: "EGP" },
       { transactionType: "expense", amount: 10000, category: "بنزين", currency: "EGP" },
-      { transactionType: "expense", amount: 1000, category: "بنزين", currency: "SAR" },
+      { transactionType: "expense", amount: 1000, category: "بنزين", currency: "SAR", recipientName: "الفني أحمد" },
     ])).toEqual({
-      EGP: { income: [{ category: "تحصيل تركيب", total: 200000 }, { category: "تحصيل صيانة", total: 80000 }], expense: [{ category: "بنزين", total: 30000 }] },
-      SAR: { income: [], expense: [{ category: "بنزين", total: 1000 }] },
+      EGP: { income: [{ category: "تحصيل تركيب", total: 200000 }, { category: "تحصيل صيانة", total: 80000 }], expense: [{ category: "بنزين", total: 30000 }], analytics: { installationIncome: 200000, serviceIncome: 80000, expenseByCategory: [{ category: "بنزين", total: 30000 }], technicianExpenses: [] } },
+      SAR: { income: [], expense: [{ category: "بنزين", total: 1000 }], analytics: { installationIncome: 0, serviceIncome: 0, expenseByCategory: [{ category: "بنزين", total: 1000 }], technicianExpenses: [{ technician: "الفني أحمد", total: 1000 }] } },
     });
   });
 });

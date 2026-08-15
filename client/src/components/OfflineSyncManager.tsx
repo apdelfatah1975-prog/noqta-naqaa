@@ -35,6 +35,12 @@ export function OfflineSyncManager() {
           latitude: customer.latitude ?? null,
           longitude: customer.longitude ?? null,
           notes: customer.notes ?? null,
+          firstVisitType: customer.firstVisitType,
+          firstVisitDate: customer.firstVisitDate ? new Date(customer.firstVisitDate) : undefined,
+          firstTechnicianName: customer.firstTechnicianName ?? null,
+          firstVisitNotes: customer.firstVisitNotes ?? null,
+          firstCollectedAmount: customer.firstCollectedAmount ?? 0,
+          firstCollectedCurrency: customer.firstCollectedCurrency ?? "SAR",
           clientOperationId: customer.clientOperationId,
         });
         customerIdMap.set(customer.localId, result.id);

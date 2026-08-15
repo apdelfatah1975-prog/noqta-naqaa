@@ -6,6 +6,8 @@ import Home from "./Home";
 const mocks = vi.hoisted(() => ({
   dashboard: vi.fn(),
   cashSummary: vi.fn(),
+  backupStatus: vi.fn(),
+  backupCreateNow: vi.fn(),
   setLocation: vi.fn(),
 }));
 
@@ -14,7 +16,12 @@ vi.mock("@/lib/trpc", () => ({
     filters: {
       dashboard: { useQuery: mocks.dashboard },
       cash: { summary: { useQuery: mocks.cashSummary } },
+      backup: {
+        status: { useQuery: mocks.backupStatus },
+        createNow: { useMutation: mocks.backupCreateNow },
+      },
     },
+    useUtils: () => ({ filters: { backup: { status: { invalidate: vi.fn() } } } }),
   },
 }));
 
@@ -40,6 +47,8 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
       },
     });
     mocks.cashSummary.mockReturnValue({ data: { balance: 250000 } });
+    mocks.backupStatus.mockReturnValue({ data: { generatedAt: null, downloadUrl: null }, isLoading: false });
+    mocks.backupCreateNow.mockReturnValue({ isPending: false, isSuccess: false, mutate: vi.fn() });
   });
 
   afterEach(() => {
@@ -68,8 +77,8 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
   it("تظهر كبطاقة تفاعلية وتنتقل إلى صفحة الخزينة عند الضغط", () => {
     render(<Home />);
 
-    const cashCard = screen.getByRole("button", { name: "فتح تفاصيل رصيد الخزينة (ج.م)" });
-    expect(cashCard.textContent).toContain("رصيد الخزينة (ج.م)");
+    const cashCard = screen.getByRole("button", { name: "فتح تفاصيل رصيد الخزينة (ر.س)" });
+    expect(cashCard.textContent).toContain("رصيد الخزينة (ر.س)");
     expect(cashCard.textContent).toContain("2500");
 
     fireEvent.click(cashCard);

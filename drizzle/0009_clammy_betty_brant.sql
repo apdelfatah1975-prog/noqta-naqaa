@@ -1,0 +1,2 @@
+ALTER TABLE `cashTransactions` MODIFY COLUMN `currency` enum('SAR','EGP') NOT NULL DEFAULT 'SAR';--> statement-breakpoint
+ALTER TABLE `inventoryMovements` MODIFY COLUMN `currency` enum('SAR','EGP') NOT NULL DEFAULT 'SAR';

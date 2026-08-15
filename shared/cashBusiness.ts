@@ -1,7 +1,8 @@
 export const cashTransactionTypes = ["income", "expense"] as const;
 export type CashTransactionType = (typeof cashTransactionTypes)[number];
 
-export const cashCurrencies = ["EGP", "SAR"] as const;
+export const cashCurrencies = ["SAR", "EGP"] as const;
+export const primaryCashCurrency: CashCurrency = "SAR";
 export type CashCurrency = (typeof cashCurrencies)[number];
 
 export type CashTransactionForSummary = {
@@ -9,6 +10,7 @@ export type CashTransactionForSummary = {
   amount: number;
   category?: string | null;
   currency?: CashCurrency | null;
+  recipientName?: string | null;
 };
 
 export type CashTransactionForSearch = {
@@ -43,27 +45,88 @@ export function calculateCashSummary(transactions: CashTransactionForSummary[]):
 
 export function calculateCashSummaries(transactions: CashTransactionForSummary[]) {
   return {
-    EGP: calculateCashSummary(transactions.filter(transaction => !transaction.currency || transaction.currency === "EGP")),
     SAR: calculateCashSummary(transactions.filter(transaction => transaction.currency === "SAR")),
+    EGP: calculateCashSummary(transactions.filter(transaction => !transaction.currency || transaction.currency === "EGP")),
   } satisfies Record<CashCurrency, CashSummary>;
 }
 
 export type CashBreakdownRow = { category: string; total: number };
-export type CashBreakdown = Record<CashCurrency, { income: CashBreakdownRow[]; expense: CashBreakdownRow[] }>;
+export type CashTechnicianRow = { technician: string; total: number };
+export type PurchaseBreakdownRow = { itemName: string; quantity: number; total: number; averageUnitCost: number };
+export type PurchaseBreakdown = Record<CashCurrency, { total: number; items: PurchaseBreakdownRow[] }>;
+export type CashAnalytics = {
+  installationIncome: number;
+  serviceIncome: number;
+  expenseByCategory: CashBreakdownRow[];
+  technicianExpenses: CashTechnicianRow[];
+};
+export type CashBreakdown = Record<CashCurrency, { income: CashBreakdownRow[]; expense: CashBreakdownRow[]; analytics: CashAnalytics }>;
+
+function addToRows(rows: CashBreakdownRow[], category: string, amount: number) {
+  const current = rows.find(row => row.category === category);
+  if (current) current.total += amount;
+  else rows.push({ category, total: amount });
+}
+
+function addToTechnicians(rows: CashTechnicianRow[], technician: string, amount: number) {
+  const current = rows.find(row => row.technician === technician);
+  if (current) current.total += amount;
+  else rows.push({ technician, total: amount });
+}
+
+export function calculatePurchaseBreakdown(movements: Array<{ itemName?: string | null; movementType: "incoming" | "outgoing"; quantity: number; unitCost?: number | null; currency?: CashCurrency | null }>): PurchaseBreakdown {
+  const result: PurchaseBreakdown = {
+    SAR: { total: 0, items: [] },
+    EGP: { total: 0, items: [] },
+  };
+  for (const movement of movements) {
+    const unitCost = movement.unitCost ?? 0;
+    if (movement.movementType !== "incoming" || unitCost <= 0) continue;
+    const currency: CashCurrency = movement.currency === "SAR" ? "SAR" : "EGP";
+    const itemName = movement.itemName?.trim() || "صنف غير معروف";
+    const amount = movement.quantity * unitCost;
+    const current = result[currency];
+    current.total += amount;
+    const row = current.items.find(item => item.itemName === itemName);
+    if (row) {
+      row.quantity += movement.quantity;
+      row.total += amount;
+      row.averageUnitCost = row.total / row.quantity;
+    } else {
+      current.items.push({ itemName, quantity: movement.quantity, total: amount, averageUnitCost: unitCost });
+    }
+  }
+  for (const currency of cashCurrencies) {
+    result[currency].items.sort((a, b) => b.total - a.total);
+  }
+  return result;
+}
 
 export function calculateCashBreakdown(transactions: CashTransactionForSummary[]): CashBreakdown {
-  const result: CashBreakdown = { EGP: { income: [], expense: [] }, SAR: { income: [], expense: [] } };
+  const result: CashBreakdown = {
+    SAR: { income: [], expense: [], analytics: { installationIncome: 0, serviceIncome: 0, expenseByCategory: [], technicianExpenses: [] } },
+    EGP: { income: [], expense: [], analytics: { installationIncome: 0, serviceIncome: 0, expenseByCategory: [], technicianExpenses: [] } },
+  };
   for (const transaction of transactions) {
     const currency: CashCurrency = transaction.currency === "SAR" ? "SAR" : "EGP";
-    const type = transaction.transactionType === "income" ? "income" : "expense";
     const category = transaction.category?.trim() || "غير مصنف";
-    const current = result[currency][type].find(row => row.category === category);
-    if (current) current.total += transaction.amount;
-    else result[currency][type].push({ category, total: transaction.amount });
+    const current = result[currency];
+    if (transaction.transactionType === "income") {
+      addToRows(current.income, category, transaction.amount);
+      if (category === "تحصيل تركيب") current.analytics.installationIncome += transaction.amount;
+      if (category === "تحصيل صيانة") current.analytics.serviceIncome += transaction.amount;
+    } else {
+      addToRows(current.expense, category, transaction.amount);
+      addToRows(current.analytics.expenseByCategory, category, transaction.amount);
+      const technician = transaction.recipientName?.trim();
+      if (technician) addToTechnicians(current.analytics.technicianExpenses, technician, transaction.amount);
+    }
   }
   for (const currency of cashCurrencies) {
     result[currency].income.sort((a, b) => b.total - a.total);
     result[currency].expense.sort((a, b) => b.total - a.total);
+    result[currency].analytics.expenseByCategory.sort((a, b) => b.total - a.total);
+    result[currency].analytics.technicianExpenses.sort((a, b) => b.total - a.total);
   }
   return result;
 }

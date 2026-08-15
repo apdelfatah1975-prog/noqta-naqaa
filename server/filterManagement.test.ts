@@ -25,6 +25,23 @@ function createContext(): TrpcContext {
 }
 
 describe("واجهات إدارة فلاتر المياه", () => {
+  it("ينشئ العميل وأول زيارة والفني والتذكير وإيراد التركيب تلقائيًا", async () => {
+    const insertCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
+    const db = {
+      select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }),
+      insert: (table: unknown) => ({ values: async (values: Record<string, unknown>) => { insertCalls.push({ table, values }); return [{ insertId: table === customers ? 77 : table === visits ? 88 : 0 }]; } }),
+      update: () => ({ set: () => ({ where: async () => undefined }) }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+    const visitDate = new Date("2026-01-01T09:00:00.000Z");
+
+    await expect(caller.filters.customers.create({ name: "عميل جديد", phone: "01000000000", firstVisitType: "installation", firstVisitDate: visitDate, firstTechnicianName: "أحمد", firstCollectedAmount: 12500, firstCollectedCurrency: "SAR" })).resolves.toMatchObject({ id: 77, firstVisitCreated: true, reminderCreated: true });
+    expect(insertCalls.find(call => call.table === visits)?.values).toMatchObject({ customerId: 77, visitType: "installation", technicianName: "أحمد", visitDate });
+    expect(insertCalls.find(call => call.table === cashTransactions)?.values).toMatchObject({ sourceVisitId: 88, amount: 12500, currency: "SAR", category: "تحصيل تركيب" });
+    expect(insertCalls.filter(call => call.table === reminders)).toHaveLength(1);
+  });
+
   it("ينشئ تذكيرًا بعد 120 يومًا عند تسجيل تركيب أو صيانة فقط", async () => {
     const insertCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
     const reminderUpdates: Array<{ table: unknown; values: Record<string, unknown> }> = [];
