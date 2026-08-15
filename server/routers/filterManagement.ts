@@ -11,7 +11,7 @@ import {
   reminders,
   visits,
 } from "../../drizzle/schema";
-import { calculateCashSummaries, cashCurrencies, cashTransactionTypes } from "../../shared/cashBusiness";
+import { calculateCashBreakdown, calculateCashSummaries, cashCurrencies, cashTransactionTypes } from "../../shared/cashBusiness";
 import {
   DEFAULT_ALERT_HOUR,
   DEFAULT_ALERT_LEAD_DAYS,
@@ -178,7 +178,8 @@ async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "al
     ? transactions.filter(transaction => transaction.category === "تحصيل صيانة" || transaction.category === "تحصيل تركيب")
     : transactions;
   const summaries = calculateCashSummaries(filteredTransactions);
-  return { transactions: filteredTransactions, ...summaries.EGP, summaries, incomeFilter };
+  const breakdown = calculateCashBreakdown(filteredTransactions);
+  return { transactions: filteredTransactions, ...summaries.EGP, summaries, breakdown, incomeFilter };
 }
 
 async function remindersWithCustomers(ownerId: number, onlyDue: boolean, withinDays?: number) {
