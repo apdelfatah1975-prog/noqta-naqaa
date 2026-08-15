@@ -133,6 +133,35 @@ describe("واجهات إدارة فلاتر المياه", () => {
     }
   });
 
+  it("يفلتر العملاء حسب حالة وموعد المتابعة", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-01T09:00:00.000Z"));
+    const customersRows = [
+      { id: 7, ownerId: 1, name: "عميل بموعد", phone: "01000000000", address: null, latitude: null, longitude: null, notes: null },
+      { id: 8, ownerId: 1, name: "عميل بلا موعد", phone: "01111111111", address: null, latitude: null, longitude: null, notes: null },
+    ];
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => {
+            if (table === customers) return { orderBy: async () => customersRows };
+            if (table === visits) return { orderBy: async () => [{ id: 55, ownerId: 1, customerId: 7, visitType: "installation" as const, visitDate: new Date("2026-01-01T09:00:00.000Z") }] };
+            return [];
+          },
+        }),
+      }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+    try {
+      await expect(caller.filters.customers.list({ followUpStatus: "today" })).resolves.toHaveLength(1);
+      await expect(caller.filters.customers.list({ followUpStatus: "none" })).resolves.toMatchObject([{ id: 8 }]);
+      await expect(caller.filters.customers.list({ followUpDate: "2026-05-01" })).resolves.toMatchObject([{ id: 7 }]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("يعيد التذكير المستحق بآخر خدمة وأيام التأخر والعميل المرتبط", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-02T09:00:00.000Z"));
@@ -484,4 +513,28 @@ describe("واجهات إدارة فلاتر المياه", () => {
 			vi.useRealTimers();
 		}
 	});
+});
+
+
+describe("صلاحيات الفني والإدارة", () => {
+  function createTechnicianContext(): TrpcContext {
+    return {
+      ...createContext(),
+      user: { ...createContext().user!, role: "user" },
+    };
+  }
+
+  it("يمنع الفني من قراءة وتعديل المخزن والخزينة", async () => {
+    const caller = appRouter.createCaller(createTechnicianContext());
+    await expect(caller.filters.inventory.summary()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.filters.cash.summary()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.filters.inventory.createItem({ name: "صنف فني", openingQuantity: 1 }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.filters.cash.create({
+      transactionType: "expense",
+      amount: 1000,
+      category: "مصروف",
+      transactionDate: new Date("2026-08-15T09:00:00.000Z"),
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
 });

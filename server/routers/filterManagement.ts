@@ -30,7 +30,7 @@ import {
 import { getDb } from "../db";
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
 import { COOKIE_NAME } from "../../shared/const";
-import { protectedProcedure, router } from "../_core/trpc";
+import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 
 const customerInput = z.object({
   name: z.string().trim().min(2, "أدخل اسم العميل").max(160),
@@ -240,7 +240,11 @@ export const filterManagementRouter = router({
   }),
 
   customers: router({
-    list: protectedProcedure.input(z.object({ search: z.string().trim().max(160).optional() })).query(async ({ ctx, input }) => {
+    list: protectedProcedure.input(z.object({
+      search: z.string().trim().max(160).optional(),
+      followUpStatus: z.enum(["all", "overdue", "today", "upcoming", "none"]).default("all"),
+      followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    })).query(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const ownerFilter = eq(customers.ownerId, ctx.user.id);
       const [customerRows, ownerVisits] = await Promise.all([
@@ -251,8 +255,18 @@ export const filterManagementRouter = router({
       ownerVisits.forEach(visit => visitsByCustomer.set(visit.customerId, [...(visitsByCustomer.get(visit.customerId) ?? []), visit]));
       const search = input.search?.toLocaleLowerCase("ar-EG");
       return customerRows
-        .filter(customer => !search || customer.name.toLocaleLowerCase("ar-EG").includes(search) || customer.phone.includes(search) || customerCode(customer.id).toLowerCase().includes(search))
-        .map(customer => withCustomerFollowUp(customer, visitsByCustomer.get(customer.id) ?? []));
+        .map(customer => withCustomerFollowUp(customer, visitsByCustomer.get(customer.id) ?? []))
+        .filter(customer => {
+          const matchesSearch = !search || customer.name.toLocaleLowerCase("ar-EG").includes(search) || customer.phone.includes(search) || customerCode(customer.id).toLowerCase().includes(search);
+          const followUp = customer.followUp;
+          const matchesStatus = input.followUpStatus === "all"
+            || (input.followUpStatus === "none" && !followUp)
+            || (input.followUpStatus === "overdue" && Boolean(followUp && followUp.daysRemaining < 0))
+            || (input.followUpStatus === "today" && Boolean(followUp && followUp.daysRemaining === 0))
+            || (input.followUpStatus === "upcoming" && Boolean(followUp && followUp.daysRemaining > 0));
+          const matchesDate = !input.followUpDate || Boolean(followUp && followUp.nextVisitDate.toISOString().slice(0, 10) === input.followUpDate);
+          return matchesSearch && matchesStatus && matchesDate;
+        });
     }),
     get: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
@@ -377,13 +391,13 @@ export const filterManagementRouter = router({
   }),
 
   inventory: router({
-    summary: protectedProcedure.query(({ ctx }) => inventorySummary(ctx.user.id)),
-    createItem: protectedProcedure.input(inventoryItemInput).mutation(async ({ ctx, input }) => {
+    summary: adminProcedure.query(({ ctx }) => inventorySummary(ctx.user.id)),
+    createItem: adminProcedure.input(inventoryItemInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const result = await db.insert(inventoryItems).values({ ...input, ownerId: ctx.user.id });
       return { id: Number(result[0].insertId) };
     }),
-    createMovement: protectedProcedure.input(inventoryMovementInput).mutation(async ({ ctx, input }) => {
+    createMovement: adminProcedure.input(inventoryMovementInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const item = await db.select().from(inventoryItems).where(and(eq(inventoryItems.id, input.inventoryItemId), eq(inventoryItems.ownerId, ctx.user.id))).limit(1);
       if (!item[0]) throw new TRPCError({ code: "NOT_FOUND", message: "لم يتم العثور على الصنف." });
@@ -401,8 +415,8 @@ export const filterManagementRouter = router({
   }),
 
   cash: router({
-    summary: protectedProcedure.query(({ ctx }) => cashSummary(ctx.user.id)),
-    create: protectedProcedure.input(cashTransactionInput).mutation(async ({ ctx, input }) => {
+    summary: adminProcedure.query(({ ctx }) => cashSummary(ctx.user.id)),
+    create: adminProcedure.input(cashTransactionInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const result = await db.insert(cashTransactions).values({ ...input, ownerId: ctx.user.id });
       return { id: Number(result[0].insertId) };

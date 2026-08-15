@@ -83,6 +83,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const visibleMenuItems = user?.role === "admin" ? menuItems : menuItems.filter(item => item.path !== "/inventory" && item.path !== "/cash");
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
@@ -111,7 +112,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         <SidebarContent className="px-3 py-5">
           <p className="mb-2 px-2 text-[11px] font-bold tracking-wide text-teal-100/55 group-data-[collapsible=icon]:hidden">الإدارة</p>
           <SidebarMenu className="gap-1">
-            {menuItems.map(item => {
+            {visibleMenuItems.map(item => {
               const isActive = activeMenuItem.path === item.path;
               return (
                 <SidebarMenuItem key={item.path}>
@@ -139,7 +140,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </Avatar>
                 <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                   <p className="truncate text-sm font-bold">{user?.name || "مدير النظام"}</p>
-                  <p className="mt-0.5 truncate text-[11px] text-teal-100/65">حساب الإدارة</p>
+                  <p className="mt-0.5 truncate text-[11px] text-teal-100/65">{user?.role === "admin" ? "حساب الإدارة" : "حساب فني"}</p>
                 </div>
               </button>
             </DropdownMenuTrigger>
