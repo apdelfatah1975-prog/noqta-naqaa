@@ -45,6 +45,24 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     cleanup();
   });
 
+  it("تعرض بطاقة الزيارات القادمة اسم العميل وموعده وعدد الأيام", () => {
+    const upcomingDate = new Date();
+    upcomingDate.setDate(upcomingDate.getDate() + 3);
+    mocks.dashboard.mockReturnValue({
+      isLoading: false,
+      data: {
+        todayVisits: [],
+        upcomingVisits: [{ id: 21, customerId: 7, visitType: "maintenance", visitDate: upcomingDate, customer: { name: "عميل متابعة", customerCode: "C-000007" } }],
+        dueReminders: [],
+        inventory: { totalItems: 0, lowStockCount: 0, lowStock: [] },
+      },
+    });
+    render(<Home />);
+    expect(screen.getByText("عميل متابعة")).toBeTruthy();
+    expect(screen.getByText(/بعد 3 يوم/)).toBeTruthy();
+    expect(screen.getByText("أسماء العملاء ومواعيدهم القادمة")).toBeTruthy();
+  });
+
   it("تظهر كبطاقة تفاعلية وتنتقل إلى صفحة الخزينة عند الضغط", () => {
     render(<Home />);
 

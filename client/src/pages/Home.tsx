@@ -63,14 +63,14 @@ export default function Home() {
       <section className="grid gap-6 xl:grid-cols-5">
         <div className="soft-card xl:col-span-3">
           <div className="flex items-center justify-between border-b border-teal-950/6 p-5">
-            <div><h2 className="font-extrabold">الزيارات القادمة</h2><p className="mt-1 text-xs text-muted-foreground">أقرب خمس زيارات مسجلة</p></div>
+            <div><div className="flex items-center gap-2"><h2 className="font-extrabold">الزيارات القادمة</h2><span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-700">{data?.upcomingVisits.length ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">أسماء العملاء ومواعيدهم القادمة</p></div>
             <button onClick={() => setLocation("/visits")} className="text-sm font-bold text-teal-700 hover:text-teal-900">عرض الكل</button>
           </div>
           <div className="divide-y divide-teal-950/6">
             {data?.upcomingVisits.length ? data.upcomingVisits.map(visit => (
               <button key={visit.id} onClick={() => setLocation(`/customers/${visit.customerId}`)} className="flex w-full items-center justify-between gap-3 p-4 text-right hover:bg-teal-50/55">
                 <div className="min-w-0"><p className="truncate font-bold">{visit.customer?.name || "عميل"}</p><p className="mt-1 text-xs text-muted-foreground">{visit.customer?.customerCode ? `${visit.customer.customerCode} · ` : ""}{visitTypeLabels[visit.visitType]} · {formatDateTime(visit.visitDate)}</p></div>
-                <ChevronLeft className="h-5 w-5 shrink-0 text-teal-600" />
+                <span className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-700">{daysUntil(visit.visitDate) === 0 ? "اليوم" : `بعد ${daysUntil(visit.visitDate)} يوم`}</span><ChevronLeft className="h-5 w-5 shrink-0 text-teal-600" />
               </button>
             )) : <EmptyRow text="لا توجد زيارات قادمة مسجلة." action="تسجيل زيارة" onAction={() => setLocation("/visits")} />}
           </div>
@@ -101,6 +101,14 @@ export default function Home() {
       </section>
     </div>
   );
+}
+
+function daysUntil(value: Date | string) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const date = new Date(value);
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.max(0, Math.ceil((target.getTime() - today.getTime()) / 86_400_000));
 }
 
 function EmptyRow({ text, action, onAction }: { text: string; action?: string; onAction?: () => void }) {
