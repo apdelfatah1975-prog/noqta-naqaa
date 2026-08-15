@@ -40,6 +40,7 @@ export const customers = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 160 }).notNull(),
+    manualCode: varchar("manualCode", { length: 64 }),
     phone: varchar("phone", { length: 32 }).notNull(),
     address: text("address"),
     latitude: varchar("latitude", { length: 32 }),
@@ -53,6 +54,7 @@ export const customers = mysqlTable(
     index("customers_owner_idx").on(table.ownerId),
     index("customers_phone_idx").on(table.phone),
     uniqueIndex("customers_owner_operation_unique").on(table.ownerId, table.clientOperationId),
+    uniqueIndex("customers_owner_manual_code_unique").on(table.ownerId, table.manualCode),
   ],
 );
 

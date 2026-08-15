@@ -5,6 +5,7 @@ const VISIT_QUEUE_PREFIX = "purepoint-pending-visits";
 
 export type OfflineCustomer = {
   id: number;
+  manualCode?: string | null;
   name: string;
   phone: string;
   address?: string | null;
@@ -91,7 +92,7 @@ export function clearOfflineState() {
 }
 
 export function cacheOfflineCustomers(customers: OfflineCustomer[]) {
-  writeJson(CUSTOMERS_KEY, customers.map(({ id, name, phone, address, latitude, longitude, notes }) => ({ id, name, phone, address, latitude, longitude, notes })));
+  writeJson(CUSTOMERS_KEY, customers.map(({ id, manualCode, name, phone, address, latitude, longitude, notes }) => ({ id, manualCode, name, phone, address, latitude, longitude, notes })));
 }
 
 export function getOfflineCustomers() {

@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { parse as parseCookie } from "cookie";
-import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, ne } from "drizzle-orm";
 import { z } from "zod";
 import {
   cashTransactions,
@@ -36,6 +36,7 @@ import { storageGet } from "../storage";
 
 const customerInput = z.object({
   name: z.string().trim().min(2, "أدخل اسم العميل").max(160),
+  manualCode: z.string().trim().max(64).optional().nullable(),
   phone: z.string().trim().min(6, "أدخل رقم هاتف صحيح").max(32),
   address: z.string().trim().max(1000).optional().nullable(),
   latitude: z.string().trim().max(32).optional().nullable(),
@@ -144,7 +145,7 @@ function withCustomerFollowUp(
 ) {
   return {
     ...customer,
-    customerCode: customerCode(customerNumber),
+    customerCode: customer.manualCode?.trim() || customerCode(customerNumber),
     followUp: followUpSummaryFromVisits(customerVisits, now),
   };
 }
@@ -262,7 +263,7 @@ async function remindersWithCustomers(ownerId: number, onlyDue: boolean, withinD
       customer: customer
         ? {
             ...customer,
-            customerCode: customerCode(customerNumbers.get(customer.id) ?? customer.id),
+            customerCode: customer.manualCode?.trim() || customerCode(customerNumbers.get(customer.id) ?? customer.id),
             followUp: { nextVisitDate: reminder.reminderDate, daysRemaining },
           }
         : null,
@@ -389,6 +390,10 @@ export const filterManagementRouter = router({
         if (existing[0]) return { id: existing[0].id, alreadySynced: true };
       }
       const { clientOperationId, firstVisitType, firstVisitDate, firstTechnicianName, firstVisitNotes, firstCollectedAmount, firstCollectedCurrency, ...data } = input;
+      if (data.manualCode) {
+        const duplicate = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.ownerId, ctx.user.id), eq(customers.manualCode, data.manualCode))).limit(1);
+        if (duplicate[0]) throw new TRPCError({ code: "CONFLICT", message: "كود العميل مستخدم بالفعل، اختر كودًا مختلفًا." });
+      }
       const result = await db.insert(customers).values({ ...data, clientOperationId, ownerId: ctx.user.id });
       const customerId = Number(result[0].insertId);
       if (!firstVisitType) {
@@ -412,6 +417,10 @@ export const filterManagementRouter = router({
       const db = await databaseOrThrow();
       await getOwnedCustomer(ctx.user.id, input.id);
       const { id, ...data } = input;
+      if (data.manualCode) {
+        const duplicate = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.ownerId, ctx.user.id), eq(customers.manualCode, data.manualCode), ne(customers.id, id))).limit(1);
+        if (duplicate[0]) throw new TRPCError({ code: "CONFLICT", message: "كود العميل مستخدم بالفعل، اختر كودًا مختلفًا." });
+      }
       await db.update(customers).set(data).where(and(eq(customers.id, id), eq(customers.ownerId, ctx.user.id)));
       await refreshOwnerBackup(ctx.user.id);
       return { success: true };

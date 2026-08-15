@@ -36,7 +36,8 @@ describe("واجهات إدارة فلاتر المياه", () => {
     const caller = appRouter.createCaller(createContext());
     const visitDate = new Date("2026-01-01T09:00:00.000Z");
 
-    await expect(caller.filters.customers.create({ name: "عميل جديد", phone: "01000000000", firstVisitType: "installation", firstVisitDate: visitDate, firstTechnicianName: "أحمد", firstCollectedAmount: 12500, firstCollectedCurrency: "SAR" })).resolves.toMatchObject({ id: 77, firstVisitCreated: true, reminderCreated: true });
+    await expect(caller.filters.customers.create({ name: "عميل جديد", phone: "01000000000", manualCode: "م-١٢", firstVisitType: "installation", firstVisitDate: visitDate, firstTechnicianName: "أحمد", firstCollectedAmount: 12500, firstCollectedCurrency: "SAR" })).resolves.toMatchObject({ id: 77, firstVisitCreated: true, reminderCreated: true });
+    expect(insertCalls.find(call => call.table === customers)?.values).toMatchObject({ manualCode: "م-١٢" });
     expect(insertCalls.find(call => call.table === visits)?.values).toMatchObject({ customerId: 77, visitType: "installation", technicianName: "أحمد", visitDate });
     expect(insertCalls.find(call => call.table === cashTransactions)?.values).toMatchObject({ sourceVisitId: 88, amount: 12500, currency: "SAR", category: "تحصيل تركيب" });
     expect(insertCalls.filter(call => call.table === reminders)).toHaveLength(1);
