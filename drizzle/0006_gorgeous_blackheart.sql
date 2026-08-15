@@ -1,0 +1,1 @@
+ALTER TABLE `cashTransactions` ADD `currency` enum('EGP','SAR') DEFAULT 'EGP' NOT NULL;

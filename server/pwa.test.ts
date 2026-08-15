@@ -7,7 +7,7 @@ type FetchHandler = (event: { request: Request; respondWith: (response: Promise<
 
 function loadServiceWorker(fetchImplementation: ReturnType<typeof vi.fn>, cachedRoot: unknown, offlinePage: unknown) {
   const handlers = new Map<string, FetchHandler>();
-  const cache = { addAll: vi.fn(), put: vi.fn() };
+  const cache = { addAll: vi.fn(), put: vi.fn(), match: vi.fn(async (request: Request | string) => request === "/" ? cachedRoot : offlinePage) };
   const caches = {
     open: vi.fn(async () => cache),
     keys: vi.fn(async () => []),
@@ -35,6 +35,12 @@ async function executeNavigation(handler: FetchHandler) {
 }
 
 describe("عامل خدمة التطبيق القابل للتثبيت", () => {
+  it("يجهز جذر التطبيق داخل غلاف التخزين المحلي", () => {
+    const source = readFileSync(path.resolve(import.meta.dirname, "../client/public/sw.js"), "utf8");
+    expect(source).toContain('const APP_SHELL = ["/"');
+    expect(source).toContain('if (requestUrl.pathname.startsWith("/api/")) return;');
+  });
+
   it("يعيد استجابة الشبكة الجديدة أولًا لمسار التطبيق", async () => {
     const networkResponse = { ok: true, clone: () => networkResponse };
     const fetchImplementation = vi.fn(async () => networkResponse);

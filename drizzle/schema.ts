@@ -1,5 +1,5 @@
 import { index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
-import { cashTransactionTypes } from "../shared/cashBusiness";
+import { cashCurrencies, cashTransactionTypes } from "../shared/cashBusiness";
 
 /**
  * Core user table backing auth flow.
@@ -152,6 +152,7 @@ export const cashTransactions = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
     transactionType: mysqlEnum("transactionType", cashTransactionTypes).notNull(),
+    currency: mysqlEnum("currency", cashCurrencies).notNull().default("EGP"),
     amount: int("amount").notNull(),
     category: varchar("category", { length: 100 }).notNull(),
     transactionDate: timestamp("transactionDate").notNull(),

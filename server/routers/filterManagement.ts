@@ -11,7 +11,7 @@ import {
   reminders,
   visits,
 } from "../../drizzle/schema";
-import { calculateCashSummary, cashTransactionTypes } from "../../shared/cashBusiness";
+import { calculateCashSummaries, cashCurrencies, cashTransactionTypes } from "../../shared/cashBusiness";
 import {
   DEFAULT_ALERT_HOUR,
   DEFAULT_ALERT_LEAD_DAYS,
@@ -67,6 +67,7 @@ const inventoryMovementInput = z.object({
 
 const cashTransactionInput = z.object({
   transactionType: z.enum(cashTransactionTypes),
+  currency: z.enum(cashCurrencies).optional().default("EGP"),
   amount: z.number().int().positive("أدخل مبلغًا أكبر من صفر"),
   category: z.string().trim().min(2, "أدخل تصنيف العملية").max(100),
   transactionDate: z.date(),
@@ -165,7 +166,8 @@ async function cashSummary(ownerId: number) {
     .from(cashTransactions)
     .where(eq(cashTransactions.ownerId, ownerId))
     .orderBy(desc(cashTransactions.transactionDate));
-  return { transactions, ...calculateCashSummary(transactions) };
+  const summaries = calculateCashSummaries(transactions);
+  return { transactions, ...summaries.EGP, summaries };
 }
 
 async function remindersWithCustomers(ownerId: number, onlyDue: boolean) {
@@ -253,7 +255,7 @@ export const filterManagementRouter = router({
         lowStock,
         items: inventory.items.map(item => ({ id: item.id, name: item.name, currentBalance: item.currentBalance })),
       },
-      cash: { incomeTotal: cash.incomeTotal, expenseTotal: cash.expenseTotal, balance: cash.balance },
+      cash: { incomeTotal: cash.incomeTotal, expenseTotal: cash.expenseTotal, balance: cash.balance, summaries: cash.summaries },
     };
   }),
 

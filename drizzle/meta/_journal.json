@@ -43,6 +43,13 @@
       "when": 1786818629871,
       "tag": "0005_cloudy_thunderbolt_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1786819583310,
+      "tag": "0006_gorgeous_blackheart",
+      "breakpoints": true
     }
   ]
 }
