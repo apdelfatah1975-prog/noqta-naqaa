@@ -36,12 +36,13 @@ export default function Reminders() {
   const utils = trpc.useUtils();
   const [, setLocation] = useLocation();
   const [whatsappState, setWhatsAppState] = useState<WhatsAppState>(readWhatsAppState);
-  const updateStatus = trpc.filters.reminders.updateStatus.useMutation({
-    onSuccess: () => {
+    const updateStatus = trpc.filters.reminders.updateStatus.useMutation({
+    onSuccess: result => {
       utils.filters.reminders.due.invalidate();
       utils.filters.reminders.alerts.invalidate();
       utils.filters.dashboard.invalidate();
-      toast.success("تم تحديث حالة التذكير");
+      utils.filters.customers.list.invalidate();
+      toast.success(result.nextVisitCreated ? "تم تسجيل الزيارة وإنشاء موعد المتابعة القادم بعد ١٢٠ يومًا" : "تم تحديث حالة التذكير");
     },
     onError: error => toast.error(error.message || "تعذر تحديث حالة التذكير. يرجى المحاولة مرة أخرى."),
   });

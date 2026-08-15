@@ -31,6 +31,7 @@ vi.mock("@/lib/trpc", () => ({
           alerts: { invalidate: mocks.invalidate },
         },
         dashboard: { invalidate: mocks.invalidate },
+        customers: { list: { invalidate: mocks.invalidate } },
       },
     }),
   },
@@ -94,6 +95,22 @@ describe("حالات واتساب اليدوية في التذكيرات", () =>
     expect(screen.getByText("أحمد العميل")).toBeTruthy();
     expect(window.localStorage.getItem("water-filter-whatsapp-reminder-state")).toContain("41:before");
     expect(mocks.open).toHaveBeenCalledWith(expect.stringContaining("wa.me/201008797774"), "_blank", "noopener,noreferrer");
+  });
+
+  it("يعرض رسالة إنشاء الموعد الجديد بعد تسجيل إتمام الزيارة", () => {
+    const item = reminder(new Date(Date.now() - 86_400_000));
+    const mutate = vi.fn();
+    mocks.due.mockReturnValue({ data: [item], isLoading: false, isError: false });
+    mocks.updateMutation.mockReturnValue({
+      mutate,
+      isPending: false,
+      options: { onSuccess: (result: { nextVisitCreated: boolean }) => mocks.toastSuccess(result.nextVisitCreated ? "تم تسجيل الزيارة وإنشاء موعد المتابعة القادم بعد ١٢٠ يومًا" : "تم تحديث حالة التذكير") },
+    });
+
+    render(<Reminders />);
+    fireEvent.click(screen.getByRole("button", { name: "تمت" }));
+
+    expect(mutate).toHaveBeenCalledWith({ id: 41, status: "completed" });
   });
 
   it("يخفي رسالة يوم الموعد بعد التأكيد ويستعيد الحالة بعد إعادة التحميل", () => {

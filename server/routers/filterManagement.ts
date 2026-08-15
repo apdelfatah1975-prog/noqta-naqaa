@@ -481,9 +481,35 @@ export const filterManagementRouter = router({
       if (!reminder[0]) {
         throw new TRPCError({ code: "NOT_FOUND", message: "لم يتم العثور على التذكير." });
       }
+
+      if (input.status === "completed") {
+        const sourceVisit = await db.select().from(visits).where(and(
+          eq(visits.id, reminder[0].visitId),
+          eq(visits.ownerId, ctx.user.id),
+        )).limit(1);
+        if (sourceVisit[0] && needsAutomaticReminder(sourceVisit[0].visitType)) {
+          const completedAt = new Date();
+          const visitResult = await db.insert(visits).values({
+            customerId: reminder[0].customerId,
+            ownerId: ctx.user.id,
+            visitType: sourceVisit[0].visitType,
+            visitDate: completedAt,
+            technicianName: sourceVisit[0].technicianName ?? null,
+            notes: "تم تسجيل الزيارة من قائمة المتابعة.",
+          });
+          const visitId = Number(visitResult[0].insertId);
+          await db.insert(reminders).values({
+            customerId: reminder[0].customerId,
+            visitId,
+            ownerId: ctx.user.id,
+            reminderDate: followUpDate(completedAt),
+          });
+        }
+      }
+
       await db.update(reminders).set({ status: input.status }).where(and(eq(reminders.id, input.id), eq(reminders.ownerId, ctx.user.id)));
       await refreshOwnerBackup(ctx.user.id);
-      return { success: true };
+      return { success: true, nextVisitCreated: input.status === "completed" };
     }),
   }),
 
