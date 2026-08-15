@@ -91,7 +91,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
       await expect(caller.filters.customers.get({ id: 7 })).resolves.toMatchObject({
         customer: {
           id: 7,
-          customerCode: "٧",
+          customerCode: "١",
           followUp: {
             lastServiceVisitType: "installation",
             nextVisitDate: new Date("2026-05-01T09:00:00.000Z"),
@@ -125,7 +125,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
     try {
       await expect(appRouter.createCaller(createContext()).filters.customers.list({})).resolves.toMatchObject([{
         id: 7,
-        customerCode: "٧",
+        customerCode: "١",
         followUp: { nextVisitDate: new Date("2026-05-01T09:00:00.000Z"), daysRemaining: 0 },
       }]);
     } finally {
@@ -187,7 +187,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         lastServiceVisitType: "installation",
         lastServiceVisitDate: installationVisit.visitDate,
         daysOverdue: 1,
-        customer: { customerCode: "٧", followUp: { nextVisitDate: dueReminder.reminderDate, daysRemaining: -1 } },
+        customer: { customerCode: "١", followUp: { nextVisitDate: dueReminder.reminderDate, daysRemaining: -1 } },
       }]);
     } finally {
       vi.useRealTimers();

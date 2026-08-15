@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { parse as parseCookie } from "cookie";
-import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
 import {
   cashTransactions,
@@ -95,6 +95,16 @@ async function databaseOrThrow() {
   return db;
 }
 
+function compareCustomersByCreation(left: typeof customers.$inferSelect, right: typeof customers.$inferSelect) {
+  const leftTime = left.createdAt instanceof Date ? left.createdAt.getTime() : 0;
+  const rightTime = right.createdAt instanceof Date ? right.createdAt.getTime() : 0;
+  return leftTime - rightTime || left.id - right.id;
+}
+
+function customerNumberMap(customerRows: Array<typeof customers.$inferSelect>) {
+  return new Map(customerRows.map((customer, index) => [customer.id, index + 1]));
+}
+
 async function getOwnedCustomer(ownerId: number, customerId: number) {
   const db = await databaseOrThrow();
   const customer = await db
@@ -111,11 +121,12 @@ async function getOwnedCustomer(ownerId: number, customerId: number) {
 function withCustomerFollowUp(
   customer: typeof customers.$inferSelect,
   customerVisits: Array<typeof visits.$inferSelect>,
+  customerNumber = customer.id,
   now = new Date(),
 ) {
   return {
     ...customer,
-    customerCode: customerCode(customer.id),
+    customerCode: customerCode(customerNumber),
     followUp: followUpSummaryFromVisits(customerVisits, now),
   };
 }
@@ -164,11 +175,13 @@ async function remindersWithCustomers(ownerId: number, onlyDue: boolean) {
   if (rows.length === 0) return [];
   const customerIds = Array.from(new Set(rows.map(row => row.customerId)));
   const visitIds = Array.from(new Set(rows.map(row => row.visitId)));
-  const [customerRows, sourceVisits] = await Promise.all([
+  const [customerRows, sourceVisits, allCustomers] = await Promise.all([
     db.select().from(customers).where(and(eq(customers.ownerId, ownerId), inArray(customers.id, customerIds))),
     db.select().from(visits).where(and(eq(visits.ownerId, ownerId), inArray(visits.id, visitIds))),
+    db.select().from(customers).where(eq(customers.ownerId, ownerId)),
   ]);
   const customerById = new Map(customerRows.map(customer => [customer.id, customer]));
+  const customerNumbers = customerNumberMap([...allCustomers].sort(compareCustomersByCreation));
   const visitById = new Map(sourceVisits.map(visit => [visit.id, visit]));
   const now = new Date();
   return rows.map(reminder => {
@@ -183,7 +196,7 @@ async function remindersWithCustomers(ownerId: number, onlyDue: boolean) {
       customer: customer
         ? {
             ...customer,
-            customerCode: customerCode(customer.id),
+            customerCode: customerCode(customerNumbers.get(customer.id) ?? customer.id),
             followUp: { nextVisitDate: reminder.reminderDate, daysRemaining },
           }
         : null,
@@ -214,19 +227,23 @@ export const filterManagementRouter = router({
       cashSummary(ownerId),
     ]);
     const visitCustomerIds = Array.from(new Set([...todayVisits, ...upcomingVisits].map(visit => visit.customerId)));
-    const visitCustomers = visitCustomerIds.length
-      ? await db.select().from(customers).where(and(eq(customers.ownerId, ownerId), inArray(customers.id, visitCustomerIds)))
-      : [];
+    const [visitCustomers, allCustomers] = await Promise.all([
+      visitCustomerIds.length
+        ? db.select().from(customers).where(and(eq(customers.ownerId, ownerId), inArray(customers.id, visitCustomerIds)))
+        : Promise.resolve([]),
+      db.select().from(customers).where(eq(customers.ownerId, ownerId)),
+    ]);
     const customerById = new Map(visitCustomers.map(customer => [customer.id, customer]));
+    const customerNumbers = customerNumberMap([...allCustomers].sort(compareCustomersByCreation));
     const lowStock = inventory.items.filter(item => item.currentBalance <= 2);
     return {
       todayVisits: todayVisits.map(visit => {
         const customer = customerById.get(visit.customerId);
-        return { ...visit, customer: customer ? { ...customer, customerCode: customerCode(customer.id) } : null };
+        return { ...visit, customer: customer ? { ...customer, customerCode: customerCode(customerNumbers.get(customer.id) ?? customer.id) } : null };
       }),
       upcomingVisits: upcomingVisits.map(visit => {
         const customer = customerById.get(visit.customerId);
-        return { ...visit, customer: customer ? { ...customer, customerCode: customerCode(customer.id) } : null };
+        return { ...visit, customer: customer ? { ...customer, customerCode: customerCode(customerNumbers.get(customer.id) ?? customer.id) } : null };
       }),
       dueReminders,
       inventory: {
@@ -252,13 +269,14 @@ export const filterManagementRouter = router({
         db.select().from(customers).where(ownerFilter).orderBy(desc(customers.createdAt)),
         db.select().from(visits).where(eq(visits.ownerId, ctx.user.id)).orderBy(desc(visits.visitDate)),
       ]);
+      const customerNumbers = customerNumberMap([...customerRows].sort(compareCustomersByCreation));
       const visitsByCustomer = new Map<number, Array<typeof visits.$inferSelect>>();
       ownerVisits.forEach(visit => visitsByCustomer.set(visit.customerId, [...(visitsByCustomer.get(visit.customerId) ?? []), visit]));
       const search = input.search?.toLocaleLowerCase("ar-EG");
       return customerRows
-        .map(customer => withCustomerFollowUp(customer, visitsByCustomer.get(customer.id) ?? []))
+        .map(customer => withCustomerFollowUp(customer, visitsByCustomer.get(customer.id) ?? [], customerNumbers.get(customer.id) ?? customer.id))
         .filter(customer => {
-          const matchesSearch = !search || customer.name.toLocaleLowerCase("ar-EG").includes(search) || customer.phone.includes(search) || customerCode(customer.id).toLowerCase().includes(search);
+          const matchesSearch = !search || customer.name.toLocaleLowerCase("ar-EG").includes(search) || customer.phone.includes(search) || (customer.customerCode ?? "").toLowerCase().includes(search);
           const followUp = customer.followUp;
           const matchesStatus = input.followUpStatus === "all"
             || (input.followUpStatus === "none" && !followUp)
@@ -279,17 +297,19 @@ export const filterManagementRouter = router({
             const statusRank = (customer: typeof left) => !customer.followUp ? 4 : customer.followUp.daysRemaining < 0 ? 1 : customer.followUp.daysRemaining === 0 ? 2 : 3;
             return statusRank(left) - statusRank(right) || left.name.localeCompare(right.name, "ar-EG");
           }
-          return left.id - right.id;
+          return left.createdAt.getTime() - right.createdAt.getTime() || left.id - right.id;
         });
     }),
     get: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const customer = await getOwnedCustomer(ctx.user.id, input.id);
+      const allCustomers = await db.select().from(customers).where(eq(customers.ownerId, ctx.user.id));
+      const customerNumbers = customerNumberMap((Array.isArray(allCustomers) ? allCustomers : [customer]).slice().sort(compareCustomersByCreation));
       const [customerVisits, customerReminders] = await Promise.all([
         db.select().from(visits).where(and(eq(visits.ownerId, ctx.user.id), eq(visits.customerId, input.id))).orderBy(desc(visits.visitDate)),
         db.select().from(reminders).where(and(eq(reminders.ownerId, ctx.user.id), eq(reminders.customerId, input.id))).orderBy(desc(reminders.reminderDate)),
       ]);
-      return { customer: withCustomerFollowUp(customer, customerVisits), visits: customerVisits, reminders: customerReminders };
+      return { customer: withCustomerFollowUp(customer, customerVisits, customerNumbers.get(customer.id) ?? customer.id), visits: customerVisits, reminders: customerReminders };
     }),
     create: protectedProcedure.input(customerInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
