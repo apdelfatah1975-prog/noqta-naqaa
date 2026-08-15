@@ -60,11 +60,13 @@ export const visits = mysqlTable(
     visitType: mysqlEnum("visitType", visitTypeValues).notNull(),
     visitDate: timestamp("visitDate").notNull(),
     notes: text("notes"),
+    clientOperationId: varchar("clientOperationId", { length: 64 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   table => [
     index("visits_owner_date_idx").on(table.ownerId, table.visitDate),
     index("visits_customer_idx").on(table.customerId),
+    uniqueIndex("visits_owner_operation_unique").on(table.ownerId, table.clientOperationId),
   ],
 );
 

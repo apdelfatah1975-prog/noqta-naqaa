@@ -1,4 +1,5 @@
 import { startLogin } from "@/const";
+import { clearOfflineState, getOfflineSession, rememberOfflineSession } from "@/lib/offlineSync";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
@@ -39,6 +40,7 @@ export function useAuth(options?: UseAuthOptions) {
       }
       throw error;
     } finally {
+      clearOfflineState();
       // Clear the Preview auto-login token mirrored into sessionStorage, so
       // header-based sessions (Safari ITP / WebView) are logged out too. The
       // backend cookie is cleared by the logout mutation.
@@ -50,16 +52,21 @@ export function useAuth(options?: UseAuthOptions) {
     }
   }, [logoutMutation, utils]);
 
+  useEffect(() => {
+    rememberOfflineSession(meQuery.data);
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("manus-runtime-user-info", JSON.stringify(meQuery.data ?? null));
+    }
+  }, [meQuery.data]);
+
   const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
+    const offlineUser = typeof navigator !== "undefined" && !navigator.onLine ? getOfflineSession() : null;
+    const currentUser = meQuery.data ?? offlineUser;
     return {
-      user: meQuery.data ?? null,
-      loading: meQuery.isLoading || logoutMutation.isPending,
-      error: meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
+      user: currentUser,
+      loading: (!offlineUser && meQuery.isLoading) || logoutMutation.isPending,
+      error: offlineUser ? logoutMutation.error ?? null : meQuery.error ?? logoutMutation.error ?? null,
+      isAuthenticated: Boolean(currentUser),
     };
   }, [
     meQuery.data,

@@ -95,6 +95,31 @@ describe("واجهات إدارة فلاتر المياه", () => {
     await expect(caller.filters.reminders.alerts()).resolves.toEqual([]);
   });
 
+  it("لا ينشئ زيارة مكررة عند إعادة مزامنة معرف العملية نفسه", async () => {
+    const insert = vi.fn();
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => table === visits
+            ? { limit: async () => [{ id: 99, ownerId: 1, visitType: "maintenance" }] }
+            : { limit: async () => [] },
+        }),
+      }),
+      insert,
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+
+    await expect(caller.filters.visits.create({
+      customerId: 7,
+      visitType: "maintenance",
+      visitDate: new Date("2026-01-02T09:00:00.000Z"),
+      clientOperationId: "26c4b0f0-e34e-4a89-8d6f-4dbdfd34403e",
+    })).resolves.toEqual({ id: 99, reminderCreated: true, alreadySynced: true });
+
+    expect(insert).not.toHaveBeenCalled();
+  });
+
   it("يرفض صرف المخزون عندما لا يكفي الرصيد", async () => {
     const db = {
       select: () => ({

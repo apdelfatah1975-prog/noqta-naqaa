@@ -43,6 +43,7 @@ const visitInput = z.object({
   visitType: z.enum(visitTypes),
   visitDate: z.date(),
   notes: z.string().trim().max(2000).optional().nullable(),
+  clientOperationId: z.string().uuid().optional(),
 });
 
 const inventoryItemInput = z.object({
@@ -224,6 +225,19 @@ export const filterManagementRouter = router({
   visits: router({
     create: protectedProcedure.input(visitInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
+      if (input.clientOperationId) {
+        const existing = await db.select().from(visits).where(and(
+          eq(visits.ownerId, ctx.user.id),
+          eq(visits.clientOperationId, input.clientOperationId),
+        )).limit(1);
+        if (existing[0]) {
+          return {
+            id: existing[0].id,
+            reminderCreated: needsAutomaticReminder(existing[0].visitType),
+            alreadySynced: true,
+          };
+        }
+      }
       await getOwnedCustomer(ctx.user.id, input.customerId);
       const visitResult = await db.insert(visits).values({ ...input, ownerId: ctx.user.id });
       const visitId = Number(visitResult[0].insertId);
@@ -243,7 +257,7 @@ export const filterManagementRouter = router({
           reminderDate: followUpDate(input.visitDate),
         });
       }
-      return { id: visitId, reminderCreated: needsAutomaticReminder(input.visitType) };
+      return { id: visitId, reminderCreated: needsAutomaticReminder(input.visitType), alreadySynced: false };
     }),
   }),
 
