@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/filterUi";
+import { getDeviceNotificationPermission, requestDeviceNotificationPermission, showDeviceReminderNotification } from "@/lib/deviceNotifications";
 import { trpc } from "@/lib/trpc";
 import { BellRing, CheckCircle2, Clock3, Settings2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -7,7 +8,6 @@ import { toast } from "sonner";
 
 export function NotificationSettingsCard() {
   const { data: settings, isLoading } = trpc.filters.notifications.settings.useQuery();
-  const { data: readyAlerts } = trpc.filters.reminders.alerts.useQuery();
   const { data: nextAlert } = trpc.filters.notifications.nextAlert.useQuery();
   const [time, setTime] = useState("09:00");
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
@@ -25,29 +25,17 @@ export function NotificationSettingsCard() {
     if (settings) setTime(`${String(settings.alertHour).padStart(2, "0")}:${String(settings.alertMinute).padStart(2, "0")}`);
   }, [settings]);
   useEffect(() => {
-    if (typeof Notification !== "undefined") setPermission(Notification.permission);
-    else setPermission("unsupported");
+    setPermission(getDeviceNotificationPermission());
   }, []);
-  useEffect(() => {
-    if (permission !== "granted" || !readyAlerts?.length || typeof Notification === "undefined") return;
-    for (const alert of readyAlerts) {
-      const key = `water-alert-${alert.id}-${new Date(alert.alertDate).getTime()}`;
-      if (localStorage.getItem(key)) continue;
-      const options = { body: `موعد متابعة ${alert.customer?.name || "عميل"} أصبح جاهزًا للمتابعة.`, icon: "/app-icon.svg", badge: "/app-icon.svg", tag: key, data: { url: "/reminders" } };
-      void navigator.serviceWorker?.ready.then(registration => registration.showNotification("موعد متابعة قريب", options)).catch(() => new Notification("موعد متابعة قريب", options));
-      localStorage.setItem(key, "sent");
-    }
-  }, [permission, readyAlerts]);
-
   function payload() {
     const [hour, minute] = time.split(":").map(Number);
     return { leadDays: 1, alertHour: Number.isFinite(hour) ? hour : 9, alertMinute: Number.isFinite(minute) ? minute : 0, timezoneOffsetMinutes: -new Date().getTimezoneOffset() };
   }
   function save() { saveSettings.mutate(payload()); }
   async function enable() {
-    if (typeof Notification === "undefined") { toast.error("الإشعارات غير مدعومة في هذا المتصفح."); return; }
-    const nextPermission = await Notification.requestPermission();
+    const nextPermission = await requestDeviceNotificationPermission();
     setPermission(nextPermission);
+    if (nextPermission === "unsupported") { toast.error("الإشعارات غير مدعومة في هذا المتصفح."); return; }
     if (nextPermission !== "granted") { toast.error("يلزم السماح بالإشعارات ليظهر التنبيه على الجهاز."); return; }
     enableScheduledAlerts.mutate(payload());
   }

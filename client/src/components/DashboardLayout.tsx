@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
+import { AutomaticReminderNotifications } from "./AutomaticReminderNotifications";
 import { InstallAppButton } from "./InstallAppButton";
 
 const menuItems = [
@@ -91,6 +92,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <AutomaticReminderNotifications />
       <Sidebar side="right" collapsible="icon" className="border-l border-teal-950/8 bg-[#063c3a] text-white">
         <SidebarHeader className="h-24 border-b border-white/10 px-3 py-4">
           <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
