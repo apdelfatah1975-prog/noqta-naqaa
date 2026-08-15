@@ -484,6 +484,21 @@ export const filterManagementRouter = router({
       await refreshOwnerBackup(ctx.user.id);
       return { id: visitId, reminderCreated: needsAutomaticReminder(input.visitType), alreadySynced: false };
     }),
+    updateDate: protectedProcedure.input(z.object({ visitId: z.number().int().positive(), visitDate: z.date() })).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const existing = await db.select().from(visits).where(and(eq(visits.id, input.visitId), eq(visits.ownerId, ctx.user.id))).limit(1);
+      if (!existing[0]) throw new TRPCError({ code: "NOT_FOUND", message: "الزيارة غير موجودة" });
+      await db.update(visits).set({ visitDate: input.visitDate }).where(and(eq(visits.id, input.visitId), eq(visits.ownerId, ctx.user.id)));
+      if (needsAutomaticReminder(existing[0].visitType)) {
+        const pending = await db.select().from(reminders).where(and(eq(reminders.visitId, input.visitId), eq(reminders.ownerId, ctx.user.id), eq(reminders.status, "pending"))).limit(1);
+        if (pending[0]) {
+          await db.update(reminders).set({ reminderDate: followUpDate(input.visitDate) }).where(eq(reminders.id, pending[0].id));
+        }
+      }
+      await db.update(cashTransactions).set({ transactionDate: input.visitDate }).where(and(eq(cashTransactions.sourceVisitId, input.visitId), eq(cashTransactions.ownerId, ctx.user.id)));
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true };
+    }),
   }),
 
   reminders: router({

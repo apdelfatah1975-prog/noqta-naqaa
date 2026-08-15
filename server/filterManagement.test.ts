@@ -350,6 +350,24 @@ describe("واجهات إدارة فلاتر المياه", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
+  it("يعدل تاريخ أول زيارة ويحدث تذكيرها دون إنشاء تحصيل جديد", async () => {
+    const firstVisit = { id: 55, ownerId: 1, customerId: 7, visitType: "installation" as const, visitDate: new Date("2026-01-01T09:00:00.000Z") };
+    const pendingReminder = { id: 14, ownerId: 1, customerId: 7, visitId: 55, status: "pending" as const, reminderDate: new Date("2026-05-01T09:00:00.000Z") };
+    const updateCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
+    const db = {
+      select: () => ({ from: (table: unknown) => ({ where: () => ({ limit: async () => table === visits ? [firstVisit] : table === reminders ? [pendingReminder] : [] }) }) }),
+      update: (table: unknown) => ({ set: (values: Record<string, unknown>) => ({ where: async () => { updateCalls.push({ table, values }); } }) }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+    const correctedDate = new Date("2026-01-05T11:30:00.000Z");
+
+    await expect(caller.filters.visits.updateDate({ visitId: 55, visitDate: correctedDate })).resolves.toEqual({ success: true });
+    expect(updateCalls.filter(call => call.table === cashTransactions)).toHaveLength(1);
+    expect(updateCalls.find(call => call.table === visits)?.values).toEqual({ visitDate: correctedDate });
+    expect(updateCalls.find(call => call.table === reminders)?.values).toEqual({ reminderDate: new Date("2026-05-05T11:30:00.000Z") });
+  });
+
   it("يرفض صرف المخزون عندما لا يكفي الرصيد", async () => {
     const db = {
       select: () => ({
