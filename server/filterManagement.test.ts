@@ -68,6 +68,103 @@ describe("واجهات إدارة فلاتر المياه", () => {
     ]);
   });
 
+  it("يعيد ملف العميل بملخص متابعة موحد بعد تسجيل زيارة تركيب", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-01T09:00:00.000Z"));
+    const installationVisit = { id: 55, ownerId: 1, customerId: 7, visitType: "installation" as const, visitDate: new Date("2026-01-01T09:00:00.000Z") };
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => {
+            if (table === customers) return { limit: async () => [{ id: 7, ownerId: 1, name: "عميل اختبار" }] };
+            if (table === visits) return { orderBy: async () => [installationVisit] };
+            if (table === reminders) return { orderBy: async () => [] };
+            return [];
+          },
+        }),
+      }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+
+    try {
+      await expect(caller.filters.customers.get({ id: 7 })).resolves.toMatchObject({
+        customer: {
+          id: 7,
+          customerCode: "C-000007",
+          followUp: {
+            lastServiceVisitType: "installation",
+            nextVisitDate: new Date("2026-05-01T09:00:00.000Z"),
+            daysRemaining: 0,
+          },
+        },
+        visits: [installationVisit],
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("يعيد قائمة العملاء بكود العميل وملخص الموعد المشتق من آخر خدمة", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-01T09:00:00.000Z"));
+    const installationVisit = { id: 55, ownerId: 1, customerId: 7, visitType: "installation" as const, visitDate: new Date("2026-01-01T09:00:00.000Z") };
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => {
+            if (table === customers) return { orderBy: async () => [{ id: 7, ownerId: 1, name: "عميل اختبار" }] };
+            if (table === visits) return { orderBy: async () => [installationVisit] };
+            return [];
+          },
+        }),
+      }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+
+    try {
+      await expect(appRouter.createCaller(createContext()).filters.customers.list({})).resolves.toMatchObject([{
+        id: 7,
+        customerCode: "C-000007",
+        followUp: { nextVisitDate: new Date("2026-05-01T09:00:00.000Z"), daysRemaining: 0 },
+      }]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("يعيد التذكير المستحق بآخر خدمة وأيام التأخر والعميل المرتبط", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-02T09:00:00.000Z"));
+    const installationVisit = { id: 55, ownerId: 1, customerId: 7, visitType: "installation" as const, visitDate: new Date("2026-01-01T09:00:00.000Z") };
+    const dueReminder = { id: 14, ownerId: 1, customerId: 7, visitId: 55, status: "pending" as const, reminderDate: new Date("2026-05-01T09:00:00.000Z") };
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => {
+            if (table === reminders) return { orderBy: async () => [dueReminder] };
+            if (table === customers) return [{ id: 7, ownerId: 1, name: "عميل اختبار" }];
+            if (table === visits) return [installationVisit];
+            return [];
+          },
+        }),
+      }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+
+    try {
+      await expect(appRouter.createCaller(createContext()).filters.reminders.due()).resolves.toMatchObject([{
+        id: 14,
+        lastServiceVisitType: "installation",
+        lastServiceVisitDate: installationVisit.visitDate,
+        daysOverdue: 1,
+        customer: { customerCode: "C-000007", followUp: { nextVisitDate: dueReminder.reminderDate, daysRemaining: -1 } },
+      }]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("يوقف ظهور التذكير في التنبيهات بعد تسجيل زيارة للعميل", async () => {
     let reminderStatus = "pending";
     const db = {

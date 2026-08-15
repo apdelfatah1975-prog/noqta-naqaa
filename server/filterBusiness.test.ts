@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertDateForReminder, calculateStockBalance, followUpDate, isAlertReady, isReminderAlertActive, mergeDashboardReminderAlerts, needsAutomaticReminder } from "../shared/filterBusiness";
+import { alertDateForReminder, calculateStockBalance, customerCode, followUpDate, followUpSummaryFromVisits, isAlertReady, isReminderAlertActive, mergeDashboardReminderAlerts, needsAutomaticReminder } from "../shared/filterBusiness";
 
 describe("منطق تطبيق فلاتر المياه", () => {
   it("ينشئ موعد المتابعة بعد 120 يومًا من تاريخ الزيارة", () => {
@@ -11,6 +11,22 @@ describe("منطق تطبيق فلاتر المياه", () => {
     expect(needsAutomaticReminder("installation")).toBe(true);
     expect(needsAutomaticReminder("maintenance")).toBe(true);
     expect(needsAutomaticReminder("cartridge_change")).toBe(false);
+  });
+
+  it("يستخلص آخر تركيب أو صيانة ليحدّث الموعد القادم والأيام المتبقية وكود العميل", () => {
+    const summary = followUpSummaryFromVisits([
+      { visitType: "installation" as const, visitDate: new Date("2026-01-01T09:00:00.000Z") },
+      { visitType: "cartridge_change" as const, visitDate: new Date("2026-02-15T09:00:00.000Z") },
+      { visitType: "maintenance" as const, visitDate: new Date("2026-03-01T09:00:00.000Z") },
+    ], new Date("2026-06-19T09:00:00.000Z"));
+
+    expect(customerCode(7)).toBe("C-000007");
+    expect(summary).toMatchObject({
+      lastServiceVisitType: "maintenance",
+      lastServiceVisitDate: new Date("2026-03-01T09:00:00.000Z"),
+      nextVisitDate: new Date("2026-06-29T09:00:00.000Z"),
+      daysRemaining: 10,
+    });
   });
 
   it("يحسب رصيد المخزنة من الرصيد الافتتاحي وحركة الوارد والمنصرف", () => {

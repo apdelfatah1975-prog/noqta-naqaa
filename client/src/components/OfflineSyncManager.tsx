@@ -35,6 +35,7 @@ export function OfflineSyncManager() {
     await Promise.all([
       utils.filters.dashboard.invalidate(),
       utils.filters.customers.list.invalidate(),
+      utils.filters.customers.get.invalidate(),
       utils.filters.reminders.due.invalidate(),
     ]);
   }, [refreshCount, syncVisit, user, utils]);

@@ -24,6 +24,32 @@ export function followUpDate(visitDate: Date) {
   return dueDate;
 }
 
+export function customerCode(customerId: number) {
+  return `C-${String(customerId).padStart(6, "0")}`;
+}
+
+export type FollowUpSourceVisit = { visitDate: Date; visitType: VisitType };
+
+export function daysUntilFollowUp(followUp: Date, now = new Date()) {
+  return Math.ceil((followUp.getTime() - now.getTime()) / 86_400_000);
+}
+
+export function followUpSummaryFromVisits<T extends FollowUpSourceVisit>(visits: T[], now = new Date()) {
+  const lastServiceVisit = visits
+    .filter(visit => needsAutomaticReminder(visit.visitType))
+    .sort((first, second) => second.visitDate.getTime() - first.visitDate.getTime())[0];
+
+  if (!lastServiceVisit) return null;
+
+  const nextVisitDate = followUpDate(lastServiceVisit.visitDate);
+  return {
+    lastServiceVisitDate: lastServiceVisit.visitDate,
+    lastServiceVisitType: lastServiceVisit.visitType,
+    nextVisitDate,
+    daysRemaining: daysUntilFollowUp(nextVisitDate, now),
+  };
+}
+
 export type ReminderAlertSettings = {
   leadDays: number;
   alertHour: number;

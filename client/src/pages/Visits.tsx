@@ -16,7 +16,7 @@ export default function Visits() {
   const [visitDate, setVisitDate] = useState(toDateTimeLocal());
   const [notes, setNotes] = useState("");
   const utils = trpc.useUtils();
-  const createVisit = trpc.filters.visits.create.useMutation({ onSuccess: result => { utils.filters.dashboard.invalidate(); utils.filters.reminders.due.invalidate(); toast.success(result.reminderCreated ? "تم التسجيل وإنشاء تذكير تلقائي بعد 120 يومًا" : "تم تسجيل الزيارة بنجاح"); setNotes(""); }, onError: error => toast.error(error.message || "تعذر تسجيل الزيارة. يرجى المحاولة مرة أخرى.") });
+  const createVisit = trpc.filters.visits.create.useMutation({ onSuccess: result => { utils.filters.dashboard.invalidate(); utils.filters.customers.list.invalidate(); utils.filters.customers.get.invalidate(); utils.filters.reminders.due.invalidate(); toast.success(result.reminderCreated ? "تم التسجيل وإنشاء تذكير تلقائي بعد 120 يومًا" : "تم تسجيل الزيارة بنجاح"); setNotes(""); }, onError: error => toast.error(error.message || "تعذر تسجيل الزيارة. يرجى المحاولة مرة أخرى.") });
   useEffect(() => { if (customers) cacheOfflineCustomers(customers); }, [customers]);
   function submit(event: FormEvent) {
     event.preventDefault();

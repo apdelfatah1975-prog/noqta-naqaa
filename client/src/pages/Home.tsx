@@ -69,7 +69,7 @@ export default function Home() {
           <div className="divide-y divide-teal-950/6">
             {data?.upcomingVisits.length ? data.upcomingVisits.map(visit => (
               <button key={visit.id} onClick={() => setLocation(`/customers/${visit.customerId}`)} className="flex w-full items-center justify-between gap-3 p-4 text-right hover:bg-teal-50/55">
-                <div className="min-w-0"><p className="truncate font-bold">{visit.customer?.name || "عميل"}</p><p className="mt-1 text-xs text-muted-foreground">{visitTypeLabels[visit.visitType]} · {formatDateTime(visit.visitDate)}</p></div>
+                <div className="min-w-0"><p className="truncate font-bold">{visit.customer?.name || "عميل"}</p><p className="mt-1 text-xs text-muted-foreground">{visit.customer?.customerCode ? `${visit.customer.customerCode} · ` : ""}{visitTypeLabels[visit.visitType]} · {formatDateTime(visit.visitDate)}</p></div>
                 <ChevronLeft className="h-5 w-5 shrink-0 text-teal-600" />
               </button>
             )) : <EmptyRow text="لا توجد زيارات قادمة مسجلة." action="تسجيل زيارة" onAction={() => setLocation("/visits")} />}
@@ -84,7 +84,7 @@ export default function Home() {
           <div className="divide-y divide-teal-950/6">
             {data?.dueReminders.length ? data.dueReminders.slice(0, 4).map(reminder => (
               <button key={reminder.id} onClick={() => setLocation(`/customers/${reminder.customerId}`)} className="flex w-full items-center justify-between gap-3 p-4 text-right hover:bg-amber-50/60">
-                <div className="min-w-0"><p className="truncate font-bold">{reminder.customer?.name || "عميل"}</p><p className="mt-1 text-xs text-amber-700">استحق في {formatDateTime(reminder.reminderDate)}</p></div>
+                <div className="min-w-0"><p className="truncate font-bold">{reminder.customer?.name || "عميل"}</p><p className="mt-1 text-xs text-amber-700">{reminder.customer?.customerCode ? `${reminder.customer.customerCode} · ` : ""}استحق في {formatDateTime(reminder.reminderDate)} · متأخر {reminder.daysOverdue} يوم</p></div>
                 <ChevronLeft className="h-5 w-5 shrink-0 text-amber-600" />
               </button>
             )) : <EmptyRow text="لا توجد متابعة مستحقة الآن." />}
