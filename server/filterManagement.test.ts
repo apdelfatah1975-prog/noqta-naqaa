@@ -206,6 +206,51 @@ describe("واجهات إدارة فلاتر المياه", () => {
     });
   });
 
+  it("ينشر تعديل العميل إلى التذكيرات ولوحة التحكم من المصدر نفسه", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-02T09:00:00.000Z"));
+    const customer = { id: 7, ownerId: 1, name: "قبل التعديل", phone: "01000000000", address: "العنوان القديم", latitude: null, longitude: null, notes: null };
+    const upcomingVisit = { id: 55, ownerId: 1, customerId: 7, visitType: "maintenance" as const, visitDate: new Date("2026-05-03T09:00:00.000Z") };
+    const dueReminder = { id: 14, ownerId: 1, customerId: 7, visitId: 55, status: "pending" as const, alertedAt: null, reminderDate: new Date("2026-05-01T09:00:00.000Z") };
+    const chain = (rows: unknown[]) => {
+      const query = {
+        orderBy: () => query,
+        limit: () => query,
+        then: (resolve: (value: unknown[]) => unknown, reject?: (reason: unknown) => unknown) => Promise.resolve(rows).then(resolve, reject),
+      };
+      return query;
+    };
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => {
+            if (table === customers) return chain([customer]);
+            if (table === visits) return chain([upcomingVisit]);
+            if (table === reminders) return chain([dueReminder]);
+            if (table === inventoryItems || table === inventoryMovements || table === cashTransactions) return chain([]);
+            return chain([]);
+          },
+        }),
+      }),
+      update: () => ({
+        set: (values: Record<string, unknown>) => ({
+          where: async () => { Object.assign(customer, values); },
+        }),
+      }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+
+    try {
+      await caller.filters.customers.update({ id: 7, name: "بعد التعديل", phone: "01111111111", address: "العنوان الجديد", latitude: null, longitude: null, notes: "ملاحظة جديدة" });
+      const dashboard = await caller.filters.dashboard();
+      expect(dashboard.dueReminders[0]?.customer).toMatchObject({ name: "بعد التعديل", phone: "01111111111", address: "العنوان الجديد" });
+      expect(dashboard.upcomingVisits[0]?.customer).toMatchObject({ name: "بعد التعديل", phone: "01111111111", address: "العنوان الجديد" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("يوقف ظهور التذكير في التنبيهات بعد تسجيل زيارة للعميل", async () => {
     let reminderStatus = "pending";
     const db = {

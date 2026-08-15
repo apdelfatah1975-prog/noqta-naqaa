@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import {
   buildWhatsAppReminderMessage,
   buildWhatsAppUrl,
+  COMPANY_WHATSAPP_DISPLAY_PHONE,
   customerMapUrl,
   formatDate,
   visitTypeLabels,
@@ -53,6 +54,14 @@ export default function Reminders() {
   const isLoading = dueLoading || alertsLoading;
   const isError = dueError || alertsError;
 
+  const markCustomerConfirmed = (reminder: (typeof reminders)[number]) => {
+    const key = `${reminder.id}:confirmed`;
+    const nextState = { ...whatsappState, [key]: new Date().toISOString() };
+    setWhatsAppState(nextState);
+    window.localStorage.setItem(WHATSAPP_STATE_KEY, JSON.stringify(nextState));
+    toast.success("تم تسجيل تأكيد العميل على الجهاز");
+  };
+
   const sendWhatsAppReminder = (reminder: (typeof reminders)[number], stage: WhatsAppReminderStage) => {
     const message = buildWhatsAppReminderMessage(reminder.customer?.name || "عميلنا الكريم", reminder.reminderDate, stage);
     const url = buildWhatsAppUrl(reminder.customer?.phone, message);
@@ -72,7 +81,7 @@ export default function Reminders() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div><h1 className="page-heading">التذكيرات والمتابعة</h1><p className="page-subheading">رسالة واتساب جاهزة قبل الموعد بيوم، ورسالة متابعة يوم الموعد إذا لم يصل رد.</p></div>
+      <div><h1 className="page-heading">التذكيرات والمتابعة</h1><p className="page-subheading">رسالة واتساب جاهزة قبل الموعد بيوم، ورسالة متابعة يوم الموعد إذا لم يصل رد.</p><p className="mt-2 text-xs font-bold text-emerald-800">رقم واتساب الشركة: <span dir="ltr">{COMPANY_WHATSAPP_DISPLAY_PHONE}</span> — اضغط زر واتساب لفتح الرسالة الجاهزة ثم اضغط إرسال.</p></div>
       <NotificationSettingsCard />
       <section className="soft-card overflow-hidden">
         <div className="flex items-center justify-between border-b border-teal-950/6 p-5"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-100 text-amber-700"><BellRing className="h-5 w-5" /></div><div><h2 className="font-extrabold">قائمة المتابعة</h2><p className="mt-1 text-xs text-muted-foreground">{isLoading ? "جارٍ التحميل…" : `${reminders.length} تذكير ظاهر`}</p></div></div></div>
@@ -81,7 +90,9 @@ export default function Reminders() {
             const mapUrl = reminder.customer ? customerMapUrl(reminder.customer) : null;
             const stage = whatsappReminderStage(reminder.reminderDate);
             const sentAt = stage ? whatsappState[`${reminder.id}:${stage}`] : null;
-            return <div key={reminder.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><button onClick={() => setLocation(`/customers/${reminder.customerId}`)} className="font-extrabold text-teal-900 hover:text-teal-600">{reminder.customer?.name || "عميل"}</button>{reminder.customer?.customerCode ? <span className="rounded bg-teal-50 px-2 py-0.5 text-xs font-bold text-teal-700" dir="ltr">{reminder.customer.customerCode}</span> : null}</div><div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"><span dir="ltr">{reminder.customer?.phone}</span><span>موعد المتابعة {formatDate(reminder.reminderDate)}</span>{reminder.lastServiceVisitType && reminder.lastServiceVisitDate ? <span>آخر خدمة: {visitTypeLabels[reminder.lastServiceVisitType as keyof typeof visitTypeLabels]} — {formatDate(reminder.lastServiceVisitDate)}</span> : null}<span className={reminder.daysOverdue ? "font-bold text-rose-700" : "font-bold text-amber-700"}>{reminder.daysOverdue ? `متأخر ${reminder.daysOverdue} يوم` : "متابعة قريبة"}</span>{sentAt ? <span className="font-bold text-emerald-700">تم تجهيز رسالة واتساب</span> : null}</div></div><div className="flex flex-wrap items-center gap-2"><a href={`tel:${reminder.customer?.phone || ""}`} className="inline-flex h-9 items-center rounded-lg bg-teal-50 px-3 text-sm font-bold text-teal-800 hover:bg-teal-100"><Phone className="ml-1.5 h-4 w-4" />اتصال</a>{mapUrl ? <a href={mapUrl} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center rounded-lg bg-sky-50 px-3 text-sm font-bold text-sky-800 hover:bg-sky-100"><MapPinned className="ml-1.5 h-4 w-4" />الموقع</a> : null}{stage ? <Button size="sm" onClick={() => sendWhatsAppReminder(reminder, stage)} className="h-9 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"><MessageCircle className="ml-1 h-4 w-4" />{stage === "before" ? "واتساب قبل الموعد" : "واتساب اليوم"}</Button> : null}<Button size="sm" disabled={updateStatus.isPending} onClick={() => updateStatus.mutate({ id: reminder.id, status: "completed" })} className="h-9 rounded-lg bg-teal-700 hover:bg-teal-800"><Check className="ml-1 h-4 w-4" />تمت</Button><Button size="sm" variant="outline" disabled={updateStatus.isPending} onClick={() => updateStatus.mutate({ id: reminder.id, status: "dismissed" })} className="h-9 rounded-lg border-amber-200 text-amber-800 hover:bg-amber-50"><X className="ml-1 h-4 w-4" />تجاوز</Button></div></div>;
+            const confirmedAt = whatsappState[`${reminder.id}:confirmed`];
+            const showWhatsAppButton = stage === "before" || (stage === "today" && !confirmedAt);
+            return <div key={reminder.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><button onClick={() => setLocation(`/customers/${reminder.customerId}`)} className="font-extrabold text-teal-900 hover:text-teal-600">{reminder.customer?.name || "عميل"}</button>{reminder.customer?.customerCode ? <span className="rounded bg-teal-50 px-2 py-0.5 text-xs font-bold text-teal-700" dir="ltr">{reminder.customer.customerCode}</span> : null}</div><div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"><span dir="ltr">{reminder.customer?.phone}</span><span>موعد المتابعة {formatDate(reminder.reminderDate)}</span>{reminder.lastServiceVisitType && reminder.lastServiceVisitDate ? <span>آخر خدمة: {visitTypeLabels[reminder.lastServiceVisitType as keyof typeof visitTypeLabels]} — {formatDate(reminder.lastServiceVisitDate)}</span> : null}<span className={reminder.daysOverdue ? "font-bold text-rose-700" : "font-bold text-amber-700"}>{reminder.daysOverdue ? `متأخر ${reminder.daysOverdue} يوم` : "متابعة قريبة"}</span>{sentAt ? <span className="font-bold text-emerald-700">تم تجهيز رسالة واتساب</span> : null}{confirmedAt ? <span className="font-bold text-sky-700">تم تسجيل تأكيد العميل</span> : null}</div></div><div className="flex flex-wrap items-center gap-2"><a href={`tel:${reminder.customer?.phone || ""}`} className="inline-flex h-9 items-center rounded-lg bg-teal-50 px-3 text-sm font-bold text-teal-800 hover:bg-teal-100"><Phone className="ml-1.5 h-4 w-4" />اتصال</a>{mapUrl ? <a href={mapUrl} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center rounded-lg bg-sky-50 px-3 text-sm font-bold text-sky-800 hover:bg-sky-100"><MapPinned className="ml-1.5 h-4 w-4" />الموقع</a> : null}{showWhatsAppButton ? <Button size="sm" onClick={() => sendWhatsAppReminder(reminder, stage!)} className="h-9 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"><MessageCircle className="ml-1 h-4 w-4" />{stage === "before" ? "واتساب قبل الموعد" : "واتساب اليوم"}</Button> : null}{stage === "today" && !confirmedAt ? <Button size="sm" variant="outline" onClick={() => markCustomerConfirmed(reminder)} className="h-9 rounded-lg border-sky-200 text-sky-800 hover:bg-sky-50"><Check className="ml-1 h-4 w-4" />تم تأكيد العميل</Button> : null}<Button size="sm" disabled={updateStatus.isPending} onClick={() => updateStatus.mutate({ id: reminder.id, status: "completed" })} className="h-9 rounded-lg bg-teal-700 hover:bg-teal-800"><Check className="ml-1 h-4 w-4" />تمت</Button><Button size="sm" variant="outline" disabled={updateStatus.isPending} onClick={() => updateStatus.mutate({ id: reminder.id, status: "dismissed" })} className="h-9 rounded-lg border-amber-200 text-amber-800 hover:bg-amber-50"><X className="ml-1 h-4 w-4" />تجاوز</Button></div></div>;
           }) : <div className="p-14 text-center"><BellRing className="mx-auto h-8 w-8 text-teal-200" /><p className="mt-3 text-sm text-muted-foreground">لا توجد تذكيرات قريبة أو مستحقة حاليًا.</p></div>}
         </div>
       </section>
