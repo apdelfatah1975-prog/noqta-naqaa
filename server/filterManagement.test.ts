@@ -165,6 +165,47 @@ describe("واجهات إدارة فلاتر المياه", () => {
     }
   });
 
+  it("ينشر تعديل بيانات العميل فعليًا في القائمة وملفه", async () => {
+    const customer = { id: 7, ownerId: 1, name: "قبل التعديل", phone: "01000000000", address: "العنوان القديم", latitude: null, longitude: null, notes: null };
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => {
+            if (table === customers) return { limit: async () => [customer], orderBy: async () => [customer] };
+            if (table === visits) return { orderBy: async () => [] };
+            if (table === reminders) return { orderBy: async () => [] };
+            return [];
+          },
+        }),
+      }),
+      update: (_table: unknown) => ({
+        set: (values: Record<string, unknown>) => ({
+          where: async () => {
+            Object.assign(customer, values);
+          },
+        }),
+      }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+
+    await caller.filters.customers.update({ id: 7, name: "بعد التعديل", phone: "01111111111", address: "العنوان الجديد", latitude: null, longitude: null, notes: "ملاحظة جديدة" });
+
+    await expect(caller.filters.customers.list({})).resolves.toMatchObject([{
+      id: 7,
+      name: "بعد التعديل",
+      phone: "01111111111",
+      address: "العنوان الجديد",
+    }]);
+    await expect(caller.filters.customers.get({ id: 7 })).resolves.toMatchObject({
+      customer: {
+        name: "بعد التعديل",
+        phone: "01111111111",
+        address: "العنوان الجديد",
+      },
+    });
+  });
+
   it("يوقف ظهور التذكير في التنبيهات بعد تسجيل زيارة للعميل", async () => {
     let reminderStatus = "pending";
     const db = {
