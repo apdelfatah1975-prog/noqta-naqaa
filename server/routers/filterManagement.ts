@@ -20,7 +20,7 @@ import {
   alertDateForReminder,
   calculateStockBalance,
   followUpDate,
-  isAlertReady,
+  isReminderAlertActive,
   needsAutomaticReminder,
   visitTypes,
 } from "../../shared/filterBusiness";
@@ -221,6 +221,14 @@ export const filterManagementRouter = router({
       await getOwnedCustomer(ctx.user.id, input.customerId);
       const visitResult = await db.insert(visits).values({ ...input, ownerId: ctx.user.id });
       const visitId = Number(visitResult[0].insertId);
+      // تسجيل الزيارة يعني أن متابعة العميل تمت؛ لا نُبقي أي تذكير سابق معلقًا.
+      await db.update(reminders)
+        .set({ status: "completed" })
+        .where(and(
+          eq(reminders.ownerId, ctx.user.id),
+          eq(reminders.customerId, input.customerId),
+          eq(reminders.status, "pending"),
+        ));
       if (needsAutomaticReminder(input.visitType)) {
         await db.insert(reminders).values({
           customerId: input.customerId,
@@ -239,7 +247,7 @@ export const filterManagementRouter = router({
       const settings = await getNotificationSettings(ctx.user.id);
       const pending = await remindersWithCustomers(ctx.user.id, false);
       return pending
-        .filter(reminder => isAlertReady(reminder.reminderDate, settings))
+        .filter(reminder => isReminderAlertActive(reminder.reminderDate, settings))
         .map(reminder => ({ ...reminder, alertDate: alertDateForReminder(reminder.reminderDate, settings) }));
     }),
     updateStatus: protectedProcedure.input(z.object({ id: z.number().int().positive(), status: z.enum(["completed", "dismissed"]) })).mutation(async ({ ctx, input }) => {

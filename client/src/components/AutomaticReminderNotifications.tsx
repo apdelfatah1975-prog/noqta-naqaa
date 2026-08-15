@@ -1,4 +1,4 @@
-import { getDeviceNotificationPermission, showDeviceReminderNotification } from "@/lib/deviceNotifications";
+import { getDeviceNotificationPermission, isReminderSoundEnabled, playReminderTone, showDeviceReminderNotification } from "@/lib/deviceNotifications";
 import { trpc } from "@/lib/trpc";
 import { useEffect } from "react";
 
@@ -11,10 +11,13 @@ export function AutomaticReminderNotifications() {
   useEffect(() => {
     if (getDeviceNotificationPermission() !== "granted" || !readyAlerts?.length) return;
     for (const alert of readyAlerts) {
-      const key = `water-alert-${alert.id}-${new Date(alert.alertDate).getTime()}`;
+      const dayKey = new Date().toLocaleDateString("en-CA");
+      const key = `water-alert-${alert.id}-${dayKey}`;
       if (localStorage.getItem(key)) continue;
       void showDeviceReminderNotification(alert.customer?.name || "عميل", key).then(sent => {
-        if (sent) localStorage.setItem(key, "sent");
+        if (!sent) return;
+        localStorage.setItem(key, "sent");
+        if (isReminderSoundEnabled()) playReminderTone();
       });
     }
   }, [readyAlerts]);

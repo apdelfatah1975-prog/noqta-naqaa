@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertDateForReminder, calculateStockBalance, followUpDate, isAlertReady, mergeDashboardReminderAlerts, needsAutomaticReminder } from "../shared/filterBusiness";
+import { alertDateForReminder, calculateStockBalance, followUpDate, isAlertReady, isReminderAlertActive, mergeDashboardReminderAlerts, needsAutomaticReminder } from "../shared/filterBusiness";
 
 describe("منطق تطبيق فلاتر المياه", () => {
   it("ينشئ موعد المتابعة بعد 120 يومًا من تاريخ الزيارة", () => {
@@ -25,7 +25,7 @@ describe("منطق تطبيق فلاتر المياه", () => {
     expect(5 > balance).toBe(true);
   });
 
-  it("يبدأ التنبيه قبل الموعد بيوم عند الساعة التاسعة صباحًا بالتوقيت المضبوط", () => {
+  it("يبدأ التنبيه قبل الموعد بيوم عند الساعة التاسعة صباحًا بالتوقيت المضبوط ويظل جاهزًا حتى إنهاء التذكير", () => {
     const settings = { leadDays: 1, alertHour: 9, alertMinute: 0, timezoneOffsetMinutes: 180 };
     const reminderDate = new Date("2026-05-10T21:00:00.000Z"); // 11 مايو، 00:00 بالتوقيت المحلي +03:00
     const alertDate = alertDateForReminder(reminderDate, settings);
@@ -33,6 +33,15 @@ describe("منطق تطبيق فلاتر المياه", () => {
     expect(alertDate.toISOString()).toBe("2026-05-10T06:00:00.000Z");
     expect(isAlertReady(reminderDate, settings, new Date("2026-05-10T05:59:59.000Z"))).toBe(false);
     expect(isAlertReady(reminderDate, settings, new Date("2026-05-10T06:00:00.000Z"))).toBe(true);
+    expect(isAlertReady(reminderDate, settings, new Date("2026-05-12T18:00:00.000Z"))).toBe(true);
+  });
+
+  it("ينهي التنبيه عند نهاية اليوم التالي للموعد إذا لم تُسجل زيارة", () => {
+    const settings = { leadDays: 1, alertHour: 9, alertMinute: 0, timezoneOffsetMinutes: 180 };
+    const reminderDate = new Date("2026-05-10T21:00:00.000Z"); // 11 مايو بالتوقيت المحلي
+
+    expect(isReminderAlertActive(reminderDate, settings, new Date("2026-05-12T20:59:59.000Z"))).toBe(true);
+    expect(isReminderAlertActive(reminderDate, settings, new Date("2026-05-12T21:00:00.000Z"))).toBe(false);
   });
 
   it("يدمج التذكيرات المستحقة والقريبة دون تكرار ويرتبها حسب أقرب موعد", () => {

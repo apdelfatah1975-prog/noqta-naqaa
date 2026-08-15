@@ -49,6 +49,21 @@ export function isAlertReady(reminderDate: Date, settings: ReminderAlertSettings
   return alertDateForReminder(reminderDate, settings).getTime() <= now.getTime();
 }
 
+export function isReminderAlertActive(reminderDate: Date, settings: ReminderAlertSettings, now = new Date()) {
+  if (!isAlertReady(reminderDate, settings, now)) return false;
+  const localDue = new Date(reminderDate.getTime() + settings.timezoneOffsetMinutes * 60_000);
+  const endOfNextLocalDay = Date.UTC(
+    localDue.getUTCFullYear(),
+    localDue.getUTCMonth(),
+    localDue.getUTCDate() + 2,
+    0,
+    0,
+    0,
+    0,
+  ) - settings.timezoneOffsetMinutes * 60_000;
+  return now.getTime() < endOfNextLocalDay;
+}
+
 export function mergeDashboardReminderAlerts<T extends { id: number; reminderDate: Date }>(
   dueReminders: T[],
   upcomingAlerts: T[],

@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   alerts: vi.fn(),
   permission: vi.fn(),
   show: vi.fn(),
+  soundEnabled: vi.fn(),
+  playTone: vi.fn(),
 }));
 
 vi.mock("@/lib/trpc", () => ({
@@ -15,6 +17,8 @@ vi.mock("@/lib/trpc", () => ({
 
 vi.mock("@/lib/deviceNotifications", () => ({
   getDeviceNotificationPermission: mocks.permission,
+  isReminderSoundEnabled: mocks.soundEnabled,
+  playReminderTone: mocks.playTone,
   showDeviceReminderNotification: mocks.show,
 }));
 
@@ -23,6 +27,7 @@ describe("التنبيه التلقائي للمواعيد", () => {
     localStorage.clear();
     mocks.permission.mockReturnValue("granted");
     mocks.show.mockResolvedValue(true);
+    mocks.soundEnabled.mockReturnValue(true);
     mocks.alerts.mockReturnValue({
       data: [{ id: 9, alertDate: new Date("2026-08-15T09:00:00.000Z"), customer: { name: "أحمد" } }],
     });
@@ -36,8 +41,8 @@ describe("التنبيه التلقائي للمواعيد", () => {
   it("يرسل إشعارًا تلقائيًا واحدًا للموعـد الجاهز بعد منح الإذن", async () => {
     render(<AutomaticReminderNotifications />);
 
-    await waitFor(() => expect(mocks.show).toHaveBeenCalledWith("أحمد", "water-alert-9-1786784400000"));
-    expect(localStorage.getItem("water-alert-9-1786784400000")).toBe("sent");
+    await waitFor(() => expect(mocks.show).toHaveBeenCalledWith("أحمد", expect.stringMatching(/^water-alert-9-\d{4}-\d{2}-\d{2}$/)));
+    expect(mocks.playTone).toHaveBeenCalledOnce();
   });
 
   it("لا يرسل إشعارًا إذا لم يمنح المستخدم الإذن", () => {

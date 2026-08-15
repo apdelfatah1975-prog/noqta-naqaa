@@ -27,6 +27,7 @@ function createContext(): TrpcContext {
 describe("واجهات إدارة فلاتر المياه", () => {
   it("ينشئ تذكيرًا بعد 120 يومًا عند تسجيل تركيب أو صيانة فقط", async () => {
     const insertCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
+    const reminderUpdates: Array<{ table: unknown; values: Record<string, unknown> }> = [];
     const db = {
       select: () => ({
         from: () => ({
@@ -38,6 +39,11 @@ describe("واجهات إدارة فلاتر المياه", () => {
           insertCalls.push({ table, values });
           return [{ insertId: table === visits ? 55 : 0 }];
         },
+      }),
+      update: (table: unknown) => ({
+        set: (values: Record<string, unknown>) => ({
+          where: async () => { reminderUpdates.push({ table, values }); },
+        }),
       }),
     };
     vi.mocked(getDb).mockResolvedValue(db as never);
@@ -55,6 +61,38 @@ describe("واجهات إدارة فلاتر المياه", () => {
     expect(reminderCalls).toHaveLength(2);
     expect(reminderCalls.every(call => call.values.visitId === 55)).toBe(true);
     expect(reminderCalls.every(call => (call.values.reminderDate as Date).toISOString() === "2026-05-01T09:00:00.000Z")).toBe(true);
+    expect(reminderUpdates).toEqual([
+      { table: reminders, values: { status: "completed" } },
+      { table: reminders, values: { status: "completed" } },
+      { table: reminders, values: { status: "completed" } },
+    ]);
+  });
+
+  it("يوقف ظهور التذكير في التنبيهات بعد تسجيل زيارة للعميل", async () => {
+    let reminderStatus = "pending";
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => {
+            if (table === customers) return { limit: async () => [{ id: 7, ownerId: 1, name: "عميل اختبار" }] };
+            if (table === notificationSettings) return { limit: async () => [{ ownerId: 1, leadDays: 1, alertHour: 9, alertMinute: 0, timezoneOffsetMinutes: 0, scheduleCronTaskUid: null }] };
+            if (table === reminders) return { orderBy: async () => reminderStatus === "pending" ? [{ id: 14, ownerId: 1, customerId: 7, status: "pending", alertedAt: null, reminderDate: new Date("2026-01-01T09:00:00.000Z") }] : [] };
+            return [];
+          },
+        }),
+      }),
+      insert: () => ({ values: async () => [{ insertId: 71 }] }),
+      update: () => ({
+        set: (values: { status: string }) => ({
+          where: async () => { reminderStatus = values.status; },
+        }),
+      }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+
+    await caller.filters.visits.create({ customerId: 7, visitType: "follow_up", visitDate: new Date("2026-01-02T09:00:00.000Z") });
+    await expect(caller.filters.reminders.alerts()).resolves.toEqual([]);
   });
 
   it("يرفض صرف المخزون عندما لا يكفي الرصيد", async () => {

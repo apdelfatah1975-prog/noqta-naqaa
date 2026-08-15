@@ -1,4 +1,5 @@
 export type DeviceNotificationPermission = NotificationPermission | "unsupported";
+const SOUND_ENABLED_KEY = "water-filter-reminder-sound-enabled";
 
 export function getDeviceNotificationPermission(): DeviceNotificationPermission {
   if (typeof Notification === "undefined") return "unsupported";
@@ -26,6 +27,37 @@ export async function showDeviceReminderNotification(customerName: string, tag: 
       return true;
     }
     new Notification("موعد متابعة قريب", options);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function isReminderSoundEnabled() {
+  return typeof localStorage === "undefined" || localStorage.getItem(SOUND_ENABLED_KEY) !== "false";
+}
+
+export function setReminderSoundEnabled(enabled: boolean) {
+  localStorage.setItem(SOUND_ENABLED_KEY, String(enabled));
+}
+
+export function playReminderTone(): boolean {
+  if (!isReminderSoundEnabled() || typeof window === "undefined") return false;
+  const AudioContextConstructor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextConstructor) return false;
+  try {
+    const context = new AudioContextConstructor();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.frequency.setValueAtTime(740, context.currentTime);
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.13, context.currentTime + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.6);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.62);
+    oscillator.onended = () => void context.close();
     return true;
   } catch {
     return false;
