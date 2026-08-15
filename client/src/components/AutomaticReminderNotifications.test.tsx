@@ -45,10 +45,11 @@ describe("التنبيه التلقائي للمواعيد", () => {
     expect(mocks.playTone).toHaveBeenCalledOnce();
   });
 
-  it("لا يرسل إشعارًا إذا لم يمنح المستخدم الإذن", () => {
+  it("يشغل الصوت حتى إذا لم يمنح المستخدم إذن إشعار الجهاز", async () => {
     mocks.permission.mockReturnValue("denied");
     render(<AutomaticReminderNotifications />);
 
+    await waitFor(() => expect(mocks.playTone).toHaveBeenCalledOnce());
     expect(mocks.show).not.toHaveBeenCalled();
   });
 });

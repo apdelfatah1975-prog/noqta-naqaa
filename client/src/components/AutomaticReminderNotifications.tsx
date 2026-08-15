@@ -9,15 +9,18 @@ export function AutomaticReminderNotifications() {
   });
 
   useEffect(() => {
-    if (getDeviceNotificationPermission() !== "granted" || !readyAlerts?.length) return;
+    if (!readyAlerts?.length) return;
+    const permissionGranted = getDeviceNotificationPermission() === "granted";
     for (const alert of readyAlerts) {
       const dayKey = new Date().toLocaleDateString("en-CA");
       const key = `water-alert-${alert.id}-${dayKey}`;
-      if (localStorage.getItem(key)) continue;
+      const soundKey = `${key}-sound`;
+      if (!localStorage.getItem(soundKey) && isReminderSoundEnabled()) {
+        if (playReminderTone()) localStorage.setItem(soundKey, "played");
+      }
+      if (!permissionGranted || localStorage.getItem(key)) continue;
       void showDeviceReminderNotification(alert.customer?.name || "عميل", key).then(sent => {
-        if (!sent) return;
-        localStorage.setItem(key, "sent");
-        if (isReminderSoundEnabled()) playReminderTone();
+        if (sent) localStorage.setItem(key, "sent");
       });
     }
   }, [readyAlerts]);
