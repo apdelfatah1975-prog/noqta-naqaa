@@ -162,8 +162,18 @@ async function inventorySummary(ownerId: number) {
 }
 
 type CashIncomeFilter = "all" | "service";
+type CashDateFilter = { month?: string; startDate?: string; endDate?: string };
 
-async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "all") {
+function matchesCashDateFilter(date: Date, dateFilter?: CashDateFilter) {
+  if (!dateFilter?.month && !dateFilter?.startDate && !dateFilter?.endDate) return true;
+  const dateKey = date.toISOString().slice(0, 10);
+  if (dateFilter.month && dateKey.slice(0, 7) !== dateFilter.month) return false;
+  if (dateFilter.startDate && dateKey < dateFilter.startDate) return false;
+  if (dateFilter.endDate && dateKey > dateFilter.endDate) return false;
+  return true;
+}
+
+async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "all", dateFilter?: CashDateFilter) {
   const db = await databaseOrThrow();
   const filters = [eq(cashTransactions.ownerId, ownerId)];
   if (incomeFilter === "service") {
@@ -174,9 +184,11 @@ async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "al
     .from(cashTransactions)
     .where(and(...filters))
     .orderBy(desc(cashTransactions.transactionDate));
-  const filteredTransactions = incomeFilter === "service"
-    ? transactions.filter(transaction => transaction.category === "تحصيل صيانة" || transaction.category === "تحصيل تركيب")
-    : transactions;
+  const filteredTransactions = transactions.filter(transaction => {
+    const isServiceIncome = transaction.category === "تحصيل صيانة" || transaction.category === "تحصيل تركيب";
+    return (incomeFilter !== "service" || (transaction.transactionType === "income" && isServiceIncome))
+      && matchesCashDateFilter(new Date(transaction.transactionDate), dateFilter);
+  });
   const summaries = calculateCashSummaries(filteredTransactions);
   const breakdown = calculateCashBreakdown(filteredTransactions);
   return { transactions: filteredTransactions, ...summaries.EGP, summaries, breakdown, incomeFilter };
@@ -483,7 +495,7 @@ export const filterManagementRouter = router({
   }),
 
   cash: router({
-    summary: adminProcedure.input(z.object({ incomeFilter: z.enum(["all", "service"]).default("all") }).optional()).query(({ ctx, input }) => cashSummary(ctx.user.id, input?.incomeFilter ?? "all")),
+    summary: adminProcedure.input(z.object({ incomeFilter: z.enum(["all", "service"]).default("all"), month: z.string().regex(/^\d{4}-\d{2}$/).optional(), startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).optional()).query(({ ctx, input }) => cashSummary(ctx.user.id, input?.incomeFilter ?? "all", input ? { month: input.month, startDate: input.startDate, endDate: input.endDate } : undefined)),
     create: adminProcedure.input(cashTransactionInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const result = await db.insert(cashTransactions).values({ ...input, ownerId: ctx.user.id });

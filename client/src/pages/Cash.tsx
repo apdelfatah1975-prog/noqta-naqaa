@@ -4,18 +4,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { trpc } from "@/lib/trpc";
 import { formatDate, toDateTimeLocal } from "@/lib/filterUi";
 import { ArrowDownRight, ArrowUpLeft, CircleDollarSign, Plus, ReceiptText, WalletCards } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 type Currency = "EGP" | "SAR";
 type IncomeFilter = "all" | "service";
+type DateFilterMode = "all" | "month" | "range";
 const currencyLabel = (currency: Currency) => currency === "SAR" ? "ريال سعودي" : "جنيه مصري";
 const currencyShortLabel = (currency: Currency) => currency === "SAR" ? "ر.س" : "ج.م";
 const formatMoney = (amount: number, currency: Currency = "EGP") => new Intl.NumberFormat("ar-EG", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount / 100);
 
 export default function Cash() {
   const [incomeFilter, setIncomeFilter] = useState<IncomeFilter>("all");
-  const { data, isLoading, isError } = trpc.filters.cash.summary.useQuery({ incomeFilter });
+  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>("all");
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const cashQueryInput = useMemo(() => ({ incomeFilter, month: dateFilterMode === "month" ? selectedMonth || undefined : undefined, startDate: dateFilterMode === "range" ? startDate || undefined : undefined, endDate: dateFilterMode === "range" ? endDate || undefined : undefined }), [incomeFilter, dateFilterMode, selectedMonth, startDate, endDate]);
+  const { data, isLoading, isError } = trpc.filters.cash.summary.useQuery(cashQueryInput);
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<"income" | "expense">("expense");
@@ -75,7 +81,7 @@ export default function Cash() {
     </section>
 
     <section className="soft-card overflow-hidden">
-      <div className="flex flex-col gap-4 border-b border-teal-950/6 p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-extrabold">سجل العمليات</h2><p className="mt-1 text-xs text-muted-foreground">آخر الإيرادات والمصروفات المسجلة في الخزينة.</p></div><div className="flex items-center gap-3"><label className="flex items-center gap-2 text-sm font-bold text-teal-950"><span className="sr-only">تصفية الإيرادات</span><select className="field-input h-10 min-w-52 rounded-xl" value={incomeFilter} onChange={event => setIncomeFilter(event.target.value as IncomeFilter)}><option value="all">كل العمليات</option><option value="service">إيرادات الصيانة والتركيب</option></select></label><ReceiptText className="h-5 w-5 text-teal-700" /></div></div>
+      <div className="flex flex-col gap-4 border-b border-teal-950/6 p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-extrabold">سجل العمليات</h2><p className="mt-1 text-xs text-muted-foreground">آخر الإيرادات والمصروفات المسجلة في الخزينة.</p></div><div className="flex flex-wrap items-center gap-2"><label><span className="sr-only">تصفية الإيرادات</span><select className="field-input h-10 min-w-48 rounded-xl" value={incomeFilter} onChange={event => setIncomeFilter(event.target.value as IncomeFilter)}><option value="all">كل العمليات</option><option value="service">إيرادات الصيانة والتركيب</option></select></label><label><span className="sr-only">الفترة الزمنية</span><select className="field-input h-10 min-w-40 rounded-xl" value={dateFilterMode} onChange={event => setDateFilterMode(event.target.value as DateFilterMode)}><option value="all">كل الفترات</option><option value="month">شهر محدد</option><option value="range">فترة مخصصة</option></select></label>{dateFilterMode === "month" ? <input aria-label="اختيار الشهر" type="month" className="field-input h-10 rounded-xl" value={selectedMonth} onChange={event => setSelectedMonth(event.target.value)} /> : null}{dateFilterMode === "range" ? <><input aria-label="من تاريخ" type="date" className="field-input h-10 rounded-xl" value={startDate} onChange={event => setStartDate(event.target.value)} /><input aria-label="إلى تاريخ" type="date" className="field-input h-10 rounded-xl" value={endDate} onChange={event => setEndDate(event.target.value)} /></> : null}<ReceiptText className="h-5 w-5 text-teal-700" /></div></div>
       <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[820px] text-right"><thead className="bg-teal-50/45 text-xs text-teal-950/65"><tr><th className="px-5 py-3 font-bold">التاريخ</th><th className="px-5 py-3 font-bold">النوع</th><th className="px-5 py-3 font-bold">العملة</th><th className="px-5 py-3 font-bold">التصنيف</th><th className="px-5 py-3 font-bold">المبلغ</th><th className="px-5 py-3 font-bold">الفني / الجهة</th><th className="px-5 py-3 font-bold">ملاحظات</th></tr></thead><tbody className="divide-y divide-teal-950/6">{data?.transactions.length ? data.transactions.map(transaction => <CashTableRow key={transaction.id} transaction={transaction} />) : <EmptyCashRow isLoading={isLoading} />}</tbody></table></div>
       <div className="divide-y divide-teal-950/6 md:hidden">{data?.transactions.length ? data.transactions.map(transaction => <CashCard key={transaction.id} transaction={transaction} />) : <div className="p-12 text-center text-sm text-muted-foreground">{isLoading ? "جارٍ تحميل الخزينة…" : "لا توجد عمليات مالية حتى الآن."}</div>}</div>
     </section>
