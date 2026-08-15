@@ -43,6 +43,7 @@ const customerInput = z.object({
   longitude: z.string().trim().max(32).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
   clientOperationId: z.string().uuid().optional(),
+  serviceDate: z.date().optional().nullable(),
 });
 
 const customerCreateInput = customerInput.extend({
@@ -416,12 +417,22 @@ export const filterManagementRouter = router({
     update: protectedProcedure.input(customerInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       await getOwnedCustomer(ctx.user.id, input.id);
-      const { id, ...data } = input;
+      const { id, serviceDate, ...data } = input;
       if (data.manualCode) {
         const duplicate = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.ownerId, ctx.user.id), eq(customers.manualCode, data.manualCode), ne(customers.id, id))).limit(1);
         if (duplicate[0]) throw new TRPCError({ code: "CONFLICT", message: "كود العميل مستخدم بالفعل، اختر كودًا مختلفًا." });
       }
       await db.update(customers).set(data).where(and(eq(customers.id, id), eq(customers.ownerId, ctx.user.id)));
+      if (serviceDate) {
+        const latestVisit = await db.select().from(visits).where(and(eq(visits.customerId, id), eq(visits.ownerId, ctx.user.id))).orderBy(desc(visits.visitDate)).limit(1);
+        if (latestVisit[0]) {
+          await db.update(visits).set({ visitDate: serviceDate }).where(and(eq(visits.id, latestVisit[0].id), eq(visits.ownerId, ctx.user.id)));
+          if (needsAutomaticReminder(latestVisit[0].visitType)) {
+            await db.update(reminders).set({ reminderDate: followUpDate(serviceDate) }).where(and(eq(reminders.visitId, latestVisit[0].id), eq(reminders.ownerId, ctx.user.id), eq(reminders.status, "pending")));
+          }
+          await db.update(cashTransactions).set({ transactionDate: serviceDate }).where(and(eq(cashTransactions.sourceVisitId, latestVisit[0].id), eq(cashTransactions.ownerId, ctx.user.id)));
+        }
+      }
       await refreshOwnerBackup(ctx.user.id);
       return { success: true };
     }),

@@ -44,7 +44,7 @@ vi.mock("wouter", () => ({ useLocation: () => ["/customers", mocks.location] }))
 describe("ترابط تعديل بيانات العميل", () => {
   beforeEach(() => {
     mocks.list.mockReturnValue({
-      data: [{ id: 12, name: "عميل قديم", phone: "01000000000", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000012", followUp: null }],
+      data: [{ id: 12, name: "عميل قديم", phone: "01000000000", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000012", followUp: { nextVisitDate: new Date("2026-12-01T09:00:00Z"), lastServiceVisitDate: new Date("2026-08-01T09:00:00Z"), lastServiceVisitType: "maintenance", daysRemaining: 108 } }],
       isLoading: false,
       isError: false,
     });
@@ -105,6 +105,18 @@ describe("ترابط تعديل بيانات العميل", () => {
     fireEvent.click(screen.getByRole("button", { name: "تلقائي" }));
     expect((codeInput as HTMLInputElement).value).toBe("");
     expect(screen.getByText("سيُنشأ تلقائيًا بعد الحفظ")).toBeTruthy();
+  });
+
+  it("يسمح بتعديل تاريخ ووقت الخدمة ويرسلهما مع حفظ العميل", () => {
+    const updateMutation = vi.fn();
+    mocks.updateUseMutation.mockReturnValue({ mutate: updateMutation, isPending: false });
+    render(<Customers />);
+    fireEvent.click(screen.getByTitle("تعديل"));
+    const dateInput = screen.getByDisplayValue("2026-08-01T09:00");
+    fireEvent.change(dateInput, { target: { value: "2026-08-05T14:30" } });
+    fireEvent.submit(screen.getByText("حفظ البيانات").closest("form")!);
+    expect(updateMutation).toHaveBeenCalledWith(expect.objectContaining({ serviceDate: expect.any(Date) }));
+    expect((updateMutation.mock.calls[0][0].serviceDate as Date).toISOString()).toBe("2026-08-05T14:30:00.000Z");
   });
 
   it("يعيد جلب القائمة والملف واللوحة والتذكيرات بعد حفظ تعديل العميل", () => {
