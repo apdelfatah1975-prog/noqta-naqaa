@@ -1,33 +1,94 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { Streamdown } from 'streamdown';
+import { trpc } from "@/lib/trpc";
+import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
+import { ArrowLeft, BellRing, CalendarDays, ChevronLeft, PackageSearch, UsersRound } from "lucide-react";
+import { useLocation } from "wouter";
 
-/**
- * All content in this page are only for example, replace with your own feature implementation
- * When building pages, remember your instructions in Frontend Workflow, Frontend Best Practices, Design Guide and Common Pitfalls
- */
+const statStyles = [
+  { icon: UsersRound, color: "bg-teal-700", label: "عملاء اليوم", key: "today" },
+  { icon: CalendarDays, color: "bg-sky-600", label: "زيارات قادمة", key: "upcoming" },
+  { icon: BellRing, color: "bg-amber-500", label: "مستحقون للمتابعة", key: "due" },
+  { icon: PackageSearch, color: "bg-violet-600", label: "أصناف بالمخزنة", key: "inventory" },
+] as const;
+
 export default function Home() {
-  // The useAuth hook provides authentication state.
-  // To implement login/logout, call logout(), or start login from an event
-  // handler: onClick={() => startLogin()} (imported from "@/const"). Never call
-  // startLogin() during render (no href={startLogin()}) — it mints a one-time
-  // nonce cookie and must run only at the moment of navigation.
-  let { user, loading, error, isAuthenticated, logout } = useAuth();
-
-  // If theme is switchable in App.tsx, we can implement theme toggling like this:
-  // const { theme, toggleTheme } = useTheme();
+  const { data, isLoading } = trpc.filters.dashboard.useQuery();
+  const [, setLocation] = useLocation();
+  const counts = {
+    today: data?.todayVisits.length ?? 0,
+    upcoming: data?.upcomingVisits.length ?? 0,
+    due: data?.dueReminders.length ?? 0,
+    inventory: data?.inventory.totalItems ?? 0,
+  };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <main>
-        {/* Example: lucide-react for icons */}
-        <Loader2 className="animate-spin" />
-        Example Page
-        {/* Example: Streamdown for markdown rendering */}
-        <Streamdown>Any **markdown** content</Streamdown>
-        <Button variant="default">Example Button</Button>
-      </main>
+    <div className="mx-auto max-w-7xl space-y-6">
+      <section className="flex flex-col justify-between gap-4 rounded-3xl bg-[linear-gradient(135deg,#064e4a,#0f766e)] px-6 py-7 text-white shadow-[0_16px_40px_rgba(6,78,74,.22)] sm:flex-row sm:items-center sm:px-8">
+        <div>
+          <p className="text-sm font-bold text-teal-100">لوحة التحكم</p>
+          <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">كل عملياتك في مكان واحد</h1>
+          <p className="mt-2 text-sm text-teal-50/80">تابع الزيارات والعملاء والمخزنة بسرعة ووضوح.</p>
+        </div>
+        <Button onClick={() => setLocation("/visits")} className="h-11 rounded-xl bg-white px-5 font-bold text-teal-800 hover:bg-teal-50">
+          <CalendarDays className="ml-2 h-5 w-5" /> تسجيل زيارة جديدة
+        </Button>
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {statStyles.map(({ icon: Icon, color, label, key }) => (
+          <div key={key} className="soft-card flex items-center gap-4 p-5">
+            <div className={`grid h-12 w-12 place-items-center rounded-2xl ${color} text-white shadow-lg shadow-black/10`}><Icon className="h-5 w-5" /></div>
+            <div>
+              <p className="text-sm text-muted-foreground">{label}</p>
+              <p className="mt-1 text-2xl font-extrabold">{isLoading ? "—" : counts[key]}</p>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-5">
+        <div className="soft-card xl:col-span-3">
+          <div className="flex items-center justify-between border-b border-teal-950/6 p-5">
+            <div><h2 className="font-extrabold">الزيارات القادمة</h2><p className="mt-1 text-xs text-muted-foreground">أقرب خمس زيارات مسجلة</p></div>
+            <button onClick={() => setLocation("/visits")} className="text-sm font-bold text-teal-700 hover:text-teal-900">عرض الكل</button>
+          </div>
+          <div className="divide-y divide-teal-950/6">
+            {data?.upcomingVisits.length ? data.upcomingVisits.map(visit => (
+              <button key={visit.id} onClick={() => setLocation(`/customers/${visit.customerId}`)} className="flex w-full items-center justify-between gap-3 p-4 text-right hover:bg-teal-50/55">
+                <div className="min-w-0"><p className="truncate font-bold">{visit.customer?.name || "عميل"}</p><p className="mt-1 text-xs text-muted-foreground">{visitTypeLabels[visit.visitType]} · {formatDateTime(visit.visitDate)}</p></div>
+                <ChevronLeft className="h-5 w-5 shrink-0 text-teal-600" />
+              </button>
+            )) : <EmptyRow text="لا توجد زيارات قادمة مسجلة." action="تسجيل زيارة" onAction={() => setLocation("/visits")} />}
+          </div>
+        </div>
+
+        <div className="soft-card xl:col-span-2">
+          <div className="flex items-center justify-between border-b border-teal-950/6 p-5">
+            <div><h2 className="font-extrabold">متابعة مستحقة</h2><p className="mt-1 text-xs text-muted-foreground">عملاء تجاوزوا تاريخ التذكير</p></div>
+            <BellRing className="h-5 w-5 text-amber-500" />
+          </div>
+          <div className="divide-y divide-teal-950/6">
+            {data?.dueReminders.length ? data.dueReminders.slice(0, 4).map(reminder => (
+              <button key={reminder.id} onClick={() => setLocation(`/customers/${reminder.customerId}`)} className="flex w-full items-center justify-between gap-3 p-4 text-right hover:bg-amber-50/60">
+                <div className="min-w-0"><p className="truncate font-bold">{reminder.customer?.name || "عميل"}</p><p className="mt-1 text-xs text-amber-700">استحق في {formatDateTime(reminder.reminderDate)}</p></div>
+                <ChevronLeft className="h-5 w-5 shrink-0 text-amber-600" />
+              </button>
+            )) : <EmptyRow text="لا توجد متابعة مستحقة الآن." />}
+          </div>
+        </div>
+      </section>
+
+      <section className="soft-card overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-teal-950/6 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div><h2 className="font-extrabold">حالة المخزنة</h2><p className="mt-1 text-xs text-muted-foreground">{data?.inventory.lowStockCount ? `${data.inventory.lowStockCount} أصناف تحتاج مراجعة الرصيد` : "الأرصدة المتاحة قيد المتابعة"}</p></div>
+          <Button variant="outline" onClick={() => setLocation("/inventory")} className="rounded-xl border-teal-700/20 text-teal-800 hover:bg-teal-50"><PackageSearch className="ml-2 h-4 w-4" />إدارة المخزنة</Button>
+        </div>
+        {data?.inventory.lowStock.length ? <div className="grid divide-y divide-teal-950/6 sm:grid-cols-2 sm:divide-x sm:divide-y-0">{data.inventory.lowStock.map(item => <div key={item.id} className="flex items-center justify-between p-5"><p className="font-bold">{item.name}</p><span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-extrabold text-amber-800">الرصيد: {item.currentBalance}</span></div>)}</div> : <EmptyRow text={isLoading ? "جارٍ تحميل حالة المخزنة…" : "لا توجد أصناف منخفضة الرصيد."} />}
+      </section>
     </div>
   );
+}
+
+function EmptyRow({ text, action, onAction }: { text: string; action?: string; onAction?: () => void }) {
+  return <div className="flex flex-col items-center justify-center gap-3 p-8 text-center"><p className="text-sm text-muted-foreground">{text}</p>{action ? <button onClick={onAction} className="inline-flex items-center text-sm font-bold text-teal-700"><ArrowLeft className="ml-1 h-4 w-4" />{action}</button> : null}</div>;
 }

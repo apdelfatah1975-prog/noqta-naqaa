@@ -1,0 +1,42 @@
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { trpc } from "@/lib/trpc";
+import { customerMapUrl } from "@/lib/filterUi";
+import { Loader2, MapPinned, Pencil, Phone, Plus, Search, UsersRound } from "lucide-react";
+import { FormEvent, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useLocation } from "wouter";
+
+type CustomerForm = { id?: number; name: string; phone: string; address: string; latitude: string; longitude: string; notes: string };
+const emptyCustomer: CustomerForm = { name: "", phone: "", address: "", latitude: "", longitude: "", notes: "" };
+
+export default function Customers() {
+  const [search, setSearch] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState<CustomerForm>(emptyCustomer);
+  const input = useMemo(() => ({ search: search || undefined }), [search]);
+  const { data: customers, isLoading, isError } = trpc.filters.customers.list.useQuery(input);
+  const utils = trpc.useUtils();
+  const [, setLocation] = useLocation();
+  const createCustomer = trpc.filters.customers.create.useMutation({ onSuccess: () => { utils.filters.customers.list.invalidate(); utils.filters.dashboard.invalidate(); toast.success("تمت إضافة العميل بنجاح"); setDialogOpen(false); }, onError: error => toast.error(error.message || "تعذر إضافة العميل. يرجى المحاولة مرة أخرى.") });
+  const updateCustomer = trpc.filters.customers.update.useMutation({ onSuccess: () => { utils.filters.customers.list.invalidate(); toast.success("تم تعديل بيانات العميل"); setDialogOpen(false); }, onError: error => toast.error(error.message || "تعذر تعديل بيانات العميل. يرجى المحاولة مرة أخرى.") });
+  const saving = createCustomer.isPending || updateCustomer.isPending;
+
+  if (isError) return <div className="soft-card p-8 text-center"><p className="font-bold text-teal-950">تعذر تحميل قائمة العملاء.</p><p className="mt-2 text-sm text-muted-foreground">تحقق من الاتصال ثم أعد المحاولة.</p><Button onClick={() => window.location.reload()} variant="outline" className="mt-4 rounded-xl">إعادة المحاولة</Button></div>;
+
+  function openNew() { setForm(emptyCustomer); setDialogOpen(true); }
+  function openEdit(customer: NonNullable<typeof customers>[number]) { setForm({ id: customer.id, name: customer.name, phone: customer.phone, address: customer.address || "", latitude: customer.latitude || "", longitude: customer.longitude || "", notes: customer.notes || "" }); setDialogOpen(true); }
+  function submit(event: FormEvent) { event.preventDefault(); const payload = { ...form, address: form.address || null, latitude: form.latitude || null, longitude: form.longitude || null, notes: form.notes || null }; if (form.id) updateCustomer.mutate(payload as CustomerForm & { id: number }); else createCustomer.mutate(payload); }
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><h1 className="page-heading">إدارة العملاء</h1><p className="page-subheading">احتفظ ببيانات العملاء ومواقعهم وسجل خدماتهم بصورة مرتبة.</p></div><Button onClick={openNew} className="h-11 rounded-xl bg-teal-700 px-5 font-bold hover:bg-teal-800"><Plus className="ml-2 h-5 w-5" />إضافة عميل</Button></div>
+      <div className="soft-card overflow-hidden"><div className="border-b border-teal-950/6 p-4"><div className="relative max-w-md"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input className="field-input pr-10" value={search} onChange={event => setSearch(event.target.value)} placeholder="ابحث باسم العميل" /></div></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-right"><thead className="bg-teal-50/70 text-xs text-teal-950/65"><tr><th className="px-5 py-4 font-bold">العميل</th><th className="px-5 py-4 font-bold">الهاتف</th><th className="px-5 py-4 font-bold">العنوان</th><th className="px-5 py-4 font-bold">إجراءات</th></tr></thead><tbody className="divide-y divide-teal-950/6">{isLoading ? <tr><td colSpan={4} className="p-10 text-center text-muted-foreground"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr> : customers?.length ? customers.map(customer => { const mapUrl = customerMapUrl(customer); return <tr key={customer.id} className="hover:bg-teal-50/45"><td className="px-5 py-4"><button onClick={() => setLocation(`/customers/${customer.id}`)} className="font-extrabold text-teal-900 hover:text-teal-600">{customer.name}</button><p className="mt-1 text-xs text-muted-foreground">#{customer.id}</p></td><td className="px-5 py-4" dir="ltr">{customer.phone}</td><td className="max-w-64 truncate px-5 py-4 text-sm text-muted-foreground">{customer.address || "—"}</td><td className="px-5 py-4"><div className="flex gap-2"><a href={`tel:${customer.phone}`} className="grid h-9 w-9 place-items-center rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100" title="اتصال"><Phone className="h-4 w-4" /></a>{mapUrl ? <a href={mapUrl} target="_blank" rel="noreferrer" className="grid h-9 w-9 place-items-center rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100" title="فتح الموقع"><MapPinned className="h-4 w-4" /></a> : null}<button onClick={() => openEdit(customer)} className="grid h-9 w-9 place-items-center rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100" title="تعديل"><Pencil className="h-4 w-4" /></button></div></td></tr>; }) : <tr><td colSpan={4} className="p-12 text-center"><UsersRound className="mx-auto h-7 w-7 text-teal-200" /><p className="mt-3 text-sm text-muted-foreground">لا توجد بيانات عملاء مطابقة.</p></td></tr>}</tbody></table></div>
+      </div>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl" dir="rtl"><DialogHeader><DialogTitle>{form.id ? "تعديل بيانات العميل" : "إضافة عميل جديد"}</DialogTitle></DialogHeader><form onSubmit={submit} className="grid gap-4 py-2 sm:grid-cols-2"><Field label="اسم العميل" value={form.name} onChange={value => setForm({ ...form, name: value })} required /><Field label="رقم الهاتف" value={form.phone} onChange={value => setForm({ ...form, phone: value })} dir="ltr" required /><div className="sm:col-span-2"><Field label="العنوان" value={form.address} onChange={value => setForm({ ...form, address: value })} /></div><Field label="خط العرض GPS" value={form.latitude} onChange={value => setForm({ ...form, latitude: value })} dir="ltr" placeholder="مثال: 24.7136" /><Field label="خط الطول GPS" value={form.longitude} onChange={value => setForm({ ...form, longitude: value })} dir="ltr" placeholder="مثال: 46.6753" /><div className="sm:col-span-2"><label className="field-label">ملاحظات</label><textarea className="field-textarea" value={form.notes} onChange={event => setForm({ ...form, notes: event.target.value })} placeholder="أي ملاحظات مفيدة للفني" /></div><div className="flex justify-end gap-3 pt-2 sm:col-span-2"><Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="rounded-xl">إلغاء</Button><Button disabled={saving} type="submit" className="rounded-xl bg-teal-700 hover:bg-teal-800">{saving ? "جارٍ الحفظ…" : "حفظ البيانات"}</Button></div></form></DialogContent></Dialog>
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, required, dir, placeholder }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; dir?: "ltr" | "rtl"; placeholder?: string }) { return <label><span className="field-label">{label}</span><input className="field-input" value={value} dir={dir} placeholder={placeholder} required={required} onChange={event => onChange(event.target.value)} /></label>; }
