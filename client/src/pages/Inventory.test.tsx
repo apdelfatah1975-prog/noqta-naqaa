@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   summary: vi.fn(),
   createItem: vi.fn(),
   createMovement: vi.fn(),
+  deleteItem: vi.fn(),
+  deleteMovement: vi.fn(),
   invalidate: vi.fn(),
 }));
 
@@ -17,6 +19,8 @@ vi.mock("@/lib/trpc", () => ({
         summary: { useQuery: mocks.summary },
         createItem: { useMutation: mocks.createItem },
         createMovement: { useMutation: mocks.createMovement },
+        deleteItem: { useMutation: mocks.deleteItem },
+        deleteMovement: { useMutation: mocks.deleteMovement },
       },
       dashboard: { invalidate: mocks.invalidate },
     },
@@ -33,6 +37,8 @@ describe("تفاصيل المنصرف في المخزون", () => {
   beforeEach(() => {
     mocks.createItem.mockReturnValue({ mutate: vi.fn(), isPending: false });
     mocks.createMovement.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    mocks.deleteItem.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    mocks.deleteMovement.mockReturnValue({ mutate: vi.fn(), isPending: false });
     mocks.summary.mockReturnValue({
       isLoading: false,
       isError: false,

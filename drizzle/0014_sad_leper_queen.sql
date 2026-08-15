@@ -1,0 +1,1 @@
+ALTER TABLE `notificationSettings` ADD `pinHash` varchar(255);

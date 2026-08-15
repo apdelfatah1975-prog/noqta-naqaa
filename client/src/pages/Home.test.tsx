@@ -71,7 +71,7 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     render(<Home />);
     expect(screen.getByText("عميل بموعد مسجل")).toBeTruthy();
     expect(screen.getByText(/بعد 3 يوم/)).toBeTruthy();
-    expect(screen.getByText("مواعيد سجلتها يدويًا وتأتي بعد اليوم")).toBeTruthy();
+    expect(screen.getByText("تظهر من الغد وحتى خمسة أيام قبل الموعد")).toBeTruthy();
   });
 
   it("تظهر كبطاقة تفاعلية وتنتقل إلى صفحة الخزينة عند الضغط", () => {

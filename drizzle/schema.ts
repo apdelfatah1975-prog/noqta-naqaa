@@ -106,6 +106,7 @@ export const notificationSettings = mysqlTable(
     alertHour: int("alertHour").default(9).notNull(),
     alertMinute: int("alertMinute").default(0).notNull(),
     timezoneOffsetMinutes: int("timezoneOffsetMinutes").default(180).notNull(),
+    pinHash: varchar("pinHash", { length: 255 }),
     scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }),
     backupFileKey: varchar("backupFileKey", { length: 512 }),
     backupGeneratedAt: timestamp("backupGeneratedAt"),

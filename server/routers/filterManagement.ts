@@ -1,4 +1,6 @@
 import { TRPCError } from "@trpc/server";
+import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 import { parse as parseCookie } from "cookie";
 import { and, asc, desc, eq, gte, inArray, lte, ne } from "drizzle-orm";
 import { z } from "zod";
@@ -44,6 +46,7 @@ const customerInput = z.object({
   notes: z.string().trim().max(2000).optional().nullable(),
   clientOperationId: z.string().uuid().optional(),
   serviceDate: z.date().optional().nullable(),
+  collectedAmount: z.number().int().nonnegative().optional().nullable(),
 });
 
 const customerCreateInput = customerInput.extend({
@@ -99,13 +102,34 @@ const notificationSettingsInput = z.object({
   alertMinute: z.number().int().min(0).max(59).default(DEFAULT_ALERT_MINUTE),
   timezoneOffsetMinutes: z.number().int().min(-720).max(840).default(DEFAULT_TIMEZONE_OFFSET_MINUTES),
 });
+const pinValue = z.string().trim().min(4, "الرقم السري يجب أن يتكون من 4 أحرف أو أرقام على الأقل.").max(64);
+const notificationSettingsSaveInput = notificationSettingsInput.extend({ pin: pinValue.optional() });
+const pinSetupInput = z.object({ newPin: pinValue, currentPin: pinValue.optional() });
 
 const defaultNotificationSettings = {
   leadDays: DEFAULT_ALERT_LEAD_DAYS,
   alertHour: DEFAULT_ALERT_HOUR,
   alertMinute: DEFAULT_ALERT_MINUTE,
   timezoneOffsetMinutes: DEFAULT_TIMEZONE_OFFSET_MINUTES,
+  pinHash: null,
 };
+
+const sensitivePinInput = z.object({ pin: z.string().trim().min(4, "الرقم السري يجب أن يتكون من 4 أحرف أو أرقام على الأقل.").max(64) });
+const scryptAsync = promisify(scrypt);
+
+async function hashPin(pin: string) {
+  const salt = randomBytes(16).toString("hex");
+  const derivedKey = (await scryptAsync(pin, salt, 64)) as Buffer;
+  return `${salt}:${derivedKey.toString("hex")}`;
+}
+
+async function verifyPin(pin: string, encodedHash: string) {
+  const [salt, storedHex] = encodedHash.split(":");
+  if (!salt || !storedHex) return false;
+  const stored = Buffer.from(storedHex, "hex");
+  const derived = (await scryptAsync(pin, salt, stored.length)) as Buffer;
+  return stored.length === derived.length && timingSafeEqual(stored, derived);
+}
 
 async function databaseOrThrow() {
   const db = await getDb();
@@ -272,10 +296,33 @@ async function remindersWithCustomers(ownerId: number, onlyDue: boolean, withinD
   });
 }
 
-async function getNotificationSettings(ownerId: number) {
+async function getNotificationSettingsRow(ownerId: number) {
   const db = await databaseOrThrow();
   const rows = await db.select().from(notificationSettings).where(eq(notificationSettings.ownerId, ownerId)).limit(1);
-  return rows[0] ?? { ownerId, ...defaultNotificationSettings, scheduleCronTaskUid: null };
+  return rows[0] ?? { ownerId, ...defaultNotificationSettings, scheduleCronTaskUid: null, id: 0, backupFileKey: null, backupGeneratedAt: null, createdAt: new Date(), updatedAt: new Date() };
+}
+
+async function getNotificationSettings(ownerId: number) {
+  const { pinHash: _pinHash, ...safeSettings } = await getNotificationSettingsRow(ownerId);
+  return safeSettings;
+}
+
+async function requirePin(ownerId: number, pin: string) {
+  const settings = await getNotificationSettingsRow(ownerId);
+  if (!settings.pinHash) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "لم يتم ضبط رقم سري بعد. افتح الإعدادات وأنشئ رقمًا سريًا أولًا." });
+  }
+  if (!(await verifyPin(pin, settings.pinHash))) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "الرقم السري غير صحيح." });
+  }
+}
+
+async function requirePinIfConfigured(ownerId: number, pin?: string) {
+  const settings = await getNotificationSettingsRow(ownerId);
+  if (settings.pinHash) {
+    if (!pin) throw new TRPCError({ code: "FORBIDDEN", message: "أدخل الرقم السري لتعديل الإعدادات." });
+    await requirePin(ownerId, pin);
+  }
 }
 
 export const filterManagementRouter = router({
@@ -287,9 +334,12 @@ export const filterManagementRouter = router({
     startOfToday.setHours(0, 0, 0, 0);
     const endOfToday = new Date(startOfToday);
     endOfToday.setDate(endOfToday.getDate() + 1);
+    const endOfUpcomingWindow = new Date(startOfToday);
+    endOfUpcomingWindow.setDate(endOfUpcomingWindow.getDate() + 6);
+    endOfUpcomingWindow.setMilliseconds(-1);
     const [todayVisits, upcomingVisits, upcomingFollowUps, dueReminders, inventory, cash] = await Promise.all([
       db.select().from(visits).where(and(eq(visits.ownerId, ownerId), gte(visits.visitDate, startOfToday), lte(visits.visitDate, endOfToday))).orderBy(visits.visitDate),
-      db.select().from(visits).where(and(eq(visits.ownerId, ownerId), gte(visits.visitDate, now))).orderBy(visits.visitDate).limit(5),
+      db.select().from(visits).where(and(eq(visits.ownerId, ownerId), gte(visits.visitDate, endOfToday), lte(visits.visitDate, endOfUpcomingWindow))).orderBy(visits.visitDate).limit(20),
       remindersWithCustomers(ownerId, false, 5),
       remindersWithCustomers(ownerId, true),
       inventorySummary(ownerId),
@@ -414,15 +464,28 @@ export const filterManagementRouter = router({
       await refreshOwnerBackup(ctx.user.id);
       return { id: customerId, alreadySynced: false, firstVisitCreated: true, reminderCreated: needsAutomaticReminder(firstVisitType) };
     }),
-    update: protectedProcedure.input(customerInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    update: protectedProcedure.input(customerInput.extend({ id: z.number().int().positive(), pin: sensitivePinInput.shape.pin })).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
       const db = await databaseOrThrow();
-      await getOwnedCustomer(ctx.user.id, input.id);
-      const { id, serviceDate, ...data } = input;
+      const customer = await getOwnedCustomer(ctx.user.id, input.id);
+      const { id, serviceDate, collectedAmount, pin: _pin, ...data } = input;
       if (data.manualCode) {
         const duplicate = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.ownerId, ctx.user.id), eq(customers.manualCode, data.manualCode), ne(customers.id, id))).limit(1);
         if (duplicate[0]) throw new TRPCError({ code: "CONFLICT", message: "كود العميل مستخدم بالفعل، اختر كودًا مختلفًا." });
       }
       await db.update(customers).set(data).where(and(eq(customers.id, id), eq(customers.ownerId, ctx.user.id)));
+      if (collectedAmount !== undefined && collectedAmount !== null) {
+        const latestForAmount = await db.select().from(visits).where(and(eq(visits.customerId, id), eq(visits.ownerId, ctx.user.id))).orderBy(desc(visits.visitDate)).limit(1);
+        if (latestForAmount[0]) {
+          const linkedIncome = await db.select().from(cashTransactions).where(and(eq(cashTransactions.sourceVisitId, latestForAmount[0].id), eq(cashTransactions.ownerId, ctx.user.id))).limit(1);
+          if (linkedIncome[0]) {
+            await db.update(cashTransactions).set({ amount: collectedAmount }).where(and(eq(cashTransactions.id, linkedIncome[0].id), eq(cashTransactions.ownerId, ctx.user.id)));
+          } else if (collectedAmount > 0) {
+            const category = latestForAmount[0].visitType === "installation" ? "تحصيل تركيب" : latestForAmount[0].visitType === "maintenance" ? "تحصيل صيانة" : latestForAmount[0].visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
+            await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: "SAR", amount: collectedAmount, category, transactionDate: latestForAmount[0].visitDate, sourceVisitId: latestForAmount[0].id, recipientName: customer.name, notes: "إيراد أُنشئ من تعديل مبلغ الخدمة" });
+          }
+        }
+      }
       if (serviceDate) {
         const latestVisit = await db.select().from(visits).where(and(eq(visits.customerId, id), eq(visits.ownerId, ctx.user.id))).orderBy(desc(visits.visitDate)).limit(1);
         if (latestVisit[0]) {
@@ -433,6 +496,14 @@ export const filterManagementRouter = router({
           await db.update(cashTransactions).set({ transactionDate: serviceDate }).where(and(eq(cashTransactions.sourceVisitId, latestVisit[0].id), eq(cashTransactions.ownerId, ctx.user.id)));
         }
       }
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true };
+    }),
+    delete: protectedProcedure.input(sensitivePinInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
+      const db = await databaseOrThrow();
+      await getOwnedCustomer(ctx.user.id, input.id);
+      await db.delete(customers).where(and(eq(customers.id, input.id), eq(customers.ownerId, ctx.user.id)));
       await refreshOwnerBackup(ctx.user.id);
       return { success: true };
     }),
@@ -484,7 +555,8 @@ export const filterManagementRouter = router({
       await refreshOwnerBackup(ctx.user.id);
       return { id: visitId, reminderCreated: needsAutomaticReminder(input.visitType), alreadySynced: false };
     }),
-    updateDate: protectedProcedure.input(z.object({ visitId: z.number().int().positive(), visitDate: z.date() })).mutation(async ({ ctx, input }) => {
+    updateDate: protectedProcedure.input(z.object({ visitId: z.number().int().positive(), visitDate: z.date(), pin: sensitivePinInput.shape.pin })).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
       const db = await databaseOrThrow();
       const existing = await db.select().from(visits).where(and(eq(visits.id, input.visitId), eq(visits.ownerId, ctx.user.id))).limit(1);
       if (!existing[0]) throw new TRPCError({ code: "NOT_FOUND", message: "الزيارة غير موجودة" });
@@ -499,6 +571,13 @@ export const filterManagementRouter = router({
       await refreshOwnerBackup(ctx.user.id);
       return { success: true };
     }),
+    delete: protectedProcedure.input(sensitivePinInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
+      const db = await databaseOrThrow();
+      await db.delete(visits).where(and(eq(visits.id, input.id), eq(visits.ownerId, ctx.user.id)));
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true };
+    }),
   }),
 
   reminders: router({
@@ -510,7 +589,8 @@ export const filterManagementRouter = router({
         .filter(reminder => isReminderAlertActive(reminder.reminderDate, settings))
         .map(reminder => ({ ...reminder, alertDate: alertDateForReminder(reminder.reminderDate, settings) }));
     }),
-    updateStatus: protectedProcedure.input(z.object({ id: z.number().int().positive(), status: z.enum(["completed", "dismissed"]) })).mutation(async ({ ctx, input }) => {
+    updateStatus: protectedProcedure.input(z.object({ id: z.number().int().positive(), status: z.enum(["completed", "dismissed"]), pin: sensitivePinInput.shape.pin })).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
       const db = await databaseOrThrow();
       const reminder = await db.select().from(reminders).where(and(eq(reminders.id, input.id), eq(reminders.ownerId, ctx.user.id))).limit(1);
       if (!reminder[0]) {
@@ -546,6 +626,13 @@ export const filterManagementRouter = router({
       await refreshOwnerBackup(ctx.user.id);
       return { success: true, nextVisitCreated: input.status === "completed" };
     }),
+    delete: protectedProcedure.input(sensitivePinInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
+      const db = await databaseOrThrow();
+      await db.delete(reminders).where(and(eq(reminders.id, input.id), eq(reminders.ownerId, ctx.user.id)));
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true };
+    }),
   }),
 
   notifications: router({
@@ -559,19 +646,35 @@ export const filterManagementRouter = router({
         .sort((first, second) => first.alertDate.getTime() - second.alertDate.getTime());
       return upcoming[0] ?? null;
     }),
-    saveSettings: protectedProcedure.input(notificationSettingsInput).mutation(async ({ ctx, input }) => {
+    saveSettings: protectedProcedure.input(notificationSettingsSaveInput).mutation(async ({ ctx, input }) => {
+      await requirePinIfConfigured(ctx.user.id, input.pin);
       const db = await databaseOrThrow();
-      await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...input }).onDuplicateKeyUpdate({ set: input });
+      const { pin: _pin, ...settingsInput } = input;
+      await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...settingsInput }).onDuplicateKeyUpdate({ set: settingsInput });
       await refreshOwnerBackup(ctx.user.id);
       return getNotificationSettings(ctx.user.id);
     }),
-    enableScheduledAlerts: protectedProcedure.input(notificationSettingsInput).mutation(async ({ ctx, input }) => {
+    setPin: protectedProcedure.input(pinSetupInput).mutation(async ({ ctx, input }) => {
+      const settings = await getNotificationSettingsRow(ctx.user.id);
+      if (settings.pinHash) {
+        if (!input.currentPin) throw new TRPCError({ code: "FORBIDDEN", message: "أدخل الرقم السري الحالي لتغييره." });
+        await requirePin(ctx.user.id, input.currentPin);
+      }
       const db = await databaseOrThrow();
+      const pinHash = await hashPin(input.newPin);
+      await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...defaultNotificationSettings, pinHash }).onDuplicateKeyUpdate({ set: { pinHash } });
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true };
+    }),
+    enableScheduledAlerts: protectedProcedure.input(notificationSettingsSaveInput).mutation(async ({ ctx, input }) => {
+      await requirePinIfConfigured(ctx.user.id, input.pin);
+      const db = await databaseOrThrow();
+      const { pin: _pin, ...settingsInput } = input;
       const sessionToken = parseCookie(ctx.req.headers.cookie ?? "")[COOKIE_NAME] ?? "";
       if (!sessionToken) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "سجّل الدخول لتفعيل التنبيهات التلقائية." });
       }
-      await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...input }).onDuplicateKeyUpdate({ set: input });
+      await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...settingsInput }).onDuplicateKeyUpdate({ set: settingsInput });
       const settings = await getNotificationSettings(ctx.user.id);
       const cron = "0 */5 * * * *";
       if (settings.scheduleCronTaskUid) {
@@ -631,6 +734,21 @@ export const filterManagementRouter = router({
       await refreshOwnerBackup(ctx.user.id);
       return { success: true, movementId };
     }),
+    deleteItem: adminProcedure.input(sensitivePinInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
+      const db = await databaseOrThrow();
+      await db.delete(inventoryItems).where(and(eq(inventoryItems.id, input.id), eq(inventoryItems.ownerId, ctx.user.id)));
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true };
+    }),
+    deleteMovement: adminProcedure.input(sensitivePinInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
+      const db = await databaseOrThrow();
+      await db.delete(cashTransactions).where(and(eq(cashTransactions.sourceInventoryMovementId, input.id), eq(cashTransactions.ownerId, ctx.user.id)));
+      await db.delete(inventoryMovements).where(and(eq(inventoryMovements.id, input.id), eq(inventoryMovements.ownerId, ctx.user.id)));
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true };
+    }),
   }),
 
   backup: router({
@@ -653,6 +771,13 @@ export const filterManagementRouter = router({
       const result = await db.insert(cashTransactions).values({ ...input, ownerId: ctx.user.id });
       await refreshOwnerBackup(ctx.user.id);
       return { id: Number(result[0].insertId) };
+    }),
+    delete: adminProcedure.input(sensitivePinInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
+      const db = await databaseOrThrow();
+      await db.delete(cashTransactions).where(and(eq(cashTransactions.id, input.id), eq(cashTransactions.ownerId, ctx.user.id)));
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true };
     }),
   }),
 });

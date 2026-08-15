@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   createUseMutation: vi.fn(),
   updateUseMutation: vi.fn(),
+  deleteUseMutation: vi.fn(),
   listInvalidate: vi.fn(),
   getInvalidate: vi.fn(),
   dashboardInvalidate: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("@/lib/trpc", () => ({
         list: { useQuery: mocks.list },
         create: { useMutation: mocks.createUseMutation },
         update: { useMutation: mocks.updateUseMutation },
+        delete: { useMutation: mocks.deleteUseMutation },
       },
       dashboard: { invalidate: mocks.dashboardInvalidate },
       reminders: { due: { invalidate: mocks.remindersInvalidate } },
@@ -49,6 +51,7 @@ describe("ترابط تعديل بيانات العميل", () => {
       isError: false,
     });
     mocks.createUseMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    mocks.deleteUseMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
     mocks.updateUseMutation.mockImplementation((options: { onSuccess?: () => void }) => {
       mocks.updateOptions = options;
       return { mutate: vi.fn(), isPending: false };
@@ -114,8 +117,14 @@ describe("ترابط تعديل بيانات العميل", () => {
     fireEvent.click(screen.getByTitle("تعديل"));
     const dateInput = screen.getByDisplayValue("2026-08-01T09:00");
     fireEvent.change(dateInput, { target: { value: "2026-08-05T14:30" } });
+    const amountInput = screen.getByPlaceholderText("مثال: 250");
+    expect((amountInput as HTMLInputElement).disabled).toBe(false);
+    fireEvent.change(amountInput, { target: { value: "275" } });
     fireEvent.submit(screen.getByText("حفظ البيانات").closest("form")!);
-    expect(updateMutation).toHaveBeenCalledWith(expect.objectContaining({ serviceDate: expect.any(Date) }));
+    fireEvent.change(screen.getByPlaceholderText("••••"), { target: { value: "1234" } });
+    fireEvent.click(screen.getByRole("button", { name: "تأكيد" }));
+    expect(updateMutation).toHaveBeenCalledWith(expect.objectContaining({ serviceDate: expect.any(Date), collectedAmount: 27500 }));
+    expect(screen.queryByText("عملة التحصيل")).toBeNull();
     expect((updateMutation.mock.calls[0][0].serviceDate as Date).toISOString()).toBe("2026-08-05T14:30:00.000Z");
   });
 

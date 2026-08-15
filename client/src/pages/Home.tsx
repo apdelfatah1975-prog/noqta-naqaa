@@ -75,8 +75,8 @@ export default function Home() {
       <section className="grid gap-6 xl:grid-cols-5">
         <div className="soft-card xl:col-span-3">
           <div className="flex items-center justify-between border-b border-teal-950/6 p-5">
-            <div><div className="flex items-center gap-2"><h2 className="font-extrabold">الزيارات القادمة</h2><span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-700">{data?.upcomingVisits.length ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">مواعيد سجلتها يدويًا وتأتي بعد اليوم</p><p className="mt-1 text-[11px] font-semibold text-sky-700">مخصصة لتنظيم الزيارات المحجوزة مسبقًا</p></div>
-            <div className="flex items-center gap-3"><span title="هذه مواعيد مسجلة يدويًا" className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Info className="h-3.5 w-3.5" />موعد مسجل</span><button onClick={() => setLocation("/visits")} className="text-sm font-bold text-teal-700 hover:text-teal-900">عرض الكل</button></div>
+            <div><div className="flex items-center gap-2"><h2 className="font-extrabold">الزيارات القادمة</h2><span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-700">{data?.upcomingVisits.length ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">المواعيد المسجلة خلال الأيام الخمسة القادمة</p><p className="mt-1 text-[11px] font-semibold text-sky-700">تظهر من الغد وحتى خمسة أيام قبل الموعد</p></div>
+            <div className="flex items-center gap-3"><span title="هذه مواعيد مسجلة خلال خمسة أيام قادمة" className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Info className="h-3.5 w-3.5" />خلال ٥ أيام</span><button onClick={() => setLocation("/visits")} className="text-sm font-bold text-teal-700 hover:text-teal-900">عرض الكل</button></div>
           </div>
           <div className="divide-y divide-teal-950/6">
             {data?.upcomingVisits.length ? data.upcomingVisits.map(visit => {

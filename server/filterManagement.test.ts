@@ -6,6 +6,9 @@ import type { TrpcContext } from "./_core/context";
 
 vi.mock("./db", () => ({ getDb: vi.fn() }));
 
+const TEST_PIN = "1234";
+const TEST_PIN_HASH = "test-salt-for-vitest:c872f951b643e146075a3a65ee17f534ce1833ce47e7f8d80d70411e185dd82a9def0d82315ac8f743256bd488bdbac95da97a2261b57d3ccf3483dd73e7e16a";
+
 function createContext(): TrpcContext {
   return {
     user: {
@@ -218,6 +221,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
       select: () => ({
         from: (table: unknown) => ({
           where: () => {
+            if (table === notificationSettings) return { limit: async () => [{ ownerId: 1, pinHash: TEST_PIN_HASH }] };
             if (table === customers) return { limit: async () => [customer], orderBy: async () => [customer] };
             if (table === visits) return { orderBy: async () => [] };
             if (table === reminders) return { orderBy: async () => [] };
@@ -236,7 +240,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
     vi.mocked(getDb).mockResolvedValue(db as never);
     const caller = appRouter.createCaller(createContext());
 
-    await caller.filters.customers.update({ id: 7, name: "بعد التعديل", phone: "01111111111", address: "العنوان الجديد", latitude: null, longitude: null, notes: "ملاحظة جديدة" });
+    await caller.filters.customers.update({ id: 7, name: "بعد التعديل", phone: "01111111111", address: "العنوان الجديد", latitude: null, longitude: null, notes: "ملاحظة جديدة", pin: TEST_PIN });
 
     await expect(caller.filters.customers.list({})).resolves.toMatchObject([{
       id: 7,
@@ -271,6 +275,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
       select: () => ({
         from: (table: unknown) => ({
           where: () => {
+            if (table === notificationSettings) return chain([{ ownerId: 1, pinHash: TEST_PIN_HASH }]);
             if (table === customers) return chain([customer]);
             if (table === visits) return chain([upcomingVisit]);
             if (table === reminders) return chain([dueReminder]);
@@ -289,7 +294,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
     const caller = appRouter.createCaller(createContext());
 
     try {
-      await caller.filters.customers.update({ id: 7, name: "بعد التعديل", phone: "01111111111", address: "العنوان الجديد", latitude: null, longitude: null, notes: "ملاحظة جديدة" });
+      await caller.filters.customers.update({ id: 7, name: "بعد التعديل", phone: "01111111111", address: "العنوان الجديد", latitude: null, longitude: null, notes: "ملاحظة جديدة", pin: TEST_PIN });
       const dashboard = await caller.filters.dashboard();
       expect(dashboard.dueReminders[0]?.customer).toMatchObject({ name: "بعد التعديل", phone: "01111111111", address: "العنوان الجديد" });
       expect(dashboard.upcomingVisits[0]?.customer).toMatchObject({ name: "بعد التعديل", phone: "01111111111", address: "العنوان الجديد" });
@@ -305,7 +310,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
         from: (table: unknown) => ({
           where: () => {
             if (table === customers) return { limit: async () => [{ id: 7, ownerId: 1, name: "عميل اختبار" }] };
-            if (table === notificationSettings) return { limit: async () => [{ ownerId: 1, leadDays: 1, alertHour: 9, alertMinute: 0, timezoneOffsetMinutes: 0, scheduleCronTaskUid: null }] };
+            if (table === notificationSettings) return { limit: async () => [{ ownerId: 1, leadDays: 1, alertHour: 9, alertMinute: 0, timezoneOffsetMinutes: 0, scheduleCronTaskUid: null, pinHash: TEST_PIN_HASH }] };
             if (table === reminders) return { orderBy: async () => reminderStatus === "pending" ? [{ id: 14, ownerId: 1, customerId: 7, status: "pending", alertedAt: null, reminderDate: new Date("2026-01-01T09:00:00.000Z") }] : [] };
             return [];
           },
@@ -355,14 +360,14 @@ describe("واجهات إدارة فلاتر المياه", () => {
     const pendingReminder = { id: 14, ownerId: 1, customerId: 7, visitId: 55, status: "pending" as const, reminderDate: new Date("2026-05-01T09:00:00.000Z") };
     const updateCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
     const db = {
-      select: () => ({ from: (table: unknown) => ({ where: () => ({ limit: async () => table === visits ? [firstVisit] : table === reminders ? [pendingReminder] : [] }) }) }),
+      select: () => ({ from: (table: unknown) => ({ where: () => ({ limit: async () => table === notificationSettings ? [{ ownerId: 1, pinHash: TEST_PIN_HASH }] : table === visits ? [firstVisit] : table === reminders ? [pendingReminder] : [] }) }) }),
       update: (table: unknown) => ({ set: (values: Record<string, unknown>) => ({ where: async () => { updateCalls.push({ table, values }); } }) }),
     };
     vi.mocked(getDb).mockResolvedValue(db as never);
     const caller = appRouter.createCaller(createContext());
     const correctedDate = new Date("2026-01-05T11:30:00.000Z");
 
-    await expect(caller.filters.visits.updateDate({ visitId: 55, visitDate: correctedDate })).resolves.toEqual({ success: true });
+    await expect(caller.filters.visits.updateDate({ visitId: 55, visitDate: correctedDate, pin: TEST_PIN })).resolves.toEqual({ success: true });
     expect(updateCalls.filter(call => call.table === cashTransactions)).toHaveLength(1);
     expect(updateCalls.find(call => call.table === visits)?.values).toEqual({ visitDate: correctedDate });
     expect(updateCalls.find(call => call.table === reminders)?.values).toEqual({ reminderDate: new Date("2026-05-05T11:30:00.000Z") });
@@ -393,15 +398,16 @@ describe("واجهات إدارة فلاتر المياه", () => {
   it("يعيد خطأ عدم العثور عند تحديث تذكير غير موجود", async () => {
     const db = {
       select: () => ({
-        from: () => ({
-          where: () => ({ limit: async () => [] }),
+        from: (table: unknown) => ({
+          where: () => ({ limit: async () => table === notificationSettings ? [{ ownerId: 1, pinHash: TEST_PIN_HASH }] : [] }),
         }),
       }),
+      update: () => ({ set: () => ({ where: async () => undefined }) }),
     };
     vi.mocked(getDb).mockResolvedValue(db as never);
     const caller = appRouter.createCaller(createContext());
 
-    await expect(caller.filters.reminders.updateStatus({ id: 404, status: "completed" }))
+    await expect(caller.filters.reminders.updateStatus({ id: 404, status: "completed", pin: TEST_PIN }))
       .rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -409,16 +415,16 @@ describe("واجهات إدارة فلاتر المياه", () => {
     const otherOwnersReminder = { id: 19, ownerId: 2, status: "pending" };
     const db = {
       select: () => ({
-        from: () => ({
+        from: (table: unknown) => ({
           // الاستعلام يقيّد النتيجة بـ ownerId للمستخدم الحالي، لذا لا يظهر تذكير المستخدم الآخر.
-          where: () => ({ limit: async () => otherOwnersReminder.ownerId === 1 ? [otherOwnersReminder] : [] }),
+          where: () => ({ limit: async () => table === notificationSettings ? [{ ownerId: 1, pinHash: TEST_PIN_HASH }] : otherOwnersReminder.ownerId === 1 ? [otherOwnersReminder] : [] }),
         }),
       }),
     };
     vi.mocked(getDb).mockResolvedValue(db as never);
     const caller = appRouter.createCaller(createContext());
 
-    await expect(caller.filters.reminders.updateStatus({ id: 19, status: "dismissed" }))
+    await expect(caller.filters.reminders.updateStatus({ id: 19, status: "dismissed", pin: TEST_PIN }))
       .rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
@@ -551,7 +557,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
 				from: (table: unknown) => ({
 					where: () => {
 						if (table === notificationSettings) {
-							return { limit: async () => [{ ownerId: 1, leadDays: 1, alertHour: 9, alertMinute: 0, timezoneOffsetMinutes: 0, scheduleCronTaskUid: null }] };
+							return { limit: async () => [{ ownerId: 1, leadDays: 1, alertHour: 9, alertMinute: 0, timezoneOffsetMinutes: 0, scheduleCronTaskUid: null, pinHash: TEST_PIN_HASH }] };
 						}
 						if (table === reminders) {
 							const rows = reminderQueryCount++ === 0 ? [dueReminder] : [upcomingReminder];

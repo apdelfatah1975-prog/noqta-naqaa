@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   due: vi.fn(),
   alerts: vi.fn(),
   updateMutation: vi.fn(),
+  deleteMutation: vi.fn(),
   invalidate: vi.fn(),
   location: vi.fn(),
   open: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("@/lib/trpc", () => ({
         due: { useQuery: mocks.due },
         alerts: { useQuery: mocks.alerts },
         updateStatus: { useMutation: mocks.updateMutation },
+        delete: { useMutation: mocks.deleteMutation },
       },
     },
     useUtils: () => ({
@@ -72,6 +74,7 @@ describe("حالات واتساب اليدوية في التذكيرات", () =>
     mocks.due.mockReturnValue({ data: [], isLoading: false, isError: false });
     mocks.alerts.mockReturnValue({ data: [], isLoading: false, isError: false });
     mocks.updateMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    mocks.deleteMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
   });
 
   afterEach(() => {
@@ -109,8 +112,10 @@ describe("حالات واتساب اليدوية في التذكيرات", () =>
 
     render(<Reminders />);
     fireEvent.click(screen.getByRole("button", { name: "تمت" }));
+    fireEvent.change(screen.getByPlaceholderText("••••"), { target: { value: "1234" } });
+    fireEvent.click(screen.getByRole("button", { name: "تأكيد" }));
 
-    expect(mutate).toHaveBeenCalledWith({ id: 41, status: "completed" });
+    expect(mutate).toHaveBeenCalledWith({ id: 41, status: "completed", pin: "1234" });
   });
 
   it("يخفي رسالة يوم الموعد بعد التأكيد ويستعيد الحالة بعد إعادة التحميل", () => {
