@@ -61,6 +61,14 @@ describe("ترابط تعديل بيانات العميل", () => {
     mocks.updateOptions = null;
   });
 
+  it("يرسل خيار الفرز حسب أقرب موعد إلى قائمة العملاء", () => {
+    render(<Customers />);
+    fireEvent.change(screen.getByLabelText("ترتيب العملاء"), { target: { value: "next_asc" } });
+    const latestInput = mocks.list.mock.calls.at(-1)?.[0];
+    expect(latestInput.sortBy).toBe("next_asc");
+    expect(latestInput.followUpStatus).toBe("all");
+  });
+
   it("يعيد جلب القائمة والملف واللوحة والتذكيرات بعد حفظ تعديل العميل", () => {
     render(<Customers />);
     fireEvent.click(screen.getByTitle("تعديل"));

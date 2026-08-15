@@ -244,6 +244,7 @@ export const filterManagementRouter = router({
       search: z.string().trim().max(160).optional(),
       followUpStatus: z.enum(["all", "overdue", "today", "upcoming", "none"]).default("all"),
       followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      sortBy: z.enum(["created_desc", "next_asc", "next_desc", "status"]).default("created_desc"),
     })).query(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const ownerFilter = eq(customers.ownerId, ctx.user.id);
@@ -266,6 +267,19 @@ export const filterManagementRouter = router({
             || (input.followUpStatus === "upcoming" && Boolean(followUp && followUp.daysRemaining > 0));
           const matchesDate = !input.followUpDate || Boolean(followUp && followUp.nextVisitDate.toISOString().slice(0, 10) === input.followUpDate);
           return matchesSearch && matchesStatus && matchesDate;
+        })
+        .sort((left, right) => {
+          if (input.sortBy === "next_asc" || input.sortBy === "next_desc") {
+            const leftDate = left.followUp?.nextVisitDate.getTime();
+            const rightDate = right.followUp?.nextVisitDate.getTime();
+            if (leftDate === undefined || rightDate === undefined) return leftDate === rightDate ? 0 : leftDate === undefined ? 1 : -1;
+            return (input.sortBy === "next_asc" ? 1 : -1) * (leftDate - rightDate);
+          }
+          if (input.sortBy === "status") {
+            const statusRank = (customer: typeof left) => !customer.followUp ? 4 : customer.followUp.daysRemaining < 0 ? 1 : customer.followUp.daysRemaining === 0 ? 2 : 3;
+            return statusRank(left) - statusRank(right) || left.name.localeCompare(right.name, "ar-EG");
+          }
+          return left.id - right.id;
         });
     }),
     get: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
