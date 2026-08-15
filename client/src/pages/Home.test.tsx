@@ -34,6 +34,7 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
       data: {
         todayVisits: [],
         upcomingVisits: [],
+        upcomingFollowUps: [],
         dueReminders: [],
         inventory: { totalItems: 0, lowStockCount: 0, lowStock: [] },
       },
@@ -52,7 +53,8 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
       isLoading: false,
       data: {
         todayVisits: [],
-        upcomingVisits: [{ id: 21, customerId: 7, visitType: "maintenance", visitDate: upcomingDate, customer: { name: "عميل متابعة", customerCode: "C-000007" } }],
+        upcomingVisits: [],
+        upcomingFollowUps: [{ id: 21, customerId: 7, reminderDate: upcomingDate, customer: { name: "عميل متابعة", customerCode: "٧", followUp: { daysRemaining: 3 } } }],
         dueReminders: [],
         inventory: { totalItems: 0, lowStockCount: 0, lowStock: [] },
       },
@@ -60,7 +62,7 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     render(<Home />);
     expect(screen.getByText("عميل متابعة")).toBeTruthy();
     expect(screen.getByText(/بعد 3 يوم/)).toBeTruthy();
-    expect(screen.getByText("أسماء العملاء ومواعيدهم القادمة")).toBeTruthy();
+    expect(screen.getByText("عملاء المتابعة التلقائية قبل الموعد بخمسة أيام")).toBeTruthy();
   });
 
   it("تظهر كبطاقة تفاعلية وتنتقل إلى صفحة الخزينة عند الضغط", () => {

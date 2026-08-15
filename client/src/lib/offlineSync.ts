@@ -25,6 +25,8 @@ export type PendingVisit = {
   visitType: "installation" | "maintenance" | "cartridge_change" | "follow_up" | "other";
   visitDate: string;
   notes: string | null;
+  collectedAmount?: number;
+  collectedCurrency?: "EGP" | "SAR";
   createdAt: string;
 };
 

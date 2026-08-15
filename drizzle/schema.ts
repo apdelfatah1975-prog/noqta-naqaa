@@ -156,9 +156,10 @@ export const cashTransactions = mysqlTable(
     amount: int("amount").notNull(),
     category: varchar("category", { length: 100 }).notNull(),
     transactionDate: timestamp("transactionDate").notNull(),
+    sourceVisitId: int("sourceVisitId").references(() => visits.id, { onDelete: "set null" }),
     recipientName: varchar("recipientName", { length: 160 }),
     notes: text("notes"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
-  table => [index("cash_transactions_owner_date_idx").on(table.ownerId, table.transactionDate)],
+  table => [index("cash_transactions_owner_date_idx").on(table.ownerId, table.transactionDate), index("cash_transactions_source_visit_idx").on(table.ownerId, table.sourceVisitId)],
 );

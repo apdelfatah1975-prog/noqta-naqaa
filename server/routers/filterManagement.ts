@@ -47,6 +47,8 @@ const visitInput = z.object({
   visitType: z.enum(visitTypes),
   visitDate: z.date(),
   notes: z.string().trim().max(2000).optional().nullable(),
+  collectedAmount: z.number().int().nonnegative().optional().default(0),
+  collectedCurrency: z.enum(cashCurrencies).optional().default("EGP"),
   clientOperationId: z.string().uuid().optional(),
 });
 
@@ -170,10 +172,11 @@ async function cashSummary(ownerId: number) {
   return { transactions, ...summaries.EGP, summaries };
 }
 
-async function remindersWithCustomers(ownerId: number, onlyDue: boolean) {
+async function remindersWithCustomers(ownerId: number, onlyDue: boolean, withinDays?: number) {
   const db = await databaseOrThrow();
   const filters = [eq(reminders.ownerId, ownerId), eq(reminders.status, "pending")];
   if (onlyDue) filters.push(lte(reminders.reminderDate, new Date()));
+  if (withinDays !== undefined) filters.push(lte(reminders.reminderDate, new Date(Date.now() + withinDays * 86400000)));
   const rows = await db.select().from(reminders).where(and(...filters)).orderBy(reminders.reminderDate);
   if (rows.length === 0) return [];
   const customerIds = Array.from(new Set(rows.map(row => row.customerId)));
@@ -222,9 +225,10 @@ export const filterManagementRouter = router({
     startOfToday.setHours(0, 0, 0, 0);
     const endOfToday = new Date(startOfToday);
     endOfToday.setDate(endOfToday.getDate() + 1);
-    const [todayVisits, upcomingVisits, dueReminders, inventory, cash] = await Promise.all([
+    const [todayVisits, upcomingVisits, upcomingFollowUps, dueReminders, inventory, cash] = await Promise.all([
       db.select().from(visits).where(and(eq(visits.ownerId, ownerId), gte(visits.visitDate, startOfToday), lte(visits.visitDate, endOfToday))).orderBy(visits.visitDate),
       db.select().from(visits).where(and(eq(visits.ownerId, ownerId), gte(visits.visitDate, now))).orderBy(visits.visitDate).limit(5),
+      remindersWithCustomers(ownerId, false, 5),
       remindersWithCustomers(ownerId, true),
       inventorySummary(ownerId),
       cashSummary(ownerId),
@@ -248,6 +252,7 @@ export const filterManagementRouter = router({
         const customer = customerById.get(visit.customerId);
         return { ...visit, customer: customer ? { ...customer, customerCode: customerCode(customerNumbers.get(customer.id) ?? customer.id) } : null };
       }),
+      upcomingFollowUps,
       dueReminders,
       inventory: {
         totalItems: inventory.items.length,
@@ -352,8 +357,9 @@ export const filterManagementRouter = router({
           };
         }
       }
-      await getOwnedCustomer(ctx.user.id, input.customerId);
-      const visitResult = await db.insert(visits).values({ ...input, ownerId: ctx.user.id });
+      const customer = await getOwnedCustomer(ctx.user.id, input.customerId);
+      const { clientOperationId, collectedAmount, collectedCurrency, ...visitData } = input;
+      const visitResult = await db.insert(visits).values({ ...visitData, ownerId: ctx.user.id, clientOperationId });
       const visitId = Number(visitResult[0].insertId);
       // تسجيل الزيارة يعني أن متابعة العميل تمت؛ لا نُبقي أي تذكير سابق معلقًا.
       await db.update(reminders)
@@ -370,6 +376,13 @@ export const filterManagementRouter = router({
           ownerId: ctx.user.id,
           reminderDate: followUpDate(input.visitDate),
         });
+      }
+      if (collectedAmount && collectedAmount > 0) {
+        const existingIncome = await db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.sourceVisitId, visitId))).limit(1);
+        if (!existingIncome[0]) {
+          const category = input.visitType === "installation" ? "تحصيل تركيب" : input.visitType === "maintenance" ? "تحصيل صيانة" : input.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
+          await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: collectedCurrency, amount: collectedAmount, category, transactionDate: input.visitDate, sourceVisitId: visitId, recipientName: customer.name, notes: "إيراد أُنشئ تلقائيًا من تسجيل الزيارة" });
+        }
       }
       return { id: visitId, reminderCreated: needsAutomaticReminder(input.visitType), alreadySynced: false };
     }),

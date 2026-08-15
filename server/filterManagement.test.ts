@@ -386,7 +386,31 @@ describe("واجهات إدارة فلاتر المياه", () => {
       .rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
-	it("يسجل عملية خزينة ضمن مالك الحساب الحالي", async () => {
+  it("يسجل المبلغ المحصل من الزيارة كإيراد مرتبط بها وبالعملة المختارة", async () => {
+    const insertCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
+    const customer = { id: 7, ownerId: 1, name: "عميل التحصيل" };
+    const db = {
+      select: () => ({ from: (table: unknown) => ({ where: () => ({ limit: async () => table === customers ? [customer] : [] }) }) }),
+      insert: (table: unknown) => ({ values: async (values: Record<string, unknown>) => { insertCalls.push({ table, values }); return [{ insertId: table === visits ? 123 : 456 }]; } }),
+      update: () => ({ set: () => ({ where: async () => undefined }) }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+
+    await expect(caller.filters.visits.create({
+      customerId: 7,
+      visitType: "follow_up",
+      visitDate: new Date("2026-08-15T09:00:00.000Z"),
+      collectedAmount: 27500,
+      collectedCurrency: "SAR",
+    })).resolves.toEqual({ id: 123, reminderCreated: false, alreadySynced: false });
+
+    expect(insertCalls).toEqual(expect.arrayContaining([
+      expect.objectContaining({ table: cashTransactions, values: expect.objectContaining({ ownerId: 1, transactionType: "income", amount: 27500, currency: "SAR", sourceVisitId: 123, recipientName: "عميل التحصيل" }) }),
+    ]));
+  });
+
+  it("يسجل عملية خزينة ضمن مالك الحساب الحالي", async () => {
     const insertCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
     const db = {
       insert: (table: unknown) => ({
