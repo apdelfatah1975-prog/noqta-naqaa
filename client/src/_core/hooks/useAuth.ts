@@ -60,12 +60,16 @@ export function useAuth(options?: UseAuthOptions) {
   }, [meQuery.data]);
 
   const state = useMemo(() => {
-    const offlineUser = typeof navigator !== "undefined" && !navigator.onLine ? getOfflineSession() : null;
-    const currentUser = meQuery.data ?? offlineUser;
+    // navigator.onLine is only a hint and can remain true when the API/server is
+    // unreachable. A cached session is therefore also valid after an auth query
+    // fails, which lets the protected shell render and use local data offline.
+    const cachedUser = getOfflineSession();
+    const networkUnavailable = typeof navigator !== "undefined" && !navigator.onLine;
+    const currentUser = meQuery.data ?? ((networkUnavailable || meQuery.error) ? cachedUser : null);
     return {
       user: currentUser,
-      loading: (!offlineUser && meQuery.isLoading) || logoutMutation.isPending,
-      error: offlineUser ? logoutMutation.error ?? null : meQuery.error ?? logoutMutation.error ?? null,
+      loading: (!currentUser && meQuery.isLoading) || logoutMutation.isPending,
+      error: currentUser ? logoutMutation.error ?? null : meQuery.error ?? logoutMutation.error ?? null,
       isAuthenticated: Boolean(currentUser),
     };
   }, [

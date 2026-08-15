@@ -83,6 +83,19 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(latestInput.followUpStatus).toBe("all");
   });
 
+  it("يعرض القائمة المحلية عند فشل الاتصال بالخادم", () => {
+    localStorage.setItem("purepoint-offline-customers", JSON.stringify([
+      { id: 44, manualCode: "٤٤", name: "عميل محفوظ محليًا", phone: "0500000000", address: "عنوان محلي", latitude: null, longitude: null, notes: null },
+    ]));
+    mocks.list.mockReturnValue({ data: undefined, isLoading: false, isError: true });
+
+    render(<Customers />);
+
+    expect(screen.getByText("عميل محفوظ محليًا")).toBeTruthy();
+    expect(screen.getByText(/تُعرض آخر قائمة عملاء محفوظة/)).toBeTruthy();
+    localStorage.removeItem("purepoint-offline-customers");
+  });
+
   it("يعيد جلب القائمة والملف واللوحة والتذكيرات بعد حفظ تعديل العميل", () => {
     render(<Customers />);
     fireEvent.click(screen.getByTitle("تعديل"));

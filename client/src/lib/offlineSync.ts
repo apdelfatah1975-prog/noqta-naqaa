@@ -20,7 +20,7 @@ export type PendingCustomer = Omit<OfflineCustomer, "id"> & {
   firstTechnicianName?: string | null;
   firstVisitNotes?: string | null;
   firstCollectedAmount?: number;
-  firstCollectedCurrency?: "EGP" | "SAR";
+  firstCollectedCurrency?: "SAR";
   localId: number;
   clientOperationId: string;
   createdAt: string;
@@ -33,7 +33,7 @@ export type PendingVisit = {
   visitDate: string;
   notes: string | null;
   collectedAmount?: number;
-  collectedCurrency?: "EGP" | "SAR";
+  collectedCurrency?: "SAR";
   createdAt: string;
 };
 
