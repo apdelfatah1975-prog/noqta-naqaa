@@ -1,24 +1,29 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
-import { ArrowLeft, BellRing, CalendarDays, ChevronLeft, PackageSearch, UsersRound } from "lucide-react";
+import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
+import { ArrowLeft, BellRing, CalendarDays, ChevronLeft, CircleDollarSign, PackageSearch, UsersRound } from "lucide-react";
+import React from "react";
 import { useLocation } from "wouter";
 
 const statStyles = [
-  { icon: UsersRound, color: "bg-teal-700", label: "عملاء اليوم", key: "today" },
-  { icon: CalendarDays, color: "bg-sky-600", label: "زيارات قادمة", key: "upcoming" },
-  { icon: BellRing, color: "bg-amber-500", label: "مستحقون للمتابعة", key: "due" },
-  { icon: PackageSearch, color: "bg-violet-600", label: "أصناف بالمخزنة", key: "inventory" },
+  { icon: UsersRound, color: "bg-teal-700", label: "عملاء اليوم", key: "today", href: "/customers" },
+  { icon: CalendarDays, color: "bg-sky-600", label: "زيارات قادمة", key: "upcoming", href: "/visits" },
+  { icon: BellRing, color: "bg-amber-500", label: "مستحقون للمتابعة", key: "due", href: "/reminders" },
+  { icon: PackageSearch, color: "bg-violet-600", label: "أصناف بالمخزنة", key: "inventory", href: "/inventory" },
+  { icon: CircleDollarSign, color: "bg-slate-800", label: "رصيد الخزينة (ج.م)", key: "cash", href: "/cash" },
 ] as const;
 
 export default function Home() {
   const { data, isLoading } = trpc.filters.dashboard.useQuery();
+  const { data: cash } = trpc.filters.cash.summary.useQuery();
   const [, setLocation] = useLocation();
   const counts = {
     today: data?.todayVisits.length ?? 0,
     upcoming: data?.upcomingVisits.length ?? 0,
     due: data?.dueReminders.length ?? 0,
     inventory: data?.inventory.totalItems ?? 0,
+    cash: Math.round((cash?.balance ?? 0) / 100),
   };
 
   return (
@@ -34,17 +39,26 @@ export default function Home() {
         </Button>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {statStyles.map(({ icon: Icon, color, label, key }) => (
-          <div key={key} className="soft-card flex items-center gap-4 p-5">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {statStyles.map(({ icon: Icon, color, label, key, href }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setLocation(href)}
+            aria-label={`فتح تفاصيل ${label}`}
+            className="soft-card group flex items-center gap-4 p-5 text-right transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(13,82,76,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
+          >
             <div className={`grid h-12 w-12 place-items-center rounded-2xl ${color} text-white shadow-lg shadow-black/10`}><Icon className="h-5 w-5" /></div>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-sm text-muted-foreground">{label}</p>
               <p className="mt-1 text-2xl font-extrabold">{isLoading ? "—" : counts[key]}</p>
             </div>
-          </div>
+            <ChevronLeft className="h-5 w-5 text-teal-700 opacity-0 transition group-hover:translate-x-[-2px] group-hover:opacity-100" />
+          </button>
         ))}
       </section>
+
+      <ReminderAlertBanner />
 
       <section className="grid gap-6 xl:grid-cols-5">
         <div className="soft-card xl:col-span-3">

@@ -1,4 +1,5 @@
-import { index, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { cashTransactionTypes } from "../shared/cashBusiness";
 
 /**
  * Core user table backing auth flow.
@@ -76,12 +77,32 @@ export const reminders = mysqlTable(
     ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
     reminderDate: timestamp("reminderDate").notNull(),
     status: mysqlEnum("status", ["pending", "completed", "dismissed"]).default("pending").notNull(),
+    alertedAt: timestamp("alertedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   table => [
     index("reminders_owner_status_date_idx").on(table.ownerId, table.status, table.reminderDate),
     index("reminders_customer_idx").on(table.customerId),
+  ],
+);
+
+export const notificationSettings = mysqlTable(
+  "notificationSettings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    leadDays: int("leadDays").default(1).notNull(),
+    alertHour: int("alertHour").default(9).notNull(),
+    alertMinute: int("alertMinute").default(0).notNull(),
+    timezoneOffsetMinutes: int("timezoneOffsetMinutes").default(180).notNull(),
+    scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("notification_settings_owner_unique").on(table.ownerId),
+    index("notification_settings_schedule_idx").on(table.scheduleCronTaskUid),
   ],
 );
 
@@ -116,4 +137,20 @@ export const inventoryMovements = mysqlTable(
     index("inventory_movements_item_idx").on(table.inventoryItemId),
     index("inventory_movements_owner_date_idx").on(table.ownerId, table.movementDate),
   ],
+);
+
+export const cashTransactions = mysqlTable(
+  "cashTransactions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    transactionType: mysqlEnum("transactionType", cashTransactionTypes).notNull(),
+    amount: int("amount").notNull(),
+    category: varchar("category", { length: 100 }).notNull(),
+    transactionDate: timestamp("transactionDate").notNull(),
+    recipientName: varchar("recipientName", { length: 160 }),
+    notes: text("notes"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [index("cash_transactions_owner_date_idx").on(table.ownerId, table.transactionDate)],
 );

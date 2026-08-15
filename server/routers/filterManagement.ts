@@ -1,20 +1,32 @@
 import { TRPCError } from "@trpc/server";
+import { parse as parseCookie } from "cookie";
 import { and, desc, eq, gte, inArray, like, lte } from "drizzle-orm";
 import { z } from "zod";
 import {
+  cashTransactions,
   customers,
   inventoryItems,
   inventoryMovements,
+  notificationSettings,
   reminders,
   visits,
 } from "../../drizzle/schema";
+import { calculateCashSummary, cashTransactionTypes } from "../../shared/cashBusiness";
 import {
+  DEFAULT_ALERT_HOUR,
+  DEFAULT_ALERT_LEAD_DAYS,
+  DEFAULT_ALERT_MINUTE,
+  DEFAULT_TIMEZONE_OFFSET_MINUTES,
+  alertDateForReminder,
   calculateStockBalance,
   followUpDate,
+  isAlertReady,
   needsAutomaticReminder,
   visitTypes,
 } from "../../shared/filterBusiness";
 import { getDb } from "../db";
+import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
+import { COOKIE_NAME } from "../../shared/const";
 import { protectedProcedure, router } from "../_core/trpc";
 
 const customerInput = z.object({
@@ -47,6 +59,29 @@ const inventoryMovementInput = z.object({
   technicianName: z.string().trim().max(160).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
 });
+
+const cashTransactionInput = z.object({
+  transactionType: z.enum(cashTransactionTypes),
+  amount: z.number().int().positive("أدخل مبلغًا أكبر من صفر"),
+  category: z.string().trim().min(2, "أدخل تصنيف العملية").max(100),
+  transactionDate: z.date(),
+  recipientName: z.string().trim().max(160).optional().nullable(),
+  notes: z.string().trim().max(2000).optional().nullable(),
+});
+
+const notificationSettingsInput = z.object({
+  leadDays: z.number().int().min(1).max(14).default(DEFAULT_ALERT_LEAD_DAYS),
+  alertHour: z.number().int().min(0).max(23).default(DEFAULT_ALERT_HOUR),
+  alertMinute: z.number().int().min(0).max(59).default(DEFAULT_ALERT_MINUTE),
+  timezoneOffsetMinutes: z.number().int().min(-720).max(840).default(DEFAULT_TIMEZONE_OFFSET_MINUTES),
+});
+
+const defaultNotificationSettings = {
+  leadDays: DEFAULT_ALERT_LEAD_DAYS,
+  alertHour: DEFAULT_ALERT_HOUR,
+  alertMinute: DEFAULT_ALERT_MINUTE,
+  timezoneOffsetMinutes: DEFAULT_TIMEZONE_OFFSET_MINUTES,
+};
 
 async function databaseOrThrow() {
   const db = await getDb();
@@ -89,6 +124,16 @@ async function inventorySummary(ownerId: number) {
   return { items: itemBalances, movements };
 }
 
+async function cashSummary(ownerId: number) {
+  const db = await databaseOrThrow();
+  const transactions = await db
+    .select()
+    .from(cashTransactions)
+    .where(eq(cashTransactions.ownerId, ownerId))
+    .orderBy(desc(cashTransactions.transactionDate));
+  return { transactions, ...calculateCashSummary(transactions) };
+}
+
 async function remindersWithCustomers(ownerId: number, onlyDue: boolean) {
   const db = await databaseOrThrow();
   const filters = [eq(reminders.ownerId, ownerId), eq(reminders.status, "pending")];
@@ -101,6 +146,12 @@ async function remindersWithCustomers(ownerId: number, onlyDue: boolean) {
   return rows.map(reminder => ({ ...reminder, customer: customerById.get(reminder.customerId) ?? null }));
 }
 
+async function getNotificationSettings(ownerId: number) {
+  const db = await databaseOrThrow();
+  const rows = await db.select().from(notificationSettings).where(eq(notificationSettings.ownerId, ownerId)).limit(1);
+  return rows[0] ?? { ownerId, ...defaultNotificationSettings, scheduleCronTaskUid: null };
+}
+
 export const filterManagementRouter = router({
   dashboard: protectedProcedure.query(async ({ ctx }) => {
     const db = await databaseOrThrow();
@@ -110,11 +161,12 @@ export const filterManagementRouter = router({
     startOfToday.setHours(0, 0, 0, 0);
     const endOfToday = new Date(startOfToday);
     endOfToday.setDate(endOfToday.getDate() + 1);
-    const [todayVisits, upcomingVisits, dueReminders, inventory] = await Promise.all([
+    const [todayVisits, upcomingVisits, dueReminders, inventory, cash] = await Promise.all([
       db.select().from(visits).where(and(eq(visits.ownerId, ownerId), gte(visits.visitDate, startOfToday), lte(visits.visitDate, endOfToday))).orderBy(visits.visitDate),
       db.select().from(visits).where(and(eq(visits.ownerId, ownerId), gte(visits.visitDate, now))).orderBy(visits.visitDate).limit(5),
       remindersWithCustomers(ownerId, true),
       inventorySummary(ownerId),
+      cashSummary(ownerId),
     ]);
     const visitCustomerIds = Array.from(new Set([...todayVisits, ...upcomingVisits].map(visit => visit.customerId)));
     const visitCustomers = visitCustomerIds.length
@@ -127,6 +179,7 @@ export const filterManagementRouter = router({
       upcomingVisits: upcomingVisits.map(visit => ({ ...visit, customer: customerById.get(visit.customerId) ?? null })),
       dueReminders,
       inventory: { totalItems: inventory.items.length, lowStockCount: lowStock.length, lowStock },
+      cash: { incomeTotal: cash.incomeTotal, expenseTotal: cash.expenseTotal, balance: cash.balance },
     };
   }),
 
@@ -182,6 +235,13 @@ export const filterManagementRouter = router({
 
   reminders: router({
     due: protectedProcedure.query(({ ctx }) => remindersWithCustomers(ctx.user.id, true)),
+    alerts: protectedProcedure.query(async ({ ctx }) => {
+      const settings = await getNotificationSettings(ctx.user.id);
+      const pending = await remindersWithCustomers(ctx.user.id, false);
+      return pending
+        .filter(reminder => isAlertReady(reminder.reminderDate, settings))
+        .map(reminder => ({ ...reminder, alertDate: alertDateForReminder(reminder.reminderDate, settings) }));
+    }),
     updateStatus: protectedProcedure.input(z.object({ id: z.number().int().positive(), status: z.enum(["completed", "dismissed"]) })).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const reminder = await db.select().from(reminders).where(and(eq(reminders.id, input.id), eq(reminders.ownerId, ctx.user.id))).limit(1);
@@ -190,6 +250,46 @@ export const filterManagementRouter = router({
       }
       await db.update(reminders).set({ status: input.status }).where(and(eq(reminders.id, input.id), eq(reminders.ownerId, ctx.user.id)));
       return { success: true };
+    }),
+  }),
+
+  notifications: router({
+    settings: protectedProcedure.query(({ ctx }) => getNotificationSettings(ctx.user.id)),
+    nextAlert: protectedProcedure.query(async ({ ctx }) => {
+      const settings = await getNotificationSettings(ctx.user.id);
+      const pending = await remindersWithCustomers(ctx.user.id, false);
+      const upcoming = pending
+        .filter(reminder => !reminder.alertedAt)
+        .map(reminder => ({ ...reminder, alertDate: alertDateForReminder(reminder.reminderDate, settings) }))
+        .sort((first, second) => first.alertDate.getTime() - second.alertDate.getTime());
+      return upcoming[0] ?? null;
+    }),
+    saveSettings: protectedProcedure.input(notificationSettingsInput).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...input }).onDuplicateKeyUpdate({ set: input });
+      return getNotificationSettings(ctx.user.id);
+    }),
+    enableScheduledAlerts: protectedProcedure.input(notificationSettingsInput).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const sessionToken = parseCookie(ctx.req.headers.cookie ?? "")[COOKIE_NAME] ?? "";
+      if (!sessionToken) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "سجّل الدخول لتفعيل التنبيهات التلقائية." });
+      }
+      await db.insert(notificationSettings).values({ ownerId: ctx.user.id, ...input }).onDuplicateKeyUpdate({ set: input });
+      const settings = await getNotificationSettings(ctx.user.id);
+      const cron = "0 */5 * * * *";
+      if (settings.scheduleCronTaskUid) {
+        const result = await updateHeartbeatJob(settings.scheduleCronTaskUid, { cron, enable: true, description: "فحص تنبيهات مواعيد فلاتر المياه كل خمس دقائق" }, sessionToken);
+        return { active: true, nextExecutionAt: result.nextExecutionAt ?? null };
+      }
+      const job = await createHeartbeatJob({
+        name: `water-filter-reminders-${ctx.user.id}`,
+        cron,
+        path: "/api/scheduled/reminder-alerts",
+        description: "إرسال تنبيه قبل مواعيد متابعة فلاتر المياه",
+      }, sessionToken);
+      await db.update(notificationSettings).set({ scheduleCronTaskUid: job.taskUid }).where(eq(notificationSettings.ownerId, ctx.user.id));
+      return { active: true, nextExecutionAt: job.nextExecutionAt ?? null };
     }),
   }),
 
@@ -214,6 +314,15 @@ export const filterManagementRouter = router({
       }
       await db.insert(inventoryMovements).values({ ...input, ownerId: ctx.user.id });
       return { success: true };
+    }),
+  }),
+
+  cash: router({
+    summary: protectedProcedure.query(({ ctx }) => cashSummary(ctx.user.id)),
+    create: protectedProcedure.input(cashTransactionInput).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const result = await db.insert(cashTransactions).values({ ...input, ownerId: ctx.user.id });
+      return { id: Number(result[0].insertId) };
     }),
   }),
 });

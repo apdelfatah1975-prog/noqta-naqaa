@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { inventoryItems, inventoryMovements, reminders, visits } from "../drizzle/schema";
+import { cashTransactions, customers, inventoryItems, inventoryMovements, notificationSettings, reminders, visits } from "../drizzle/schema";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
 import type { TrpcContext } from "./_core/context";
@@ -110,4 +110,132 @@ describe("واجهات إدارة فلاتر المياه", () => {
     await expect(caller.filters.reminders.updateStatus({ id: 19, status: "dismissed" }))
       .rejects.toMatchObject({ code: "NOT_FOUND" });
   });
+
+	it("يسجل عملية خزينة ضمن مالك الحساب الحالي", async () => {
+    const insertCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
+    const db = {
+      insert: (table: unknown) => ({
+        values: async (values: Record<string, unknown>) => {
+          insertCalls.push({ table, values });
+          return [{ insertId: 91 }];
+        },
+      }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+
+    await expect(caller.filters.cash.create({
+      transactionType: "expense",
+      amount: 350,
+      category: "مستلزمات تشغيل",
+      transactionDate: new Date("2026-08-15T09:00:00.000Z"),
+      recipientName: "فني الصيانة",
+    })).resolves.toEqual({ id: 91 });
+
+		expect(insertCalls).toEqual([expect.objectContaining({
+			table: cashTransactions,
+			values: expect.objectContaining({ ownerId: 1, amount: 350, transactionType: "expense" }),
+		})]);
+	});
+
+	it("يعيد حساب وقت الإشعار القادم فور حفظ وقت تنبيه جديد", async () => {
+		let savedSettings = {
+			ownerId: 1,
+			leadDays: 1,
+			alertHour: 9,
+			alertMinute: 0,
+			timezoneOffsetMinutes: 180,
+			scheduleCronTaskUid: null,
+		};
+		const pendingReminder = {
+			id: 23,
+			ownerId: 1,
+			customerId: 7,
+			status: "pending" as const,
+			alertedAt: null,
+			reminderDate: new Date("2026-05-10T21:00:00.000Z"),
+		};
+		const db = {
+			select: () => ({
+				from: (table: unknown) => ({
+					where: () => {
+						if (table === notificationSettings) return { limit: async () => [savedSettings] };
+						if (table === reminders) return { orderBy: async () => [pendingReminder] };
+						if (table === customers) return [{ id: 7, ownerId: 1, name: "عميل الاختبار" }];
+						return [];
+					},
+				}),
+			}),
+			insert: () => ({
+				values: (values: Record<string, unknown>) => ({
+					onDuplicateKeyUpdate: async () => {
+						savedSettings = { ...savedSettings, ...values } as typeof savedSettings;
+					},
+				}),
+			}),
+		};
+		vi.mocked(getDb).mockResolvedValue(db as never);
+		const caller = appRouter.createCaller(createContext());
+
+		const beforeSave = await caller.filters.notifications.nextAlert();
+		expect(beforeSave?.alertDate.toISOString()).toBe("2026-05-10T06:00:00.000Z");
+
+		await caller.filters.notifications.saveSettings({
+			leadDays: 1,
+			alertHour: 14,
+			alertMinute: 30,
+			timezoneOffsetMinutes: 180,
+		});
+
+		const afterSave = await caller.filters.notifications.nextAlert();
+		expect(afterSave?.alertDate.toISOString()).toBe("2026-05-10T11:30:00.000Z");
+	});
+
+	it("يوفر التذكير المستحق والقريب للمصادر التي يعرضها بانر لوحة التحكم", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-08-15T12:00:00.000Z"));
+		const dueReminder = {
+			id: 81,
+			ownerId: 1,
+			customerId: 7,
+			status: "pending" as const,
+			alertedAt: null,
+			reminderDate: new Date("2026-08-14T12:00:00.000Z"),
+		};
+		const upcomingReminder = {
+			id: 82,
+			ownerId: 1,
+			customerId: 7,
+			status: "pending" as const,
+			alertedAt: null,
+			reminderDate: new Date("2026-08-16T15:00:00.000Z"),
+		};
+		let reminderQueryCount = 0;
+		const db = {
+			select: () => ({
+				from: (table: unknown) => ({
+					where: () => {
+						if (table === notificationSettings) {
+							return { limit: async () => [{ ownerId: 1, leadDays: 1, alertHour: 9, alertMinute: 0, timezoneOffsetMinutes: 0, scheduleCronTaskUid: null }] };
+						}
+						if (table === reminders) {
+							const rows = reminderQueryCount++ === 0 ? [dueReminder] : [upcomingReminder];
+							return { orderBy: async () => rows };
+						}
+						if (table === customers) return [{ id: 7, ownerId: 1, name: "عميل الاختبار" }];
+						return [];
+					},
+				}),
+			}),
+		};
+		vi.mocked(getDb).mockResolvedValue(db as never);
+		const caller = appRouter.createCaller(createContext());
+
+		try {
+			await expect(caller.filters.reminders.due()).resolves.toMatchObject([{ id: 81 }]);
+			await expect(caller.filters.reminders.alerts()).resolves.toMatchObject([{ id: 82, alertDate: new Date("2026-08-15T09:00:00.000Z") }]);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
 });

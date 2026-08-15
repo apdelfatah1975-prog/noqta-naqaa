@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateStockBalance, followUpDate, needsAutomaticReminder } from "../shared/filterBusiness";
+import { alertDateForReminder, calculateStockBalance, followUpDate, isAlertReady, mergeDashboardReminderAlerts, needsAutomaticReminder } from "../shared/filterBusiness";
 
 describe("منطق تطبيق فلاتر المياه", () => {
   it("ينشئ موعد المتابعة بعد 120 يومًا من تاريخ الزيارة", () => {
@@ -23,5 +23,25 @@ describe("منطق تطبيق فلاتر المياه", () => {
   it("يكشف أن الرصيد لا يكفي لصرف كمية أكبر من المتاح", () => {
     const balance = calculateStockBalance(3, [{ movementType: "outgoing", quantity: 1 }]);
     expect(5 > balance).toBe(true);
+  });
+
+  it("يبدأ التنبيه قبل الموعد بيوم عند الساعة التاسعة صباحًا بالتوقيت المضبوط", () => {
+    const settings = { leadDays: 1, alertHour: 9, alertMinute: 0, timezoneOffsetMinutes: 180 };
+    const reminderDate = new Date("2026-05-10T21:00:00.000Z"); // 11 مايو، 00:00 بالتوقيت المحلي +03:00
+    const alertDate = alertDateForReminder(reminderDate, settings);
+
+    expect(alertDate.toISOString()).toBe("2026-05-10T06:00:00.000Z");
+    expect(isAlertReady(reminderDate, settings, new Date("2026-05-10T05:59:59.000Z"))).toBe(false);
+    expect(isAlertReady(reminderDate, settings, new Date("2026-05-10T06:00:00.000Z"))).toBe(true);
+  });
+
+  it("يدمج التذكيرات المستحقة والقريبة دون تكرار ويرتبها حسب أقرب موعد", () => {
+    const due = { id: 2, reminderDate: new Date("2026-08-15T06:00:00.000Z") };
+    const upcoming = { id: 3, reminderDate: new Date("2026-08-16T06:00:00.000Z") };
+
+    expect(mergeDashboardReminderAlerts([due], [upcoming, due])).toEqual([
+      { reminder: due, isDue: true },
+      { reminder: upcoming, isDue: false },
+    ]);
   });
 });

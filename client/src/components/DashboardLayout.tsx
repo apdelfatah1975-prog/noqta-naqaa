@@ -25,6 +25,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import {
   BellRing,
   CalendarPlus,
+  CircleDollarSign,
   Droplets,
   LayoutDashboard,
   LogOut,
@@ -34,6 +35,7 @@ import {
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
+import { InstallAppButton } from "./InstallAppButton";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "الرئيسية", path: "/" },
@@ -41,6 +43,7 @@ const menuItems = [
   { icon: CalendarPlus, label: "تسجيل زيارة", path: "/visits" },
   { icon: BellRing, label: "التذكيرات", path: "/reminders" },
   { icon: PackageSearch, label: "المخزنة", path: "/inventory" },
+  { icon: CircleDollarSign, label: "الخزينة والمصروفات", path: "/cash" },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -61,6 +64,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Button onClick={() => startLogin()} size="lg" className="mt-8 h-12 w-full rounded-xl bg-teal-700 text-base hover:bg-teal-800">
             تسجيل الدخول
           </Button>
+          <div className="mt-3 flex justify-center">
+            <InstallAppButton />
+          </div>
         </div>
       </div>
     );
@@ -152,11 +158,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               <h2 className="text-sm font-extrabold text-foreground">{activeMenuItem.label}</h2>
             </div>
           </div>
-          {!isMobile ? (
-            <button onClick={toggleSidebar} className="grid h-10 w-10 place-items-center rounded-xl border border-teal-950/8 bg-white text-teal-800 transition hover:bg-teal-50" aria-label="طي القائمة الجانبية">
-              <Menu className="h-5 w-5" />
-            </button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            <InstallAppButton compact={isMobile} />
+            {!isMobile ? (
+              <button onClick={toggleSidebar} className="grid h-10 w-10 place-items-center rounded-xl border border-teal-950/8 bg-white text-teal-800 transition hover:bg-teal-50" aria-label="طي القائمة الجانبية">
+                <Menu className="h-5 w-5" />
+              </button>
+            ) : null}
+          </div>
         </header>
         <main className="min-w-0 min-h-[calc(100vh-4rem)] p-4 sm:p-6 lg:p-8">{children}</main>
       </SidebarInset>
