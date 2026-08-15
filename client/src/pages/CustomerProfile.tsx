@@ -57,7 +57,7 @@ export default function CustomerProfile() {
         <div className="bg-[linear-gradient(135deg,#064e4a,#0f766e)] p-6 text-white sm:flex sm:items-center sm:justify-between">
           <div>
             <p className="text-sm text-teal-100">ملف العميل</p>
-            <div className="mt-1 flex flex-wrap items-center gap-2"><h1 className="text-2xl font-extrabold">{customer.name}</h1><Badge className="border border-white/25 bg-white/15 text-white" dir="ltr">{customer.customerCode}</Badge></div>
+            <div className="mt-1 flex flex-wrap items-center gap-2"><h1 className="text-2xl font-extrabold">{customer.name}</h1><span className="text-lg font-extrabold text-white" dir="ltr">{customer.customerCode}</span></div>
             <p className="mt-2 text-sm text-teal-50/80" dir="ltr">{customer.phone}</p>
           </div>
           <Button onClick={() => setDialogOpen(true)} className="mt-5 rounded-xl bg-white text-teal-800 hover:bg-teal-50 sm:mt-0"><CalendarPlus className="ml-2 h-4 w-4" />تسجيل زيارة</Button>
