@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { trpc } from "@/lib/trpc";
 import { formatDate, toDateTimeLocal } from "@/lib/filterUi";
 import { ArrowDownLeft, ArrowUpRight, Boxes, PackagePlus, Plus } from "lucide-react";
-import { FormEvent, useState } from "react";
+import React, { FormEvent, useState } from "react";
 import { toast } from "sonner";
 
 export default function Inventory() {
@@ -76,13 +76,13 @@ export default function Inventory() {
       <section className="soft-card overflow-hidden">
         <div className="border-b border-teal-950/6 p-5"><h2 className="font-extrabold">آخر حركات المخزنة</h2><p className="mt-1 text-xs text-muted-foreground">الوارد والمنصرف مع تفاصيل الفني المستلم.</p></div>
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[760px] text-right">
-            <thead className="bg-teal-50/45 text-xs text-teal-950/65"><tr><th className="px-5 py-3 font-bold">التاريخ</th><th className="px-5 py-3 font-bold">الحركة</th><th className="px-5 py-3 font-bold">الكمية</th><th className="px-5 py-3 font-bold">الفني</th><th className="px-5 py-3 font-bold">ملاحظات</th></tr></thead>
-            <tbody className="divide-y divide-teal-950/6">{data?.movements.length ? data.movements.map(movement => <MovementTableRow key={movement.id} movement={movement} />) : <tr><td colSpan={5} className="p-10 text-center text-sm text-muted-foreground">لا توجد حركات مخزنة بعد.</td></tr>}</tbody>
+          <table className="w-full min-w-[900px] text-right">
+            <thead className="bg-teal-50/45 text-xs text-teal-950/65"><tr><th className="px-5 py-3 font-bold">التاريخ</th><th className="px-5 py-3 font-bold">الصنف</th><th className="px-5 py-3 font-bold">نوع الحركة</th><th className="px-5 py-3 font-bold">الكمية</th><th className="px-5 py-3 font-bold">الفني / المستلم</th><th className="px-5 py-3 font-bold">ملاحظات</th></tr></thead>
+            <tbody className="divide-y divide-teal-950/6">{data?.movements.length ? data.movements.map(movement => <MovementTableRow key={movement.id} movement={movement} />) : <tr><td colSpan={6} className="p-10 text-center text-sm text-muted-foreground">لا توجد حركات مخزنة بعد.</td></tr>}</tbody>
           </table>
         </div>
         <div className="divide-y divide-teal-950/6 md:hidden">
-          {data?.movements.length ? data.movements.map(movement => <div key={movement.id} className="p-5"><div className="flex items-center justify-between"><MovementType movementType={movement.movementType} /><span className="font-extrabold">{movement.quantity} قطعة</span></div><div className="mt-3 grid grid-cols-2 gap-y-2 text-xs text-muted-foreground"><p>التاريخ</p><p className="text-left text-teal-950">{formatDate(movement.movementDate)}</p><p>الفني</p><p className="text-left text-teal-950">{movement.technicianName || "—"}</p>{movement.notes ? <><p>ملاحظات</p><p className="text-left text-teal-950">{movement.notes}</p></> : null}</div></div>) : <div className="p-10 text-center text-sm text-muted-foreground">لا توجد حركات مخزنة بعد.</div>}
+          {data?.movements.length ? data.movements.map(movement => <div key={movement.id} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">الصنف</p><p className="mt-1 font-extrabold text-teal-950">{movement.inventoryItemName}</p></div><span className="font-extrabold">{movement.quantity} قطعة</span></div><div className="mt-3"><MovementType movementType={movement.movementType} /></div><div className="mt-3 grid grid-cols-2 gap-y-2 text-xs text-muted-foreground"><p>التاريخ</p><p className="text-left text-teal-950">{formatDate(movement.movementDate)}</p><p>الفني / المستلم</p><p className="text-left text-teal-950">{movement.technicianName || "—"}</p>{movement.notes ? <><p>ملاحظات</p><p className="text-left text-teal-950">{movement.notes}</p></> : null}</div></div>) : <div className="p-10 text-center text-sm text-muted-foreground">لا توجد حركات مخزنة بعد.</div>}
         </div>
       </section>
 
@@ -97,4 +97,4 @@ function InventoryTableRow({ item, onMovement }: { item: { id: number; name: str
 function EmptyInventoryRow({ isLoading }: { isLoading: boolean }) { return <tr><td colSpan={5} className="p-14 text-center"><Boxes className="mx-auto h-8 w-8 text-teal-200" /><p className="mt-3 text-sm text-muted-foreground">{isLoading ? "جارٍ تحميل المخزنة…" : "لا توجد أصناف مسجلة حتى الآن."}</p></td></tr>; }
 function EmptyInventoryCard({ isLoading }: { isLoading: boolean }) { return <div className="p-12 text-center"><Boxes className="mx-auto h-8 w-8 text-teal-200" /><p className="mt-3 text-sm text-muted-foreground">{isLoading ? "جارٍ تحميل المخزنة…" : "لا توجد أصناف مسجلة حتى الآن."}</p></div>; }
 function MovementType({ movementType }: { movementType: "incoming" | "outgoing" }) { return movementType === "incoming" ? <span className="inline-flex items-center gap-1 text-sm font-bold text-teal-700"><ArrowDownLeft className="h-4 w-4" />وارد</span> : <span className="inline-flex items-center gap-1 text-sm font-bold text-amber-700"><ArrowUpRight className="h-4 w-4" />منصرف</span>; }
-function MovementTableRow({ movement }: { movement: { id: number; movementDate: Date; movementType: "incoming" | "outgoing"; quantity: number; technicianName: string | null; notes: string | null } }) { return <tr><td className="px-5 py-4 text-sm">{formatDate(movement.movementDate)}</td><td className="px-5 py-4"><MovementType movementType={movement.movementType} /></td><td className="px-5 py-4 font-extrabold">{movement.quantity}</td><td className="px-5 py-4 text-sm">{movement.technicianName || "—"}</td><td className="max-w-64 truncate px-5 py-4 text-sm text-muted-foreground">{movement.notes || "—"}</td></tr>; }
+function MovementTableRow({ movement }: { movement: { id: number; movementDate: Date; inventoryItemName: string; movementType: "incoming" | "outgoing"; quantity: number; technicianName: string | null; notes: string | null } }) { return <tr><td className="px-5 py-4 text-sm">{formatDate(movement.movementDate)}</td><td className="px-5 py-4 font-bold text-teal-950">{movement.inventoryItemName}</td><td className="px-5 py-4"><MovementType movementType={movement.movementType} /></td><td className="px-5 py-4 font-extrabold">{movement.quantity}</td><td className="px-5 py-4 text-sm">{movement.technicianName || "—"}</td><td className="max-w-64 truncate px-5 py-4 text-sm text-muted-foreground">{movement.notes || "—"}</td></tr>; }

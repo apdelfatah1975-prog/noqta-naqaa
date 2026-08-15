@@ -121,7 +121,13 @@ async function inventorySummary(ownerId: number) {
       movements.filter(movement => movement.inventoryItemId === item.id),
     ),
   }));
-  return { items: itemBalances, movements };
+  return {
+    items: itemBalances,
+    movements: movements.map(movement => ({
+      ...movement,
+      inventoryItemName: items.find(item => item.id === movement.inventoryItemId)?.name ?? "صنف غير معروف",
+    })),
+  };
 }
 
 async function cashSummary(ownerId: number) {
