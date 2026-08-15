@@ -8,12 +8,14 @@ import { FormEvent, useState } from "react";
 import { toast } from "sonner";
 
 type Currency = "EGP" | "SAR";
+type IncomeFilter = "all" | "service";
 const currencyLabel = (currency: Currency) => currency === "SAR" ? "ريال سعودي" : "جنيه مصري";
 const currencyShortLabel = (currency: Currency) => currency === "SAR" ? "ر.س" : "ج.م";
 const formatMoney = (amount: number, currency: Currency = "EGP") => new Intl.NumberFormat("ar-EG", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount / 100);
 
 export default function Cash() {
-  const { data, isLoading, isError } = trpc.filters.cash.summary.useQuery();
+  const [incomeFilter, setIncomeFilter] = useState<IncomeFilter>("all");
+  const { data, isLoading, isError } = trpc.filters.cash.summary.useQuery({ incomeFilter });
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<"income" | "expense">("expense");
@@ -67,7 +69,7 @@ export default function Cash() {
     </section>
 
     <section className="soft-card overflow-hidden">
-      <div className="flex items-center justify-between border-b border-teal-950/6 p-5"><div><h2 className="font-extrabold">سجل العمليات</h2><p className="mt-1 text-xs text-muted-foreground">آخر الإيرادات والمصروفات المسجلة في الخزينة.</p></div><ReceiptText className="h-5 w-5 text-teal-700" /></div>
+      <div className="flex flex-col gap-4 border-b border-teal-950/6 p-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-extrabold">سجل العمليات</h2><p className="mt-1 text-xs text-muted-foreground">آخر الإيرادات والمصروفات المسجلة في الخزينة.</p></div><div className="flex items-center gap-3"><label className="flex items-center gap-2 text-sm font-bold text-teal-950"><span className="sr-only">تصفية الإيرادات</span><select className="field-input h-10 min-w-52 rounded-xl" value={incomeFilter} onChange={event => setIncomeFilter(event.target.value as IncomeFilter)}><option value="all">كل العمليات</option><option value="service">إيرادات الصيانة والتركيب</option></select></label><ReceiptText className="h-5 w-5 text-teal-700" /></div></div>
       <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[820px] text-right"><thead className="bg-teal-50/45 text-xs text-teal-950/65"><tr><th className="px-5 py-3 font-bold">التاريخ</th><th className="px-5 py-3 font-bold">النوع</th><th className="px-5 py-3 font-bold">العملة</th><th className="px-5 py-3 font-bold">التصنيف</th><th className="px-5 py-3 font-bold">المبلغ</th><th className="px-5 py-3 font-bold">الفني / الجهة</th><th className="px-5 py-3 font-bold">ملاحظات</th></tr></thead><tbody className="divide-y divide-teal-950/6">{data?.transactions.length ? data.transactions.map(transaction => <CashTableRow key={transaction.id} transaction={transaction} />) : <EmptyCashRow isLoading={isLoading} />}</tbody></table></div>
       <div className="divide-y divide-teal-950/6 md:hidden">{data?.transactions.length ? data.transactions.map(transaction => <CashCard key={transaction.id} transaction={transaction} />) : <div className="p-12 text-center text-sm text-muted-foreground">{isLoading ? "جارٍ تحميل الخزينة…" : "لا توجد عمليات مالية حتى الآن."}</div>}</div>
     </section>

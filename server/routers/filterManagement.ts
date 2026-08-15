@@ -161,15 +161,24 @@ async function inventorySummary(ownerId: number) {
   };
 }
 
-async function cashSummary(ownerId: number) {
+type CashIncomeFilter = "all" | "service";
+
+async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "all") {
   const db = await databaseOrThrow();
+  const filters = [eq(cashTransactions.ownerId, ownerId)];
+  if (incomeFilter === "service") {
+    filters.push(eq(cashTransactions.transactionType, "income"));
+  }
   const transactions = await db
     .select()
     .from(cashTransactions)
-    .where(eq(cashTransactions.ownerId, ownerId))
+    .where(and(...filters))
     .orderBy(desc(cashTransactions.transactionDate));
-  const summaries = calculateCashSummaries(transactions);
-  return { transactions, ...summaries.EGP, summaries };
+  const filteredTransactions = incomeFilter === "service"
+    ? transactions.filter(transaction => transaction.category === "تحصيل صيانة" || transaction.category === "تحصيل تركيب")
+    : transactions;
+  const summaries = calculateCashSummaries(filteredTransactions);
+  return { transactions: filteredTransactions, ...summaries.EGP, summaries, incomeFilter };
 }
 
 async function remindersWithCustomers(ownerId: number, onlyDue: boolean, withinDays?: number) {
@@ -473,7 +482,7 @@ export const filterManagementRouter = router({
   }),
 
   cash: router({
-    summary: adminProcedure.query(({ ctx }) => cashSummary(ctx.user.id)),
+    summary: adminProcedure.input(z.object({ incomeFilter: z.enum(["all", "service"]).default("all") }).optional()).query(({ ctx, input }) => cashSummary(ctx.user.id, input?.incomeFilter ?? "all")),
     create: adminProcedure.input(cashTransactionInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const result = await db.insert(cashTransactions).values({ ...input, ownerId: ctx.user.id });
