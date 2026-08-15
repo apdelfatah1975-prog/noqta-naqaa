@@ -229,7 +229,12 @@ export const filterManagementRouter = router({
         return { ...visit, customer: customer ? { ...customer, customerCode: customerCode(customer.id) } : null };
       }),
       dueReminders,
-      inventory: { totalItems: inventory.items.length, lowStockCount: lowStock.length, lowStock },
+      inventory: {
+        totalItems: inventory.items.length,
+        lowStockCount: lowStock.length,
+        lowStock,
+        items: inventory.items.map(item => ({ id: item.id, name: item.name, currentBalance: item.currentBalance })),
+      },
       cash: { incomeTotal: cash.incomeTotal, expenseTotal: cash.expenseTotal, balance: cash.balance },
     };
   }),

@@ -37,3 +37,39 @@ export function customerMapUrl(customer: { address?: string | null; latitude?: s
     : customer.address;
   return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : null;
 }
+
+export type WhatsAppReminderStage = "before" | "today";
+
+export function normalizeEgyptianWhatsAppPhone(phone: string | null | undefined) {
+  const digits = (phone ?? "").replace(/\D/g, "");
+  if (!digits) return null;
+  if (digits.startsWith("20")) return digits;
+  if (digits.startsWith("0")) return `20${digits.slice(1)}`;
+  return digits;
+}
+
+export function whatsappReminderStage(reminderDate: Date | string, now = new Date()): WhatsAppReminderStage | null {
+  const due = new Date(reminderDate);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfDue = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  const days = Math.round((startOfDue.getTime() - startOfToday.getTime()) / 86_400_000);
+  if (days === 1) return "before";
+  if (days === 0) return "today";
+  return null;
+}
+
+export function buildWhatsAppReminderMessage(customerName: string, reminderDate: Date | string, stage: WhatsAppReminderStage) {
+  const date = formatDate(reminderDate);
+  if (stage === "before") {
+    return `مرحبًا ${customerName}،\nنذكّركم بأن موعد الصيانة الدورية لفلتر المياه غدًا ${date}.\nيرجى الرد بالموافقة على الموعد أو التواصل معنا لتغييره.\nشركة نقطة نقاء`;
+  }
+  return `مرحبًا ${customerName}،\nكان موعد الصيانة الدورية لفلتر المياه اليوم ${date}.\nنرجو تأكيد مناسبة الزيارة أو الرد لطلب تغيير الموعد.\nشركة نقطة نقاء`;
+}
+
+export function buildWhatsAppUrl(phone: string | null | undefined, message: string) {
+  const normalized = normalizeEgyptianWhatsAppPhone(phone);
+  return normalized ? `https://wa.me/${normalized}?text=${encodeURIComponent(message)}` : null;
+}
+
+export const COMPANY_WHATSAPP_PHONE = "201008797774";
+export const COMPANY_WHATSAPP_DISPLAY_PHONE = "01008797774";
