@@ -96,6 +96,17 @@ describe("ترابط تعديل بيانات العميل", () => {
     localStorage.removeItem("purepoint-offline-customers");
   });
 
+  it("يمسح الكود اليدوي عند اختيار التوليد التلقائي", () => {
+    render(<Customers />);
+    fireEvent.click(screen.getByText("إضافة عميل"));
+    const codeInput = screen.getByPlaceholderText("مثال: ١٠٠ أو 100");
+    fireEvent.change(codeInput, { target: { value: "١٠٠" } });
+    expect((codeInput as HTMLInputElement).value).toBe("١٠٠");
+    fireEvent.click(screen.getByRole("button", { name: "تلقائي" }));
+    expect((codeInput as HTMLInputElement).value).toBe("");
+    expect(screen.getByText("سيُنشأ تلقائيًا بعد الحفظ")).toBeTruthy();
+  });
+
   it("يعيد جلب القائمة والملف واللوحة والتذكيرات بعد حفظ تعديل العميل", () => {
     render(<Customers />);
     fireEvent.click(screen.getByTitle("تعديل"));
