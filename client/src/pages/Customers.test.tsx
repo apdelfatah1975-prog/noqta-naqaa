@@ -61,6 +61,20 @@ describe("ترابط تعديل بيانات العميل", () => {
     mocks.updateOptions = null;
   });
 
+  it("يعرض شارة موعد اليوم وشارة التأخر بوضوح", () => {
+    mocks.list.mockReturnValue({
+      data: [
+        { id: 12, name: "عميل اليوم", phone: "01000000000", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000012", followUp: { nextVisitDate: new Date("2026-08-15T09:00:00Z"), daysRemaining: 0 } },
+        { id: 13, name: "عميل متأخر", phone: "01000000001", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000013", followUp: { nextVisitDate: new Date("2026-08-10T09:00:00Z"), daysRemaining: -5 } },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+    render(<Customers />);
+    expect(screen.getByLabelText("موعد متابعة العميل اليوم")).toBeTruthy();
+    expect(screen.getByLabelText("العميل متأخر عن موعد المتابعة")).toBeTruthy();
+  });
+
   it("يرسل خيار الفرز حسب أقرب موعد إلى قائمة العملاء", () => {
     render(<Customers />);
     fireEvent.change(screen.getByLabelText("ترتيب العملاء"), { target: { value: "next_asc" } });
