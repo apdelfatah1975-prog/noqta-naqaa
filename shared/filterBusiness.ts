@@ -25,7 +25,7 @@ export function followUpDate(visitDate: Date) {
 }
 
 export function customerCode(customerId: number) {
-  return `C-${String(customerId).padStart(6, "0")}`;
+  return String(customerId).replace(/\d/g, digit => "٠١٢٣٤٥٦٧٨٩"[Number(digit)]);
 }
 
 export type FollowUpSourceVisit = { visitDate: Date; visitType: VisitType };

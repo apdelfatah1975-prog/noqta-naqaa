@@ -20,7 +20,7 @@ describe("منطق تطبيق فلاتر المياه", () => {
       { visitType: "maintenance" as const, visitDate: new Date("2026-03-01T09:00:00.000Z") },
     ], new Date("2026-06-19T09:00:00.000Z"));
 
-    expect(customerCode(7)).toBe("C-000007");
+    expect(customerCode(7)).toBe("٧");
     expect(summary).toMatchObject({
       lastServiceVisitType: "maintenance",
       lastServiceVisitDate: new Date("2026-03-01T09:00:00.000Z"),
