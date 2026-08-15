@@ -30,7 +30,6 @@ export default function Cash() {
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<"income" | "expense">("expense");
-  const [currency, setCurrency] = useState<Currency>("SAR");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [transactionDate, setTransactionDate] = useState(toDateTimeLocal());
@@ -42,7 +41,7 @@ export default function Cash() {
       utils.filters.cash.summary.invalidate();
       utils.filters.dashboard.invalidate();
       toast.success(transactionType === "income" ? "تم تسجيل الإيراد" : "تم تسجيل المصروف");
-      setOpen(false); setAmount(""); setCategory(""); setRecipientName(""); setNotes(""); setCurrency("SAR");
+      setOpen(false); setAmount(""); setCategory(""); setRecipientName(""); setNotes("");
     },
     onError: error => toast.error(error.message || "تعذر حفظ العملية المالية. حاول مرة أخرى."),
   });
@@ -51,7 +50,7 @@ export default function Cash() {
     event.preventDefault();
     createTransaction.mutate({
       transactionType,
-      currency,
+      currency: "SAR",
       amount: Math.round(Number(amount) * 100),
       category,
       transactionDate: new Date(transactionDate),
@@ -103,7 +102,7 @@ export default function Cash() {
       <div className="divide-y divide-teal-950/6 md:hidden">{data?.transactions.length ? data.transactions.map(transaction => <CashCard key={transaction.id} transaction={transaction} />) : <div className="p-12 text-center text-sm text-muted-foreground">{isLoading ? "جارٍ تحميل الخزينة…" : "لا توجد عمليات مالية حتى الآن."}</div>}</div>
     </section>
 
-    <Dialog open={open} onOpenChange={setOpen}><DialogContent dir="rtl"><DialogHeader><DialogTitle>تسجيل عملية مالية</DialogTitle></DialogHeader><form onSubmit={submit} className="grid gap-4 py-2 sm:grid-cols-2"><label><span className="field-label">نوع العملية</span><select className="field-input" value={transactionType} onChange={event => setTransactionType(event.target.value as "income" | "expense")}><option value="expense">مصروف</option><option value="income">إيراد</option></select></label><label><span className="field-label">العملة</span><select className="field-input" value={currency} onChange={event => setCurrency(event.target.value as Currency)}><option value="SAR">ريال سعودي (ر.س)</option></select></label><label><span className="field-label">المبلغ بـ {currencyShortLabel(currency)}</span><input type="number" min="0.01" step="0.01" className="field-input" value={amount} onChange={event => setAmount(event.target.value)} required placeholder="مثال: 250" /></label><label><span className="field-label">التصنيف</span><input className="field-input" value={category} onChange={event => setCategory(event.target.value)} required placeholder={transactionType === "expense" ? "مثال: مواصلات أو شراء مستلزمات" : "مثال: تحصيل صيانة"} /></label><label><span className="field-label">التاريخ والوقت</span><input type="datetime-local" className="field-input" value={transactionDate} onChange={event => setTransactionDate(event.target.value)} required /></label><label><span className="field-label">الفني أو الجهة المستلمة</span><input className="field-input" value={recipientName} onChange={event => setRecipientName(event.target.value)} placeholder="اختياري" /></label><label className="sm:col-span-2"><span className="field-label">ملاحظات</span><textarea className="field-textarea" value={notes} onChange={event => setNotes(event.target.value)} placeholder="تفاصيل إضافية عن العملية" /></label><div className="flex justify-end gap-3 sm:col-span-2"><Button type="button" variant="outline" onClick={() => setOpen(false)} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={createTransaction.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">{createTransaction.isPending ? "جارٍ الحفظ…" : "حفظ العملية"}</Button></div></form></DialogContent></Dialog>
+    <Dialog open={open} onOpenChange={setOpen}><DialogContent dir="rtl"><DialogHeader><DialogTitle>تسجيل عملية مالية</DialogTitle></DialogHeader><form onSubmit={submit} className="grid gap-4 py-2 sm:grid-cols-2"><label><span className="field-label">نوع العملية</span><select className="field-input" value={transactionType} onChange={event => setTransactionType(event.target.value as "income" | "expense")}><option value="expense">مصروف</option><option value="income">إيراد</option></select></label><label><span className="field-label">المبلغ بالريال السعودي</span><input type="number" min="0.01" step="0.01" className="field-input" value={amount} onChange={event => setAmount(event.target.value)} required placeholder="مثال: 250" /></label><label><span className="field-label">التصنيف</span><input className="field-input" value={category} onChange={event => setCategory(event.target.value)} required placeholder={transactionType === "expense" ? "مثال: مواصلات أو شراء مستلزمات" : "مثال: تحصيل صيانة"} /></label><label><span className="field-label">التاريخ والوقت</span><input type="datetime-local" className="field-input" value={transactionDate} onChange={event => setTransactionDate(event.target.value)} required /></label><label><span className="field-label">الفني أو الجهة المستلمة</span><input className="field-input" value={recipientName} onChange={event => setRecipientName(event.target.value)} placeholder="اختياري" /></label><label className="sm:col-span-2"><span className="field-label">ملاحظات</span><textarea className="field-textarea" value={notes} onChange={event => setNotes(event.target.value)} placeholder="تفاصيل إضافية عن العملية" /></label><div className="flex justify-end gap-3 sm:col-span-2"><Button type="button" variant="outline" onClick={() => setOpen(false)} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={createTransaction.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">{createTransaction.isPending ? "جارٍ الحفظ…" : "حفظ العملية"}</Button></div></form></DialogContent></Dialog>
   </div>;
 }
 

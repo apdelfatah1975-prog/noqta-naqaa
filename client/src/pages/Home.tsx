@@ -23,16 +23,16 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const counts = {
     today: data?.todayVisits.length ?? 0,
-    upcoming: data?.upcomingFollowUps.length ?? 0,
+    upcoming: data?.upcomingVisits.length ?? 0,
     due: data?.dueReminders.length ?? 0,
     inventory: data?.inventory.totalItems ?? 0,
     cash: Math.round((cash?.balance ?? 0) / 100),
   };
-  const nextVisit = data?.upcomingFollowUps[0];
+  const nextVisit = data?.upcomingVisits[0];
   const nextDueReminder = data?.dueReminders[0];
   const cardDetails = {
     today: "الزيارات المسجلة لهذا اليوم",
-    upcoming: nextVisit ? `${nextVisit.customer?.name || "عميل"} · ${formatDateTime(nextVisit.reminderDate)}` : "لا توجد متابعات قريبة",
+    upcoming: nextVisit ? `${nextVisit.customer?.name || "عميل"} · ${formatDateTime(nextVisit.visitDate)}` : "لا توجد زيارات مسجلة",
     due: nextDueReminder ? `${nextDueReminder.customer?.name || "عميل"} · متأخر ${nextDueReminder.daysOverdue} يوم` : "لا توجد متابعة متأخرة",
     inventory: "عدد الأصناف المسجلة",
     cash: "الرصيد بالريال السعودي",
@@ -75,17 +75,17 @@ export default function Home() {
       <section className="grid gap-6 xl:grid-cols-5">
         <div className="soft-card xl:col-span-3">
           <div className="flex items-center justify-between border-b border-teal-950/6 p-5">
-            <div><div className="flex items-center gap-2"><h2 className="font-extrabold">الزيارات القادمة</h2><span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-700">{data?.upcomingFollowUps.length ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">عملاء المتابعة التلقائية قبل الموعد بخمسة أيام</p><p className="mt-1 text-[11px] font-semibold text-sky-700">تظهر تلقائيًا من آخر تركيب أو صيانة</p></div>
-            <div className="flex items-center gap-3"><span title="هذه متابعة محسوبة تلقائيًا بعد 120 يومًا" className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Info className="h-3.5 w-3.5" />متابعة تلقائية</span><button onClick={() => setLocation("/visits")} className="text-sm font-bold text-teal-700 hover:text-teal-900">عرض الكل</button></div>
+            <div><div className="flex items-center gap-2"><h2 className="font-extrabold">الزيارات القادمة</h2><span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-700">{data?.upcomingVisits.length ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">مواعيد سجلتها يدويًا وتأتي بعد اليوم</p><p className="mt-1 text-[11px] font-semibold text-sky-700">مخصصة لتنظيم الزيارات المحجوزة مسبقًا</p></div>
+            <div className="flex items-center gap-3"><span title="هذه مواعيد مسجلة يدويًا" className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Info className="h-3.5 w-3.5" />موعد مسجل</span><button onClick={() => setLocation("/visits")} className="text-sm font-bold text-teal-700 hover:text-teal-900">عرض الكل</button></div>
           </div>
           <div className="divide-y divide-teal-950/6">
-            {data?.upcomingFollowUps.length ? data.upcomingFollowUps.map(reminder => {
-              const days = reminder.customer?.followUp?.daysRemaining ?? 0;
-              return <button key={reminder.id} onClick={() => setLocation(`/customers/${reminder.customerId}`)} className="flex w-full items-center justify-between gap-3 p-4 text-right hover:bg-teal-50/55">
-                <div className="min-w-0"><p className="truncate font-bold">{reminder.customer?.name || "عميل"}</p><p className="mt-1 text-xs text-muted-foreground">{reminder.customer?.customerCode ? `${reminder.customer.customerCode} · ` : ""}متابعة تلقائية · {formatDateTime(reminder.reminderDate)}</p></div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-extrabold ${days <= 0 ? "bg-amber-100 text-amber-800" : "bg-sky-50 text-sky-700"}`}>{days === 0 ? "اليوم" : days < 0 ? `متأخر ${Math.abs(days)} يوم` : `بعد ${days} يوم`}</span><ChevronLeft className="h-5 w-5 shrink-0 text-teal-600" />
+            {data?.upcomingVisits.length ? data.upcomingVisits.map(visit => {
+              const days = daysUntil(visit.visitDate);
+              return <button key={visit.id} onClick={() => setLocation(`/customers/${visit.customerId}`)} className="flex w-full items-center justify-between gap-3 p-4 text-right hover:bg-teal-50/55">
+                <div className="min-w-0"><p className="truncate font-bold">{visit.customer?.name || "عميل"}</p><p className="mt-1 text-xs text-muted-foreground">{visit.customer?.customerCode ? `${visit.customer.customerCode} · ` : ""}{visitTypeLabels[visit.visitType as keyof typeof visitTypeLabels] || "زيارة"} · {formatDateTime(visit.visitDate)}</p></div>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-extrabold ${days <= 0 ? "bg-amber-100 text-amber-800" : "bg-sky-50 text-sky-700"}`}>{days === 0 ? "اليوم" : `بعد ${days} يوم`}</span><ChevronLeft className="h-5 w-5 shrink-0 text-teal-600" />
               </button>;
-            }) : <EmptyRow text="لا توجد متابعات قريبة حاليًا." action="فتح المتابعات" onAction={() => setLocation("/visits")} />}
+            }) : <EmptyRow text="لا توجد زيارات مسجلة قادمة حاليًا." action="تسجيل زيارة" onAction={() => setLocation("/visits")} />}
           </div>
         </div>
 

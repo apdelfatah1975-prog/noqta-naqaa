@@ -62,16 +62,16 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
       isLoading: false,
       data: {
         todayVisits: [],
-        upcomingVisits: [],
-        upcomingFollowUps: [{ id: 21, customerId: 7, reminderDate: upcomingDate, customer: { name: "عميل متابعة", customerCode: "٧", followUp: { daysRemaining: 3 } } }],
+        upcomingVisits: [{ id: 21, customerId: 7, visitDate: upcomingDate, visitType: "maintenance", customer: { name: "عميل بموعد مسجل", customerCode: "٧" } }],
+        upcomingFollowUps: [],
         dueReminders: [],
         inventory: { totalItems: 0, lowStockCount: 0, lowStock: [] },
       },
     });
     render(<Home />);
-    expect(screen.getByText("عميل متابعة")).toBeTruthy();
+    expect(screen.getByText("عميل بموعد مسجل")).toBeTruthy();
     expect(screen.getByText(/بعد 3 يوم/)).toBeTruthy();
-    expect(screen.getByText("عملاء المتابعة التلقائية قبل الموعد بخمسة أيام")).toBeTruthy();
+    expect(screen.getByText("مواعيد سجلتها يدويًا وتأتي بعد اليوم")).toBeTruthy();
   });
 
   it("تظهر كبطاقة تفاعلية وتنتقل إلى صفحة الخزينة عند الضغط", () => {
