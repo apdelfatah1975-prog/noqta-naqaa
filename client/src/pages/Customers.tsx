@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { useLocation } from "wouter";
 
 type VisitType = "installation" | "maintenance" | "cartridge_change" | "follow_up" | "other";
-type Currency = "SAR" | "EGP";
+type Currency = "SAR";
 type CustomerForm = { id?: number; manualCode: string; name: string; phone: string; address: string; latitude: string; longitude: string; notes: string; firstVisitType: VisitType; firstVisitDate: string; firstTechnicianName: string; firstVisitNotes: string; firstCollectedAmount: string; firstCollectedCurrency: Currency };
 function toDateTimeLocal() { const date = new Date(); date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); return date.toISOString().slice(0, 16); }
 const emptyCustomer: CustomerForm = { manualCode: "", name: "", phone: "", address: "", latitude: "", longitude: "", notes: "", firstVisitType: "installation", firstVisitDate: toDateTimeLocal(), firstTechnicianName: "", firstVisitNotes: "", firstCollectedAmount: "", firstCollectedCurrency: "SAR" };

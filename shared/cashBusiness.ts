@@ -1,7 +1,7 @@
 export const cashTransactionTypes = ["income", "expense"] as const;
 export type CashTransactionType = (typeof cashTransactionTypes)[number];
 
-export const cashCurrencies = ["SAR", "EGP"] as const;
+export const cashCurrencies = ["SAR"] as const;
 export const primaryCashCurrency: CashCurrency = "SAR";
 export type CashCurrency = (typeof cashCurrencies)[number];
 
@@ -45,8 +45,7 @@ export function calculateCashSummary(transactions: CashTransactionForSummary[]):
 
 export function calculateCashSummaries(transactions: CashTransactionForSummary[]) {
   return {
-    SAR: calculateCashSummary(transactions.filter(transaction => transaction.currency === "SAR")),
-    EGP: calculateCashSummary(transactions.filter(transaction => !transaction.currency || transaction.currency === "EGP")),
+    SAR: calculateCashSummary(transactions.filter(transaction => !transaction.currency || transaction.currency === "SAR")),
   } satisfies Record<CashCurrency, CashSummary>;
 }
 
@@ -77,12 +76,11 @@ function addToTechnicians(rows: CashTechnicianRow[], technician: string, amount:
 export function calculatePurchaseBreakdown(movements: Array<{ itemName?: string | null; movementType: "incoming" | "outgoing"; quantity: number; unitCost?: number | null; currency?: CashCurrency | null }>): PurchaseBreakdown {
   const result: PurchaseBreakdown = {
     SAR: { total: 0, items: [] },
-    EGP: { total: 0, items: [] },
   };
   for (const movement of movements) {
     const unitCost = movement.unitCost ?? 0;
     if (movement.movementType !== "incoming" || unitCost <= 0) continue;
-    const currency: CashCurrency = movement.currency === "SAR" ? "SAR" : "EGP";
+    const currency: CashCurrency = "SAR";
     const itemName = movement.itemName?.trim() || "صنف غير معروف";
     const amount = movement.quantity * unitCost;
     const current = result[currency];
@@ -105,10 +103,9 @@ export function calculatePurchaseBreakdown(movements: Array<{ itemName?: string 
 export function calculateCashBreakdown(transactions: CashTransactionForSummary[]): CashBreakdown {
   const result: CashBreakdown = {
     SAR: { income: [], expense: [], analytics: { installationIncome: 0, serviceIncome: 0, expenseByCategory: [], technicianExpenses: [] } },
-    EGP: { income: [], expense: [], analytics: { installationIncome: 0, serviceIncome: 0, expenseByCategory: [], technicianExpenses: [] } },
   };
   for (const transaction of transactions) {
-    const currency: CashCurrency = transaction.currency === "SAR" ? "SAR" : "EGP";
+    const currency: CashCurrency = "SAR";
     const category = transaction.category?.trim() || "غير مصنف";
     const current = result[currency];
     if (transaction.transactionType === "income") {
@@ -132,9 +129,9 @@ export function calculateCashBreakdown(transactions: CashTransactionForSummary[]
 }
 
 export function currencyLabel(currency: CashCurrency | null | undefined) {
-  return currency === "SAR" ? "ريال سعودي" : "جنيه مصري";
+  return "ريال سعودي";
 }
 
 export function currencySymbol(currency: CashCurrency | null | undefined) {
-  return currency === "SAR" ? "ر.س" : "ج.م";
+  return "ر.س";
 }

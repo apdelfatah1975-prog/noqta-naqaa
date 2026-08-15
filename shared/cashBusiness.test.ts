@@ -28,31 +28,29 @@ describe("calculateCashSummary", () => {
 });
 
 describe("calculateCashSummaries", () => {
-  it("يفصل إجماليات الجنيه المصري والريال السعودي دون خلط العملات", () => {
+  it("يجمع إجماليات الريال السعودي فقط دون خلط العملات", () => {
     expect(calculateCashSummaries([
-      { transactionType: "income", amount: 1000 },
-      { transactionType: "expense", amount: 250, currency: "EGP" },
+      { transactionType: "income", amount: 1000, currency: "SAR" },
+      { transactionType: "expense", amount: 250, currency: "SAR" },
       { transactionType: "income", amount: 400, currency: "SAR" },
       { transactionType: "expense", amount: 100, currency: "SAR" },
     ])).toEqual({
-      EGP: { incomeTotal: 1000, expenseTotal: 250, balance: 750 },
-      SAR: { incomeTotal: 400, expenseTotal: 100, balance: 300 },
+      SAR: { incomeTotal: 1400, expenseTotal: 350, balance: 1050 },
     });
   });
 });
 
 describe("calculateCashBreakdown", () => {
-  it("يجمع كل بند إيراد ومصروف بشكل مستقل مع فصل العملات", () => {
+  it("يجمع كل بند إيراد ومصروف بشكل مستقل بالريال السعودي", () => {
     expect(calculateCashBreakdown([
-      { transactionType: "income", amount: 150000, category: "تحصيل تركيب", currency: "EGP" },
-      { transactionType: "income", amount: 50000, category: "تحصيل تركيب", currency: "EGP" },
-      { transactionType: "income", amount: 80000, category: "تحصيل صيانة", currency: "EGP" },
-      { transactionType: "expense", amount: 20000, category: "بنزين", currency: "EGP" },
-      { transactionType: "expense", amount: 10000, category: "بنزين", currency: "EGP" },
+      { transactionType: "income", amount: 150000, category: "تحصيل تركيب", currency: "SAR" },
+      { transactionType: "income", amount: 50000, category: "تحصيل تركيب", currency: "SAR" },
+      { transactionType: "income", amount: 80000, category: "تحصيل صيانة", currency: "SAR" },
+      { transactionType: "expense", amount: 20000, category: "بنزين", currency: "SAR" },
+      { transactionType: "expense", amount: 10000, category: "بنزين", currency: "SAR" },
       { transactionType: "expense", amount: 1000, category: "بنزين", currency: "SAR", recipientName: "الفني أحمد" },
     ])).toEqual({
-      EGP: { income: [{ category: "تحصيل تركيب", total: 200000 }, { category: "تحصيل صيانة", total: 80000 }], expense: [{ category: "بنزين", total: 30000 }], analytics: { installationIncome: 200000, serviceIncome: 80000, expenseByCategory: [{ category: "بنزين", total: 30000 }], technicianExpenses: [] } },
-      SAR: { income: [], expense: [{ category: "بنزين", total: 1000 }], analytics: { installationIncome: 0, serviceIncome: 0, expenseByCategory: [{ category: "بنزين", total: 1000 }], technicianExpenses: [{ technician: "الفني أحمد", total: 1000 }] } },
+      SAR: { income: [{ category: "تحصيل تركيب", total: 200000 }, { category: "تحصيل صيانة", total: 80000 }], expense: [{ category: "بنزين", total: 31000 }], analytics: { installationIncome: 200000, serviceIncome: 80000, expenseByCategory: [{ category: "بنزين", total: 31000 }], technicianExpenses: [{ technician: "الفني أحمد", total: 1000 }] } },
     });
   });
 });

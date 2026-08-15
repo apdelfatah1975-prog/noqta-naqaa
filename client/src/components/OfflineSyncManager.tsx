@@ -40,7 +40,7 @@ export function OfflineSyncManager() {
           firstTechnicianName: customer.firstTechnicianName ?? null,
           firstVisitNotes: customer.firstVisitNotes ?? null,
           firstCollectedAmount: customer.firstCollectedAmount ?? 0,
-          firstCollectedCurrency: customer.firstCollectedCurrency ?? "SAR",
+          firstCollectedCurrency: "SAR",
           clientOperationId: customer.clientOperationId,
         });
         customerIdMap.set(customer.localId, result.id);
