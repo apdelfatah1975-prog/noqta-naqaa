@@ -1,8 +1,24 @@
 const SESSION_KEY = "purepoint-offline-session";
 const CUSTOMERS_KEY = "purepoint-offline-customers";
-const QUEUE_PREFIX = "purepoint-pending-visits";
+const CUSTOMER_QUEUE_PREFIX = "purepoint-pending-customers";
+const VISIT_QUEUE_PREFIX = "purepoint-pending-visits";
 
-export type OfflineCustomer = { id: number; name: string; phone: string };
+export type OfflineCustomer = {
+  id: number;
+  name: string;
+  phone: string;
+  address?: string | null;
+  latitude?: string | null;
+  longitude?: string | null;
+  notes?: string | null;
+};
+
+export type PendingCustomer = Omit<OfflineCustomer, "id"> & {
+  localId: number;
+  clientOperationId: string;
+  createdAt: string;
+};
+
 export type PendingVisit = {
   clientOperationId: string;
   customerId: number;
@@ -37,8 +53,8 @@ function writeJson(key: string, value: unknown) {
   if (available()) localStorage.setItem(key, JSON.stringify(value));
 }
 
-function queueKey(ownerId: number) {
-  return `${QUEUE_PREFIX}-${ownerId}`;
+function queueKey(prefix: string, ownerId: number) {
+  return `${prefix}-${ownerId}`;
 }
 
 function newOperationId() {
@@ -60,28 +76,58 @@ export function clearOfflineState() {
   const session = getOfflineSession();
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(CUSTOMERS_KEY);
-  if (session) localStorage.removeItem(queueKey(session.id));
+  if (session) {
+    localStorage.removeItem(queueKey(CUSTOMER_QUEUE_PREFIX, session.id));
+    localStorage.removeItem(queueKey(VISIT_QUEUE_PREFIX, session.id));
+  }
 }
 
 export function cacheOfflineCustomers(customers: OfflineCustomer[]) {
-  writeJson(CUSTOMERS_KEY, customers.map(({ id, name, phone }) => ({ id, name, phone })));
+  writeJson(CUSTOMERS_KEY, customers.map(({ id, name, phone, address, latitude, longitude, notes }) => ({ id, name, phone, address, latitude, longitude, notes })));
 }
 
 export function getOfflineCustomers() {
   return readJson<OfflineCustomer[]>(CUSTOMERS_KEY, []);
 }
 
+export function getPendingCustomers(ownerId: number) {
+  return readJson<PendingCustomer[]>(queueKey(CUSTOMER_QUEUE_PREFIX, ownerId), []);
+}
+
+export function queueOfflineCustomer(ownerId: number, customer: Omit<OfflineCustomer, "id">) {
+  const pending: PendingCustomer = {
+    ...customer,
+    localId: -Date.now(),
+    clientOperationId: newOperationId(),
+    createdAt: new Date().toISOString(),
+  };
+  writeJson(queueKey(CUSTOMER_QUEUE_PREFIX, ownerId), [...getPendingCustomers(ownerId), pending]);
+  cacheOfflineCustomers([...getOfflineCustomers(), { ...customer, id: pending.localId }]);
+  return pending;
+}
+
+export function removePendingCustomer(ownerId: number, clientOperationId: string) {
+  writeJson(queueKey(CUSTOMER_QUEUE_PREFIX, ownerId), getPendingCustomers(ownerId).filter(item => item.clientOperationId !== clientOperationId));
+}
+
+export function replaceOfflineCustomerId(localId: number, serverId: number) {
+  writeJson(CUSTOMERS_KEY, getOfflineCustomers().map(customer => customer.id === localId ? { ...customer, id: serverId } : customer));
+}
+
 export function getPendingVisits(ownerId: number) {
-  return readJson<PendingVisit[]>(queueKey(ownerId), []);
+  return readJson<PendingVisit[]>(queueKey(VISIT_QUEUE_PREFIX, ownerId), []);
 }
 
 export function queueOfflineVisit(ownerId: number, visit: Omit<PendingVisit, "clientOperationId" | "createdAt">) {
   const pending: PendingVisit = { ...visit, clientOperationId: newOperationId(), createdAt: new Date().toISOString() };
-  const visits = getPendingVisits(ownerId);
-  writeJson(queueKey(ownerId), [...visits, pending]);
+  writeJson(queueKey(VISIT_QUEUE_PREFIX, ownerId), [...getPendingVisits(ownerId), pending]);
   return pending;
 }
 
 export function removePendingVisit(ownerId: number, clientOperationId: string) {
-  writeJson(queueKey(ownerId), getPendingVisits(ownerId).filter(item => item.clientOperationId !== clientOperationId));
+  writeJson(queueKey(VISIT_QUEUE_PREFIX, ownerId), getPendingVisits(ownerId).filter(item => item.clientOperationId !== clientOperationId));
+}
+
+export function getPendingOperationCount(ownerId: number) {
+  return getPendingCustomers(ownerId).length + getPendingVisits(ownerId).length;
 }

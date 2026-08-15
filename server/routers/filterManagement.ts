@@ -39,6 +39,7 @@ const customerInput = z.object({
   latitude: z.string().trim().max(32).optional().nullable(),
   longitude: z.string().trim().max(32).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
+  clientOperationId: z.string().uuid().optional(),
 });
 
 const visitInput = z.object({
@@ -313,8 +314,16 @@ export const filterManagementRouter = router({
     }),
     create: protectedProcedure.input(customerInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
-      const result = await db.insert(customers).values({ ...input, ownerId: ctx.user.id });
-      return { id: Number(result[0].insertId) };
+      if (input.clientOperationId) {
+        const existing = await db.select().from(customers).where(and(
+          eq(customers.ownerId, ctx.user.id),
+          eq(customers.clientOperationId, input.clientOperationId),
+        )).limit(1);
+        if (existing[0]) return { id: existing[0].id, alreadySynced: true };
+      }
+      const { clientOperationId, ...data } = input;
+      const result = await db.insert(customers).values({ ...data, clientOperationId, ownerId: ctx.user.id });
+      return { id: Number(result[0].insertId), alreadySynced: false };
     }),
     update: protectedProcedure.input(customerInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();

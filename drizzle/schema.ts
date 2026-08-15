@@ -47,8 +47,13 @@ export const customers = mysqlTable(
     notes: text("notes"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+    clientOperationId: varchar("clientOperationId", { length: 64 }),
   },
-  table => [index("customers_owner_idx").on(table.ownerId), index("customers_phone_idx").on(table.phone)],
+  table => [
+    index("customers_owner_idx").on(table.ownerId),
+    index("customers_phone_idx").on(table.phone),
+    uniqueIndex("customers_owner_operation_unique").on(table.ownerId, table.clientOperationId),
+  ],
 );
 
 export const visits = mysqlTable(

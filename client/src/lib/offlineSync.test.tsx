@@ -4,7 +4,9 @@ import {
   clearOfflineState,
   getOfflineCustomers,
   getOfflineSession,
+  getPendingCustomers,
   getPendingVisits,
+  queueOfflineCustomer,
   queueOfflineVisit,
   rememberOfflineSession,
   removePendingVisit,
@@ -22,6 +24,13 @@ describe("التخزين المحلي للمزامنة", () => {
 
     expect(getOfflineSession()).toMatchObject({ id: 5, name: "مدير" });
     expect(getOfflineCustomers()).toEqual([{ id: 8, name: "عميل اختبار", phone: "01000000000" }]);
+  });
+
+  it("يضع العميل الجديد في طابور المزامنة ويظهر محليًا", () => {
+    const pending = queueOfflineCustomer(5, { name: "عميل دون اتصال", phone: "01011111111", address: null, latitude: null, longitude: null, notes: null });
+
+    expect(getPendingCustomers(5)).toEqual([expect.objectContaining({ clientOperationId: pending.clientOperationId, name: "عميل دون اتصال" })]);
+    expect(getOfflineCustomers()).toEqual([expect.objectContaining({ id: pending.localId, name: "عميل دون اتصال" })]);
   });
 
   it("يضع الزيارة في طابور الحساب ثم يزيلها بعد تأكيد المزامنة", () => {
