@@ -11,6 +11,20 @@ export type CashTransactionForSummary = {
   currency?: CashCurrency | null;
 };
 
+export type CashTransactionForSearch = {
+  recipientName?: string | null;
+  notes?: string | null;
+  category?: string | null;
+};
+
+export function matchesCashTransactionSearch(transaction: CashTransactionForSearch, search?: string) {
+  const query = search?.trim().toLocaleLowerCase("ar") ?? "";
+  if (!query) return true;
+  return [transaction.recipientName, transaction.notes, transaction.category]
+    .filter(Boolean)
+    .some(value => value!.toLocaleLowerCase("ar").includes(query));
+}
+
 export type CashSummary = {
   incomeTotal: number;
   expenseTotal: number;

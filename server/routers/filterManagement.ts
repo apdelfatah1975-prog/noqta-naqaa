@@ -11,7 +11,7 @@ import {
   reminders,
   visits,
 } from "../../drizzle/schema";
-import { calculateCashBreakdown, calculateCashSummaries, cashCurrencies, cashTransactionTypes } from "../../shared/cashBusiness";
+import { calculateCashBreakdown, calculateCashSummaries, cashCurrencies, cashTransactionTypes, matchesCashTransactionSearch } from "../../shared/cashBusiness";
 import {
   DEFAULT_ALERT_HOUR,
   DEFAULT_ALERT_LEAD_DAYS,
@@ -173,7 +173,7 @@ function matchesCashDateFilter(date: Date, dateFilter?: CashDateFilter) {
   return true;
 }
 
-async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "all", dateFilter?: CashDateFilter) {
+async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "all", dateFilter?: CashDateFilter, search?: string) {
   const db = await databaseOrThrow();
   const filters = [eq(cashTransactions.ownerId, ownerId)];
   if (incomeFilter === "service") {
@@ -187,11 +187,12 @@ async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "al
   const filteredTransactions = transactions.filter(transaction => {
     const isServiceIncome = transaction.category === "تحصيل صيانة" || transaction.category === "تحصيل تركيب";
     return (incomeFilter !== "service" || (transaction.transactionType === "income" && isServiceIncome))
-      && matchesCashDateFilter(new Date(transaction.transactionDate), dateFilter);
+      && matchesCashDateFilter(new Date(transaction.transactionDate), dateFilter)
+      && matchesCashTransactionSearch(transaction, search);
   });
   const summaries = calculateCashSummaries(filteredTransactions);
   const breakdown = calculateCashBreakdown(filteredTransactions);
-  return { transactions: filteredTransactions, ...summaries.EGP, summaries, breakdown, incomeFilter };
+  return { transactions: filteredTransactions, ...summaries.EGP, summaries, breakdown, incomeFilter, search: search?.trim() ?? "" };
 }
 
 async function remindersWithCustomers(ownerId: number, onlyDue: boolean, withinDays?: number) {
@@ -495,7 +496,7 @@ export const filterManagementRouter = router({
   }),
 
   cash: router({
-    summary: adminProcedure.input(z.object({ incomeFilter: z.enum(["all", "service"]).default("all"), month: z.string().regex(/^\d{4}-\d{2}$/).optional(), startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).optional()).query(({ ctx, input }) => cashSummary(ctx.user.id, input?.incomeFilter ?? "all", input ? { month: input.month, startDate: input.startDate, endDate: input.endDate } : undefined)),
+    summary: adminProcedure.input(z.object({ incomeFilter: z.enum(["all", "service"]).default("all"), month: z.string().regex(/^\d{4}-\d{2}$/).optional(), startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), search: z.string().max(160).optional() }).optional()).query(({ ctx, input }) => cashSummary(ctx.user.id, input?.incomeFilter ?? "all", input ? { month: input.month, startDate: input.startDate, endDate: input.endDate } : undefined, input?.search)),
     create: adminProcedure.input(cashTransactionInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const result = await db.insert(cashTransactions).values({ ...input, ownerId: ctx.user.id });

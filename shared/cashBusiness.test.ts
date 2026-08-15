@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { calculateCashBreakdown, calculateCashSummaries, calculateCashSummary } from "./cashBusiness";
+import { calculateCashBreakdown, calculateCashSummaries, calculateCashSummary, matchesCashTransactionSearch } from "./cashBusiness";
+
+describe("matchesCashTransactionSearch", () => {
+  it("يبحث باسم العميل أو الملاحظات مع تجاهل حالة الأحرف والمسافات", () => {
+    const transaction = { recipientName: "محمد أحمد", notes: "صيانة دورية للمطبخ", category: "تحصيل صيانة" };
+    expect(matchesCashTransactionSearch(transaction, "محمد")).toBe(true);
+    expect(matchesCashTransactionSearch(transaction, "دورية")).toBe(true);
+    expect(matchesCashTransactionSearch(transaction, "تركيب")).toBe(false);
+    expect(matchesCashTransactionSearch(transaction, "   ")).toBe(true);
+  });
+});
 
 describe("calculateCashSummary", () => {
   it("يجمع الإيرادات والمصروفات ويحسب رصيد الخزينة", () => {
