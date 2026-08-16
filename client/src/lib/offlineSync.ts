@@ -323,6 +323,10 @@ export function createOfflineBackup(now = new Date()): OfflineBackup {
   };
 }
 
+function serializeStoredValue(value: unknown) {
+  return typeof value === "string" ? value : JSON.stringify(value) ?? "";
+}
+
 function readableSheetRows(storage: Record<string, unknown>) {
   const groups: Record<string, Array<Record<string, unknown>>> = {
     "العملاء": [],
@@ -337,16 +341,40 @@ function readableSheetRows(storage: Record<string, unknown>) {
   };
 
   for (const [key, value] of Object.entries(storage)) {
-    const serialized = typeof value === "string" ? value : JSON.stringify(value);
-    const row = { "مفتاح البيانات": key, "القيمة": serialized ?? "" };
-    if (key.includes("customers")) groups["العملاء"].push(row);
-    else if (key.includes("visits")) groups["الزيارات"].push(row);
-    else if (key.includes("report")) groups["التقارير"].push(row);
-    else if (key.includes("cash")) groups["الخزينة"].push(row);
-    else if (key.includes("inventory")) groups["المخزن"].push(row);
-    else if (key.includes("pending")) groups["العمليات المعلقة"].push(row);
-    else if (key.includes("session")) groups["بيانات الحساب"].push(row);
-    else groups["بيانات محلية"].push(row);
+    const serialized = serializeStoredValue(value);
+    // هذه الورقة هي المصدر الكامل للاستعادة، لذلك تضم كل مفتاح purepoint بلا استثناء.
+    groups["بيانات محلية"].push({ "مفتاح البيانات": key, "القيمة": serialized });
+
+    let groupName = "بيانات محلية";
+    if (key.includes("customers")) groupName = "العملاء";
+    else if (key.includes("visits")) groupName = "الزيارات";
+    else if (key.includes("report")) groupName = "التقارير";
+    else if (key.includes("cash")) groupName = "الخزينة";
+    else if (key.includes("inventory")) groupName = "المخزن";
+    else if (key.includes("pending")) groupName = "العمليات المعلقة";
+    else if (key.includes("session")) groupName = "بيانات الحساب";
+
+    if (Array.isArray(value)) {
+      value.forEach((record, index) => {
+        groups[groupName].push({
+          "مفتاح البيانات": key,
+          "رقم السجل": index + 1,
+          "البيانات": serializeStoredValue(record),
+        });
+      });
+    } else if (value && typeof value === "object") {
+      groups[groupName].push({
+        "مفتاح البيانات": key,
+        "رقم السجل": 1,
+        "البيانات": serialized,
+      });
+    } else {
+      groups[groupName].push({
+        "مفتاح البيانات": key,
+        "رقم السجل": 1,
+        "البيانات": serialized,
+      });
+    }
   }
   return groups;
 }
@@ -365,7 +393,7 @@ export function downloadOfflineBackup(now = new Date()) {
   }];
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summary), "ملخص النسخة");
   for (const [sheetName, rows] of Object.entries(groups)) {
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.length ? rows : [{ "مفتاح البيانات": "لا توجد بيانات", "القيمة": "" }]), sheetName);
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.length ? rows : [{ "مفتاح البيانات": "لا توجد بيانات", "البيانات": "", "القيمة": "" }]), sheetName);
   }
   const output = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
   const blob = new Blob([output], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
