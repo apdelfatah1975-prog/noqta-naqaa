@@ -56,4 +56,25 @@ describe("التخزين المحلي للمزامنة", () => {
     expect(getOfflineSession()).toBeNull();
     expect(getPendingVisits(5)).toEqual([]);
   });
+
+  it("يحفظ ويسترجع 500 عميل محليًا بسرعة مناسبة للعمل دون اتصال", () => {
+    const customers = Array.from({ length: 500 }, (_, index) => ({
+      id: index + 1,
+      name: `عميل ${index + 1}`,
+      phone: `0100000${String(index).padStart(4, "0")}`,
+      address: null,
+      latitude: null,
+      longitude: null,
+      notes: null,
+    }));
+
+    const startedAt = performance.now();
+    cacheOfflineCustomers(customers);
+    const restored = getOfflineCustomers();
+    const elapsedMs = performance.now() - startedAt;
+
+    expect(restored).toHaveLength(500);
+    expect(restored[499]).toMatchObject({ id: 500, name: "عميل 500" });
+    expect(elapsedMs).toBeLessThan(500);
+  });
 });
