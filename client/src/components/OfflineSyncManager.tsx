@@ -15,6 +15,8 @@ export function OfflineSyncManager() {
   const { user } = useAuth();
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [syncFailed, setSyncFailed] = useState(false);
   const utils = trpc.useUtils();
   const { mutateAsync: syncCustomer } = trpc.filters.customers.create.useMutation();
   const { mutateAsync: syncVisit } = trpc.filters.visits.create.useMutation();
@@ -25,6 +27,8 @@ export function OfflineSyncManager() {
 
   const syncPendingOperations = useCallback(async () => {
     if (!user || !navigator.onLine) return;
+    setSyncing(true);
+    setSyncFailed(false);
     const customerIdMap = new Map<number, number>();
     for (const customer of getPendingCustomers(user.id)) {
       try {
@@ -47,6 +51,7 @@ export function OfflineSyncManager() {
         replaceOfflineCustomerId(customer.localId, result.id);
         removePendingCustomer(user.id, customer.clientOperationId);
       } catch {
+        setSyncFailed(true);
         break;
       }
     }
@@ -63,9 +68,11 @@ export function OfflineSyncManager() {
         });
         removePendingVisit(user.id, visit.clientOperationId);
       } catch {
+        setSyncFailed(true);
         break;
       }
     }
+    setSyncing(false);
     refreshCount();
     await Promise.all([
       utils.filters.dashboard.invalidate(),
@@ -89,13 +96,17 @@ export function OfflineSyncManager() {
   }, [refreshCount, syncPendingOperations]);
 
   if (online && pendingCount === 0) return null;
-  const message = online
-    ? `جارٍ مزامنة ${pendingCount} عملية محفوظة…`
-    : pendingCount
+  const message = !online
+    ? pendingCount
       ? `${pendingCount} عملية محفوظة وستتزامن عند عودة الإنترنت`
-      : "وضع دون إنترنت";
+      : "وضع دون إنترنت"
+    : syncing
+      ? `جارٍ مزامنة ${pendingCount} عملية محفوظة…`
+      : syncFailed
+        ? `تعذر مزامنة ${pendingCount} عملية. ستتم المحاولة لاحقًا.`
+        : `${pendingCount} عملية بانتظار المزامنة`;
   return (
-    <div className={`fixed bottom-4 left-4 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-xl px-4 py-3 text-xs font-bold shadow-lg ${online ? "bg-teal-700 text-white" : "bg-amber-500 text-amber-950"}`} role="status" aria-live="polite">
+    <div className={`fixed bottom-4 left-4 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-xl px-4 py-3 text-xs font-bold shadow-lg ${!online ? "bg-amber-500 text-amber-950" : syncFailed ? "bg-red-600 text-white" : "bg-teal-700 text-white"}`} role="status" aria-live="polite" title="حالة المزامنة">
       {online ? <CloudUpload className="h-4 w-4" /> : <CloudOff className="h-4 w-4" />}
       <span>{message}</span>
     </div>

@@ -6,7 +6,8 @@ import { trpc } from "@/lib/trpc";
 import { formatDate, toDateTimeLocal } from "@/lib/filterUi";
 import { ArrowDownRight, ArrowUpLeft, CircleDollarSign, Plus, ReceiptText, Search, WalletCards } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 type Currency = "SAR";
@@ -17,6 +18,7 @@ const currencyShortLabel = (_currency: Currency) => "ر.س";
 const formatMoney = (amount: number, currency: Currency = "SAR") => new Intl.NumberFormat("ar-EG", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount / 100);
 
 export default function Cash() {
+  const [location] = useLocation();
   const [incomeFilter, setIncomeFilter] = useState<IncomeFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [technicianFilter, setTechnicianFilter] = useState("");
@@ -31,6 +33,14 @@ export default function Cash() {
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<"income" | "expense">("expense");
+
+  useEffect(() => {
+    const entry = new URLSearchParams(location.split("?")[1] ?? "").get("entry");
+    if (entry === "expense") {
+      setTransactionType("expense");
+      setOpen(true);
+    }
+  }, [location]);
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [transactionDate, setTransactionDate] = useState(toDateTimeLocal());
