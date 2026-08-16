@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Inventory from "./Inventory";
@@ -71,6 +71,16 @@ describe("تفاصيل المنصرف في المخزون", () => {
     expect(screen.getAllByText("محمد الفني").length).toBeGreaterThan(0);
     expect(screen.getAllByText("صرف لتركيب جديد").length).toBeGreaterThan(0);
     expect(screen.getAllByText("الفني / المستلم").length).toBeGreaterThan(0);
+  });
+
+  it("يعرض حقول بيانات الصنف المفيدة داخل بطاقة الإضافة", () => {
+    render(<Inventory />);
+    fireEvent.click(screen.getByRole("button", { name: "إضافة صنف" }));
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByText("نوع الصنف")).toBeTruthy();
+    expect(dialog.getByText("وحدة القياس")).toBeTruthy();
+    expect(dialog.getByText("حد التنبيه")).toBeTruthy();
+    expect(dialog.getByText("سعر الشراء الافتراضي")).toBeTruthy();
   });
 
   it("يعرض واجهة المخزن الفارغة عند فشل الاستعلام دون رسالة تعذر التحميل", () => {

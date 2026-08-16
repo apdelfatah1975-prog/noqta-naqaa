@@ -71,6 +71,10 @@ const visitInput = z.object({
 
 const inventoryItemInput = z.object({
   name: z.string().trim().min(2, "أدخل اسم الصنف").max(160),
+  category: z.string().trim().min(2).max(120).default("عام"),
+  unit: z.string().trim().min(1).max(40).default("قطعة"),
+  reorderLevel: z.number().int().min(0).max(999999).default(2),
+  defaultUnitCost: z.number().int().nonnegative().max(999999999).default(0),
   openingQuantity: z.number().int().min(0).default(0),
   notes: z.string().trim().max(2000).optional().nullable(),
   clientOperationId: z.string().uuid().optional(),
