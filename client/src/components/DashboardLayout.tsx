@@ -27,6 +27,7 @@ import {
   CalendarPlus,
   CircleDollarSign,
   FileBarChart,
+  WalletCards,
   Droplets,
   LayoutDashboard,
   LogOut,
@@ -49,6 +50,7 @@ const menuItems = [
   { icon: PackageSearch, label: "المخزنة", path: "/inventory" },
   { icon: CircleDollarSign, label: "الخزينة والمصروفات", path: "/cash" },
   { icon: FileBarChart, label: "التقارير", path: "/reports" },
+  { icon: WalletCards, label: "كشف رواتب الفنيين", path: "/technician-payroll" },
   { icon: Settings, label: "الإعدادات", path: "/settings" },
 ];
 
@@ -89,7 +91,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
-  const visibleMenuItems = user?.role === "admin" ? menuItems : menuItems.filter(item => item.path !== "/inventory" && item.path !== "/cash" && item.path !== "/reports");
+  const visibleMenuItems = user?.role === "admin" ? menuItems : menuItems.filter(item => item.path !== "/inventory" && item.path !== "/cash" && item.path !== "/reports" && item.path !== "/technician-payroll");
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
