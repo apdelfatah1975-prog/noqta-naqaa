@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
+import { cacheOfflineReport, getOfflineReport, getOfflineSession } from "@/lib/offlineSync";
 import { CalendarDays, Download, FileBarChart, PackageSearch, Printer, RefreshCw, WalletCards } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -12,10 +13,15 @@ const firstOfMonth = () => { const date = new Date(); date.setDate(1); return is
 const today = () => isoDate(new Date());
 
 export default function Reports() {
+  const user = getOfflineSession();
   const [dateFrom, setDateFrom] = useState(firstOfMonth);
   const [dateTo, setDateTo] = useState(today);
-  const query = trpc.filters.reports.monthly.useQuery({ dateFrom, dateTo });
-  const data = query.data;
+  const query = trpc.filters.reports.monthly.useQuery({ dateFrom, dateTo }, { retry: false, staleTime: 60_000 });
+  const cachedReport = getOfflineReport<typeof query.data>(user?.id ?? 0, dateFrom, dateTo);
+  const data = query.data ?? cachedReport ?? undefined;
+  useEffect(() => {
+    if (query.data && user) cacheOfflineReport(user.id, dateFrom, dateTo, query.data);
+  }, [dateFrom, dateTo, query.data, user]);
 
   const exportExcel = () => {
     if (!data) return;
@@ -48,7 +54,7 @@ export default function Reports() {
     { label: "أصناف منخفضة الرصيد", value: number(data.summary.lowStock), tone: "bg-rose-50 text-rose-900", icon: PackageSearch },
   ] : [] , [data]);
 
-  if (query.isError) return <div dir="rtl" className="soft-card mx-auto max-w-xl p-8 text-center"><h1 className="text-xl font-black text-teal-950">تعذر تحميل التقرير</h1><p className="mt-2 text-sm text-muted-foreground">تحقق من الفترة أو الاتصال ثم أعد المحاولة.</p><Button className="mt-5 rounded-xl" onClick={() => query.refetch()}>إعادة المحاولة</Button></div>;
+  if (query.isError && !data) return <div dir="rtl" className="soft-card mx-auto max-w-xl p-8 text-center"><h1 className="text-xl font-black text-teal-950">تعذر تحميل التقرير</h1><p className="mt-2 text-sm text-muted-foreground">تحقق من الفترة أو الاتصال ثم أعد المحاولة.</p><Button className="mt-5 rounded-xl" onClick={() => query.refetch()}>إعادة المحاولة</Button></div>;
 
   return <div dir="rtl" className="mx-auto max-w-7xl space-y-6 print:bg-white">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between print:hidden">
@@ -62,7 +68,8 @@ export default function Reports() {
       <div className="rounded-xl bg-teal-50 px-4 py-3 text-sm font-bold text-teal-900">{dateFrom && dateTo ? `تقرير من ${dateFrom} إلى ${dateTo}` : "اختر الفترة"}</div>
     </section>
 
-    {query.isLoading ? <div className="soft-card p-12 text-center text-sm text-muted-foreground">جارٍ إعداد التقرير…</div> : data ? <>
+    {query.isLoading && !data ? <div className="soft-card p-12 text-center text-sm text-muted-foreground">جارٍ إعداد التقرير…</div> : data ? <>
+      {query.isError ? <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 print:hidden">يُعرض آخر تقرير محفوظ محليًا؛ يمكنك التصدير والطباعة دون اتصال.</div> : null}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{cards.map(card => <article key={card.label} className={`rounded-2xl p-5 shadow-sm ${card.tone}`}><div className="flex items-center justify-between"><p className="text-sm font-bold opacity-80">{card.label}</p><card.icon className="h-5 w-5 opacity-80" /></div><p className="mt-4 text-2xl font-black">{card.value}</p></article>)}</div>
       <div className="hidden border-b pb-4 print:block"><h1 className="text-2xl font-black">تقرير نقطة نقاء</h1><p className="mt-2 text-sm">الفترة: {dateLabel(`${data.period.dateFrom}T00:00:00`)} — {dateLabel(`${data.period.dateTo}T00:00:00`)}</p></div>
       <div className="grid gap-6 lg:grid-cols-2">

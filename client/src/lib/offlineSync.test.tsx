@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cacheOfflineCustomers,
+  cacheOfflineReport,
   clearOfflineState,
   getOfflineCustomers,
+  getOfflineReport,
   getOfflineSession,
   getPendingCustomers,
   getPendingVisits,
@@ -45,6 +47,13 @@ describe("التخزين المحلي للمزامنة", () => {
     expect(getPendingVisits(6)).toEqual([]);
     removePendingVisit(5, pending.clientOperationId);
     expect(getPendingVisits(5)).toEqual([]);
+  });
+
+  it("يحفظ التقرير محليًا ليستعمله التصدير دون اتصال", () => {
+    const report = { period: { dateFrom: "2026-08-01", dateTo: "2026-08-16" }, summary: { income: 1000 } };
+    cacheOfflineReport(5, "2026-08-01", "2026-08-16", report);
+    expect(getOfflineReport(5, "2026-08-01", "2026-08-16")).toEqual(report);
+    expect(getOfflineReport(5, "2026-07-01", "2026-07-31")).toBeNull();
   });
 
   it("يمسح بيانات الجهاز وطابور مزامنته عند تسجيل الخروج", () => {

@@ -9,6 +9,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { cacheOfflineCash, getOfflineCash, getOfflineSession, queueOfflineCash, queueOfflineDelete } from "@/lib/offlineSync";
 
 type Currency = "SAR";
 type IncomeFilter = "all" | "service" | "installation" | "maintenance";
@@ -29,7 +30,15 @@ export default function Cash() {
   const [endDate, setEndDate] = useState("");
   const [search, setSearch] = useState("");
   const cashQueryInput = useMemo(() => ({ incomeFilter, category: categoryFilter || undefined, technician: technicianFilter || undefined, itemName: itemNameFilter || undefined, month: dateFilterMode === "month" ? selectedMonth || undefined : undefined, startDate: dateFilterMode === "range" ? startDate || undefined : undefined, endDate: dateFilterMode === "range" ? endDate || undefined : undefined, search: search.trim() || undefined }), [incomeFilter, categoryFilter, technicianFilter, itemNameFilter, dateFilterMode, selectedMonth, startDate, endDate, search]);
-  const { data, isLoading, isError } = trpc.filters.cash.summary.useQuery(cashQueryInput);
+  const owner = getOfflineSession();
+  const cashQuery = trpc.filters.cash.summary.useQuery(cashQueryInput, { retry: false, staleTime: 60_000 });
+  const cachedCash = getOfflineCash<typeof cashQuery.data>(owner?.id ?? 0);
+  const data = cashQuery.data ?? cachedCash ?? undefined;
+  const isLoading = cashQuery.isLoading && !data;
+  const isError = cashQuery.isError && !data;
+  useEffect(() => {
+    if (cashQuery.data && owner) cacheOfflineCash(owner.id, cashQuery.data);
+  }, [cashQuery.data, owner]);
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<"income" | "expense">("expense");
@@ -62,15 +71,30 @@ export default function Cash() {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    createTransaction.mutate({
+    const input = {
       transactionType,
-      currency: "SAR",
+      currency: "SAR" as const,
       amount: Math.round(Number(amount) * 100),
       category,
       transactionDate: new Date(transactionDate),
       recipientName: recipientName || null,
       notes: notes || null,
-    });
+    };
+    if (!navigator.onLine && owner) {
+      queueOfflineCash(owner.id, { ...input, transactionDate: input.transactionDate.toISOString() });
+      const localTransaction = { ...input, id: -Date.now(), transactionDate: input.transactionDate.toISOString(), sourceVisitId: null, sourceInventoryMovementId: null, createdAt: new Date().toISOString() };
+      const current = data as any;
+      if (current) {
+        const sign = transactionType === "income" ? 1 : -1;
+        const currentSummary = current.summaries?.SAR ?? { incomeTotal: 0, expenseTotal: 0, balance: 0 };
+        const nextSummary = { ...currentSummary, incomeTotal: currentSummary.incomeTotal + (transactionType === "income" ? input.amount : 0), expenseTotal: currentSummary.expenseTotal + (transactionType === "expense" ? input.amount : 0), balance: currentSummary.balance + sign * input.amount };
+        cacheOfflineCash(owner.id, { ...current, transactions: [localTransaction, ...current.transactions], incomeTotal: nextSummary.incomeTotal, expenseTotal: nextSummary.expenseTotal, balance: nextSummary.balance, summaries: { ...current.summaries, SAR: nextSummary } });
+      }
+      toast.success("تم حفظ العملية محليًا وستتم مزامنتها عند عودة الإنترنت");
+      setOpen(false); setAmount(""); setCategory(""); setRecipientName(""); setNotes("");
+      return;
+    }
+    createTransaction.mutate(input);
   }
 
   if (isError) return <div className="soft-card p-8 text-center"><p className="font-bold text-teal-950">تعذر تحميل بيانات الخزينة.</p><p className="mt-2 text-sm text-muted-foreground">تحقق من الاتصال ثم أعد المحاولة.</p><Button onClick={() => window.location.reload()} variant="outline" className="mt-4 rounded-xl">إعادة المحاولة</Button></div>;
@@ -116,7 +140,7 @@ export default function Cash() {
       <div className="divide-y divide-teal-950/6 md:hidden">{data?.transactions.length ? data.transactions.map(transaction => <CashCard key={transaction.id} transaction={transaction} onDelete={() => setDeleteId(transaction.id)} />) : <div className="p-12 text-center text-sm text-muted-foreground">{isLoading ? "جارٍ تحميل الخزينة…" : "لا توجد عمليات مالية حتى الآن."}</div>}</div>
     </section>
 
-    <PinVerificationDialog open={deleteId !== null} onOpenChange={openState => { if (!openState) setDeleteId(null); }} busy={deleteTransaction.isPending} title="تأكيد حذف العملية المالية" description="سيتم حذف العملية نهائيًا من سجل الخزينة، وقد يؤثر ذلك في الملخصات." onConfirm={pin => { if (deleteId !== null) deleteTransaction.mutate({ id: deleteId, pin }); }} />
+    <PinVerificationDialog open={deleteId !== null} onOpenChange={openState => { if (!openState) setDeleteId(null); }} busy={deleteTransaction.isPending} title="تأكيد حذف العملية المالية" description="سيتم حذف العملية نهائيًا من سجل الخزينة، وقد يؤثر ذلك في الملخصات." onConfirm={pin => { if (deleteId !== null && !navigator.onLine && owner) { queueOfflineDelete(owner.id, { entity: "cash", id: deleteId, pin }); const current = data as any; if (current) cacheOfflineCash(owner.id, { ...current, transactions: current.transactions.filter((item: any) => item.id !== deleteId) }); setDeleteId(null); toast.success("تم حذف العملية محليًا وستتم مزامنة الحذف عند عودة الإنترنت"); } else if (deleteId !== null) deleteTransaction.mutate({ id: deleteId, pin }); }} />
     <Dialog open={open} onOpenChange={setOpen}><DialogContent dir="rtl"><DialogHeader><DialogTitle>تسجيل عملية مالية</DialogTitle></DialogHeader><form onSubmit={submit} className="grid gap-4 py-2 sm:grid-cols-2"><label><span className="field-label">نوع العملية</span><select className="field-input" value={transactionType} onChange={event => setTransactionType(event.target.value as "income" | "expense")}><option value="expense">مصروف</option><option value="income">إيراد</option></select></label><label><span className="field-label">المبلغ بالريال السعودي</span><input type="number" min="0.01" step="0.01" className="field-input" value={amount} onChange={event => setAmount(event.target.value)} required placeholder="مثال: 250" /></label><label><span className="field-label">التصنيف</span><input className="field-input" value={category} onChange={event => setCategory(event.target.value)} required placeholder={transactionType === "expense" ? "مثال: مواصلات أو شراء مستلزمات" : "مثال: تحصيل صيانة"} /></label><label><span className="field-label">التاريخ والوقت</span><input type="datetime-local" className="field-input" value={transactionDate} onChange={event => setTransactionDate(event.target.value)} required /></label><label><span className="field-label">الفني أو الجهة المستلمة</span><input className="field-input" value={recipientName} onChange={event => setRecipientName(event.target.value)} placeholder="اختياري" /></label><label className="sm:col-span-2"><span className="field-label">ملاحظات</span><textarea className="field-textarea" value={notes} onChange={event => setNotes(event.target.value)} placeholder="تفاصيل إضافية عن العملية" /></label><div className="flex justify-end gap-3 sm:col-span-2"><Button type="button" variant="outline" onClick={() => setOpen(false)} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={createTransaction.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">{createTransaction.isPending ? "جارٍ الحفظ…" : "حفظ العملية"}</Button></div></form></DialogContent></Dialog>
   </div>;
 }

@@ -4,6 +4,10 @@ import {
   getPendingCustomers,
   getPendingOperationCount,
   getPendingVisits,
+  getPendingCash,
+  getPendingInventory,
+  removePendingCash,
+  removePendingInventory,
   removePendingCustomer,
   removePendingVisit,
   replaceOfflineCustomerId,
@@ -22,6 +26,12 @@ export function OfflineSyncManager() {
   const utils = trpc.useUtils();
   const { mutateAsync: syncCustomer } = trpc.filters.customers.create.useMutation();
   const { mutateAsync: syncVisit } = trpc.filters.visits.create.useMutation();
+  const { mutateAsync: syncCash } = trpc.filters.cash.create.useMutation();
+  const { mutateAsync: syncInventoryItem } = trpc.filters.inventory.createItem.useMutation();
+  const { mutateAsync: syncInventoryMovement } = trpc.filters.inventory.createMovement.useMutation();
+  const { mutateAsync: deleteCash } = trpc.filters.cash.delete.useMutation();
+  const { mutateAsync: deleteInventoryItem } = trpc.filters.inventory.deleteItem.useMutation();
+  const { mutateAsync: deleteInventoryMovement } = trpc.filters.inventory.deleteMovement.useMutation();
 
   const refreshCount = useCallback(() => {
     setPendingCount(user ? getPendingOperationCount(user.id) : 0);
@@ -81,6 +91,44 @@ export function OfflineSyncManager() {
         break;
       }
     }
+    const inventoryIdMap = new Map<number, number>();
+    for (const operation of getPendingInventory(user.id)) {
+      try {
+        if (operation.entity === "item") {
+          const result = await syncInventoryItem({ name: operation.name, openingQuantity: operation.openingQuantity, notes: operation.notes ?? null, clientOperationId: operation.clientOperationId });
+          inventoryIdMap.set(operation.localId ?? -Date.now(), result.id);
+        } else if (operation.entity === "movement") {
+          const inventoryItemId = inventoryIdMap.get(operation.inventoryItemId) ?? operation.inventoryItemId;
+          if (inventoryItemId <= 0) throw new Error("الصنف المحلي لم تتم مزامنته بعد");
+          await syncInventoryMovement({ inventoryItemId, movementType: operation.movementType, quantity: operation.quantity, unitCost: operation.unitCost, currency: operation.currency, movementDate: new Date(operation.movementDate), technicianName: operation.technicianName ?? null, notes: operation.notes ?? null, clientOperationId: operation.clientOperationId });
+        } else if (operation.entity === "inventoryItem" && operation.id > 0) {
+          await deleteInventoryItem({ id: operation.id, pin: operation.pin });
+        } else if (operation.entity === "inventoryMovement" && operation.id > 0) {
+          await deleteInventoryMovement({ id: operation.id, pin: operation.pin });
+        } else {
+          removePendingInventory(user.id, operation.clientOperationId);
+          continue;
+        }
+        removePendingInventory(user.id, operation.clientOperationId);
+        syncedCount += 1;
+      } catch {
+        batchFailed = true;
+        setSyncFailed(true);
+        break;
+      }
+    }
+    for (const operation of getPendingCash(user.id)) {
+      try {
+        if ("transactionType" in operation) await syncCash({ transactionType: operation.transactionType, currency: operation.currency, amount: operation.amount, category: operation.category, transactionDate: new Date(operation.transactionDate), recipientName: operation.recipientName ?? null, notes: operation.notes ?? null, clientOperationId: operation.clientOperationId });
+        else await deleteCash({ id: operation.id, pin: operation.pin });
+        removePendingCash(user.id, operation.clientOperationId);
+        syncedCount += 1;
+      } catch {
+        batchFailed = true;
+        setSyncFailed(true);
+        break;
+      }
+    }
     setSyncing(false);
     syncingRef.current = false;
     refreshCount();
@@ -92,8 +140,10 @@ export function OfflineSyncManager() {
       utils.filters.customers.list.invalidate(),
       utils.filters.customers.get.invalidate(),
       utils.filters.reminders.due.invalidate(),
+      utils.filters.cash.summary.invalidate(),
+      utils.filters.inventory.summary.invalidate(),
     ]);
-  }, [refreshCount, syncCustomer, syncVisit, user, utils]);
+  }, [deleteCash, deleteInventoryItem, deleteInventoryMovement, refreshCount, syncCash, syncCustomer, syncInventoryItem, syncInventoryMovement, syncVisit, user, utils]);
 
   useEffect(() => {
     const goOnline = () => { setOnline(true); void syncPendingOperations(); };

@@ -3,6 +3,11 @@ const CUSTOMERS_KEY = "purepoint-offline-customers";
 const CUSTOMER_QUEUE_PREFIX = "purepoint-pending-customers";
 const VISIT_QUEUE_PREFIX = "purepoint-pending-visits";
 const DASHBOARD_KEY = "purepoint-offline-dashboard";
+const CASH_KEY_PREFIX = "purepoint-offline-cash";
+const INVENTORY_KEY_PREFIX = "purepoint-offline-inventory";
+const CASH_QUEUE_PREFIX = "purepoint-pending-cash";
+const INVENTORY_QUEUE_PREFIX = "purepoint-pending-inventory";
+const REPORT_KEY_PREFIX = "purepoint-offline-report";
 
 export type OfflineCustomer = {
   id: number;
@@ -38,6 +43,53 @@ export type PendingVisit = {
   createdAt: string;
 };
 
+export type PendingCashTransaction = {
+  entity?: "cash";
+  clientOperationId: string;
+  transactionType: "income" | "expense";
+  currency: "SAR";
+  amount: number;
+  category: string;
+  transactionDate: string;
+  recipientName?: string | null;
+  notes?: string | null;
+  createdAt: string;
+};
+
+export type PendingCashDelete = PendingOfflineDelete & { entity: "cash" };
+
+export type PendingInventoryItem = {
+  entity: "item";
+  localId: number;
+  clientOperationId: string;
+  name: string;
+  openingQuantity: number;
+  notes?: string | null;
+  createdAt: string;
+};
+
+export type PendingInventoryMovement = {
+  entity: "movement";
+  clientOperationId: string;
+  inventoryItemId: number;
+  movementType: "incoming" | "outgoing";
+  quantity: number;
+  unitCost: number;
+  currency: "SAR";
+  movementDate: string;
+  technicianName?: string | null;
+  notes?: string | null;
+  createdAt: string;
+};
+
+export type PendingOfflineDelete = {
+  clientOperationId: string;
+  entity: "cash" | "inventoryItem" | "inventoryMovement";
+  id: number;
+  pin: string;
+  createdAt: string;
+};
+
 export type OfflineUser = {
   id: number;
   name: string | null;
@@ -64,6 +116,10 @@ function writeJson(key: string, value: unknown) {
 }
 
 function queueKey(prefix: string, ownerId: number) {
+  return `${prefix}-${ownerId}`;
+}
+
+function ownerDataKey(prefix: string, ownerId: number) {
   return `${prefix}-${ownerId}`;
 }
 
@@ -146,6 +202,71 @@ export function removePendingVisit(ownerId: number, clientOperationId: string) {
   writeJson(queueKey(VISIT_QUEUE_PREFIX, ownerId), getPendingVisits(ownerId).filter(item => item.clientOperationId !== clientOperationId));
 }
 
+export function cacheOfflineReport<T>(ownerId: number, dateFrom: string, dateTo: string, value: T) {
+  writeJson(`${REPORT_KEY_PREFIX}-${ownerId}-${dateFrom}-${dateTo}`, value);
+}
+
+export function getOfflineReport<T>(ownerId: number, dateFrom: string, dateTo: string) {
+  return readJson<T | null>(`${REPORT_KEY_PREFIX}-${ownerId}-${dateFrom}-${dateTo}`, null);
+}
+
+export function cacheOfflineCash<T>(ownerId: number, value: T) {
+  writeJson(ownerDataKey(CASH_KEY_PREFIX, ownerId), value);
+}
+
+export function getOfflineCash<T>(ownerId: number) {
+  return readJson<T | null>(ownerDataKey(CASH_KEY_PREFIX, ownerId), null);
+}
+
+export function cacheOfflineInventory<T>(ownerId: number, value: T) {
+  writeJson(ownerDataKey(INVENTORY_KEY_PREFIX, ownerId), value);
+}
+
+export function getOfflineInventory<T>(ownerId: number) {
+  return readJson<T | null>(ownerDataKey(INVENTORY_KEY_PREFIX, ownerId), null);
+}
+
+export function getPendingCash(ownerId: number) {
+  return readJson<Array<PendingCashTransaction | PendingOfflineDelete>>(queueKey(CASH_QUEUE_PREFIX, ownerId), []);
+}
+
+export function queueOfflineCash(ownerId: number, input: Omit<PendingCashTransaction, "clientOperationId" | "createdAt" | "entity">) {
+  const pending = { ...input, clientOperationId: newOperationId(), createdAt: new Date().toISOString() };
+  writeJson(queueKey(CASH_QUEUE_PREFIX, ownerId), [...getPendingCash(ownerId), pending]);
+  return pending;
+}
+
+export function removePendingCash(ownerId: number, clientOperationId: string) {
+  writeJson(queueKey(CASH_QUEUE_PREFIX, ownerId), getPendingCash(ownerId).filter(item => item.clientOperationId !== clientOperationId));
+}
+
+export function getPendingInventory(ownerId: number) {
+  return readJson<Array<PendingInventoryItem | PendingInventoryMovement | PendingOfflineDelete>>(queueKey(INVENTORY_QUEUE_PREFIX, ownerId), []);
+}
+
+export function queueOfflineInventoryItem(ownerId: number, input: Omit<PendingInventoryItem, "clientOperationId" | "createdAt" | "entity" | "localId">) {
+  const pending = { ...input, localId: -Date.now(), clientOperationId: newOperationId(), createdAt: new Date().toISOString(), entity: "item" as const };
+  writeJson(queueKey(INVENTORY_QUEUE_PREFIX, ownerId), [...getPendingInventory(ownerId), pending]);
+  return pending;
+}
+
+export function queueOfflineInventoryMovement(ownerId: number, input: Omit<PendingInventoryMovement, "clientOperationId" | "createdAt" | "entity">) {
+  const pending = { ...input, clientOperationId: newOperationId(), createdAt: new Date().toISOString(), entity: "movement" as const };
+  writeJson(queueKey(INVENTORY_QUEUE_PREFIX, ownerId), [...getPendingInventory(ownerId), pending]);
+  return pending;
+}
+
+export function queueOfflineDelete(ownerId: number, input: Omit<PendingOfflineDelete, "clientOperationId" | "createdAt">) {
+  const pending = { ...input, clientOperationId: newOperationId(), createdAt: new Date().toISOString() };
+  const prefix = input.entity === "cash" ? CASH_QUEUE_PREFIX : INVENTORY_QUEUE_PREFIX;
+  writeJson(queueKey(prefix, ownerId), [...(input.entity === "cash" ? getPendingCash(ownerId) : getPendingInventory(ownerId)), pending]);
+  return pending;
+}
+
+export function removePendingInventory(ownerId: number, clientOperationId: string) {
+  writeJson(queueKey(INVENTORY_QUEUE_PREFIX, ownerId), getPendingInventory(ownerId).filter(item => item.clientOperationId !== clientOperationId));
+}
+
 export function getPendingOperationCount(ownerId: number) {
-  return getPendingCustomers(ownerId).length + getPendingVisits(ownerId).length;
+  return getPendingCustomers(ownerId).length + getPendingVisits(ownerId).length + getPendingCash(ownerId).length + getPendingInventory(ownerId).length;
 }

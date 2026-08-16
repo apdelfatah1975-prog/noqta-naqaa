@@ -73,6 +73,7 @@ const inventoryItemInput = z.object({
   name: z.string().trim().min(2, "أدخل اسم الصنف").max(160),
   openingQuantity: z.number().int().min(0).default(0),
   notes: z.string().trim().max(2000).optional().nullable(),
+  clientOperationId: z.string().uuid().optional(),
 });
 
 const inventoryMovementInput = z.object({
@@ -84,6 +85,7 @@ const inventoryMovementInput = z.object({
   movementDate: z.date(),
   technicianName: z.string().trim().max(160).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
+  clientOperationId: z.string().uuid().optional(),
 });
 
 const cashTransactionInput = z.object({
@@ -94,6 +96,7 @@ const cashTransactionInput = z.object({
   transactionDate: z.date(),
   recipientName: z.string().trim().max(160).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
+  clientOperationId: z.string().uuid().optional(),
 });
 
 const notificationSettingsInput = z.object({
@@ -782,12 +785,20 @@ export const filterManagementRouter = router({
     summary: adminProcedure.query(({ ctx }) => inventorySummary(ctx.user.id)),
     createItem: adminProcedure.input(inventoryItemInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
+      if (input.clientOperationId) {
+        const existing = await db.select({ id: inventoryItems.id }).from(inventoryItems).where(and(eq(inventoryItems.ownerId, ctx.user.id), eq(inventoryItems.clientOperationId, input.clientOperationId))).limit(1);
+        if (existing[0]) return { id: existing[0].id };
+      }
       const result = await db.insert(inventoryItems).values({ ...input, ownerId: ctx.user.id });
       await refreshOwnerBackup(ctx.user.id);
       return { id: Number(result[0].insertId) };
     }),
     createMovement: adminProcedure.input(inventoryMovementInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
+      if (input.clientOperationId) {
+        const existing = await db.select({ id: inventoryMovements.id }).from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ctx.user.id), eq(inventoryMovements.clientOperationId, input.clientOperationId))).limit(1);
+        if (existing[0]) return { success: true, movementId: existing[0].id };
+      }
       const item = await db.select().from(inventoryItems).where(and(eq(inventoryItems.id, input.inventoryItemId), eq(inventoryItems.ownerId, ctx.user.id))).limit(1);
       if (!item[0]) throw new TRPCError({ code: "NOT_FOUND", message: "لم يتم العثور على الصنف." });
       const itemMovements = await db
@@ -854,6 +865,10 @@ export const filterManagementRouter = router({
     summary: adminProcedure.input(z.object({ incomeFilter: z.enum(["all", "service", "installation", "maintenance"]).default("all"), category: z.string().max(100).optional(), technician: z.string().max(160).optional(), itemName: z.string().max(160).optional(), month: z.string().regex(/^\d{4}-\d{2}$/).optional(), startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), search: z.string().max(160).optional() }).optional()).query(({ ctx, input }) => cashSummary(ctx.user.id, input?.incomeFilter ?? "all", input ? { month: input.month, startDate: input.startDate, endDate: input.endDate } : undefined, input?.search, { category: input?.category, technician: input?.technician, itemName: input?.itemName })),
     create: adminProcedure.input(cashTransactionInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
+      if (input.clientOperationId) {
+        const existing = await db.select({ id: cashTransactions.id }).from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.clientOperationId, input.clientOperationId))).limit(1);
+        if (existing[0]) return { id: existing[0].id };
+      }
       const result = await db.insert(cashTransactions).values({ ...input, ownerId: ctx.user.id });
       await refreshOwnerBackup(ctx.user.id);
       return { id: Number(result[0].insertId) };

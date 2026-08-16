@@ -127,10 +127,11 @@ export const inventoryItems = mysqlTable(
     name: varchar("name", { length: 160 }).notNull(),
     openingQuantity: int("openingQuantity").default(0).notNull(),
     notes: text("notes"),
+    clientOperationId: varchar("clientOperationId", { length: 64 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
-  table => [index("inventory_items_owner_idx").on(table.ownerId)],
+  table => [index("inventory_items_owner_idx").on(table.ownerId), uniqueIndex("inventory_items_owner_operation_unique").on(table.ownerId, table.clientOperationId)],
 );
 
 export const inventoryMovements = mysqlTable(
@@ -146,10 +147,12 @@ export const inventoryMovements = mysqlTable(
     movementDate: timestamp("movementDate").notNull(),
     technicianName: varchar("technicianName", { length: 160 }),
     notes: text("notes"),
+    clientOperationId: varchar("clientOperationId", { length: 64 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   table => [
     index("inventory_movements_item_idx").on(table.inventoryItemId),
+    uniqueIndex("inventory_movements_owner_operation_unique").on(table.ownerId, table.clientOperationId),
     index("inventory_movements_owner_date_idx").on(table.ownerId, table.movementDate),
     index("inventory_movements_purchase_idx").on(table.ownerId, table.movementType, table.movementDate),
   ],
@@ -169,7 +172,9 @@ export const cashTransactions = mysqlTable(
     sourceInventoryMovementId: int("sourceInventoryMovementId").references(() => inventoryMovements.id, { onDelete: "set null" }),
     recipientName: varchar("recipientName", { length: 160 }),
     notes: text("notes"),
+    clientOperationId: varchar("clientOperationId", { length: 64 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
-  table => [index("cash_transactions_owner_date_idx").on(table.ownerId, table.transactionDate), index("cash_transactions_source_visit_idx").on(table.ownerId, table.sourceVisitId), index("cash_transactions_source_inventory_idx").on(table.ownerId, table.sourceInventoryMovementId)],
+  table => [index("cash_transactions_owner_date_idx").on(table.ownerId, table.transactionDate),
+    uniqueIndex("cash_transactions_owner_operation_unique").on(table.ownerId, table.clientOperationId), index("cash_transactions_source_visit_idx").on(table.ownerId, table.sourceVisitId), index("cash_transactions_source_inventory_idx").on(table.ownerId, table.sourceInventoryMovementId)],
 );

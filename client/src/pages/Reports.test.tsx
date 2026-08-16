@@ -46,6 +46,6 @@ describe("تقارير نقطة نقاء", () => {
   it("تغيّر مدخل الفترة يعيد طلب التقرير بالحد الجديد", () => {
     render(<Reports />);
     fireEvent.change(screen.getByLabelText("من تاريخ"), { target: { value: "2026-07-01" } });
-    expect(mocks.monthly).toHaveBeenLastCalledWith(expect.objectContaining({ dateFrom: "2026-07-01" }));
+    expect(mocks.monthly.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ dateFrom: "2026-07-01" }));
   });
 });

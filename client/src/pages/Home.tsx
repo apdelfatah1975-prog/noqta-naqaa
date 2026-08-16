@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { cacheOfflineDashboard, getOfflineDashboard, getOfflineSession, getPendingOperationCount } from "@/lib/offlineSync";
+import { cacheOfflineCash, cacheOfflineDashboard, getOfflineDashboard, getOfflineSession, getPendingOperationCount } from "@/lib/offlineSync";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
 import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, CloudOff, CloudUpload, Info, PackageSearch, Plus, RefreshCw, UsersRound } from "lucide-react";
 import React from "react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
 
 const statStyles = [
   { icon: BellRing, color: "bg-amber-500", label: "مستحقون للمتابعة", key: "due", href: "/reminders" },
@@ -70,6 +71,16 @@ export default function Home() {
   };
   const nextVisit = displayData?.upcomingVisits[0];
   const nextDueReminder = displayData?.dueReminders[0];
+  function saveLocalSnapshot() {
+    if (!displayData && !cash) {
+      toast.error("لا توجد بيانات متاحة للحفظ المحلي بعد");
+      return;
+    }
+    if (displayData) cacheOfflineDashboard(displayData);
+    if (cash && offlineOwnerId) cacheOfflineCash(offlineOwnerId, cash);
+    setOfflineDashboard(displayData ?? null);
+    toast.success("تم حفظ البيانات الحالية على الجهاز بنجاح");
+  }
   const cardDetails = {
     today: "الزيارات المسجلة لهذا اليوم",
     upcoming: nextVisit ? `${nextVisit.customer?.name || "عميل"} · ${formatDateTime(nextVisit.visitDate)}` : "لا توجد زيارات مسجلة",
@@ -107,7 +118,7 @@ export default function Home() {
             <p className={`mt-1 text-xs font-semibold ${online ? "text-emerald-700" : "text-amber-800"}`}>{pendingCount > 0 ? `${pendingCount} عملية محفوظة محليًا ${online ? "وتنتظر المزامنة" : "وستتزامن عند عودة الاتصال"}` : online ? "البيانات متزامنة ولا توجد عمليات معلقة" : "ستُحفظ البيانات محليًا وتتم مزامنتها عند عودة الاتصال"}</p>
           </div>
         </div>
-        <span className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${pendingCount > 0 ? "bg-sky-100 text-sky-800" : online ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{pendingCount > 0 ? "بانتظار المزامنة" : online ? "جاهز" : "حفظ محلي"}</span>
+        <button type="button" onClick={saveLocalSnapshot} className={`rounded-full px-3 py-1.5 text-xs font-extrabold transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${pendingCount > 0 ? "bg-sky-100 text-sky-800 hover:bg-sky-200" : online ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" : "bg-amber-100 text-amber-800 hover:bg-amber-200"}`} aria-label="حفظ البيانات الحالية محليًا">{pendingCount > 0 ? "حفظ محلي الآن" : online ? "حفظ محلي" : "حفظ محلي الآن"}</button>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
