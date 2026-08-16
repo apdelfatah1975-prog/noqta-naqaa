@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cacheOfflineCustomers,
   cacheOfflineReport,
+  createOfflineBackup,
   clearOfflineState,
   getOfflineCustomers,
   getOfflineReport,
   getOfflineSession,
   getPendingCustomers,
+  queueOfflineCash,
   getPendingVisits,
   queueOfflineCustomer,
   queueOfflineVisit,
@@ -54,6 +56,20 @@ describe("التخزين المحلي للمزامنة", () => {
     cacheOfflineReport(5, "2026-08-01", "2026-08-16", report);
     expect(getOfflineReport(5, "2026-08-01", "2026-08-16")).toEqual(report);
     expect(getOfflineReport(5, "2026-07-01", "2026-07-31")).toBeNull();
+  });
+
+  it("يجمع كل بيانات التطبيق المحلية في نسخة احتياطية واحدة", () => {
+    rememberOfflineSession({ id: 5, name: "مدير", email: "manager@example.com", openId: "owner-5", role: "admin" });
+    cacheOfflineCustomers([{ id: 8, name: "عميل محفوظ", phone: "01000000000" }]);
+    cacheOfflineReport(5, "2026-08-01", "2026-08-16", { summary: { income: 1000 } });
+    queueOfflineCash(5, { transactionType: "income", currency: "SAR", amount: 250, category: "صيانة", transactionDate: "2026-08-16", recipientName: "عميل محفوظ", notes: null });
+
+    const backup = createOfflineBackup(new Date("2026-08-16T12:00:00.000Z"));
+
+    expect(backup).toMatchObject({ format: "purepoint-offline-backup", version: 1, exportedAt: "2026-08-16T12:00:00.000Z", app: "نقطة نقاء" });
+    expect(backup.storage["purepoint-offline-session"]).toMatchObject({ id: 5 });
+    expect(backup.storage["purepoint-offline-customers"]).toEqual([expect.objectContaining({ name: "عميل محفوظ" })]);
+    expect(Object.keys(backup.storage).some(key => key.startsWith("purepoint-pending-cash-5"))).toBe(true);
   });
 
   it("يمسح بيانات الجهاز وطابور مزامنته عند تسجيل الخروج", () => {

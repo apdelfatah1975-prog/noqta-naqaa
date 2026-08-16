@@ -270,3 +270,53 @@ export function removePendingInventory(ownerId: number, clientOperationId: strin
 export function getPendingOperationCount(ownerId: number) {
   return getPendingCustomers(ownerId).length + getPendingVisits(ownerId).length + getPendingCash(ownerId).length + getPendingInventory(ownerId).length;
 }
+
+export type OfflineBackup = {
+  format: "purepoint-offline-backup";
+  version: 1;
+  exportedAt: string;
+  app: "نقطة نقاء";
+  storage: Record<string, unknown>;
+};
+
+export function createOfflineBackup(now = new Date()): OfflineBackup {
+  const storage: Record<string, unknown> = {};
+  if (available()) {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key || !key.startsWith("purepoint-")) continue;
+      const raw = localStorage.getItem(key);
+      if (raw === null) continue;
+      try {
+        storage[key] = JSON.parse(raw);
+      } catch {
+        storage[key] = raw;
+      }
+    }
+  }
+  return {
+    format: "purepoint-offline-backup",
+    version: 1,
+    exportedAt: now.toISOString(),
+    app: "نقطة نقاء",
+    storage,
+  };
+}
+
+export function downloadOfflineBackup(now = new Date()) {
+  if (!available()) return false;
+  const backup = createOfflineBackup(now);
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  const stamp = now.toISOString().replace(/[:.]/g, "-");
+  anchor.href = url;
+  anchor.download = `pure-point-backup-${stamp}.json`;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  return true;
+}
+
+export function getOfflineBackupKeyCount() {
+  return Object.keys(createOfflineBackup().storage).length;
+}

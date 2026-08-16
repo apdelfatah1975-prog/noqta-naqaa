@@ -26,6 +26,7 @@ import {
   BellRing,
   CalendarPlus,
   CircleDollarSign,
+  Download,
   FileBarChart,
   Droplets,
   LayoutDashboard,
@@ -35,6 +36,8 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
+import { downloadOfflineBackup, getOfflineBackupKeyCount } from "@/lib/offlineSync";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { AutomaticReminderNotifications } from "./AutomaticReminderNotifications";
 import { InstallAppButton } from "./InstallAppButton";
@@ -168,6 +171,19 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const downloaded = downloadOfflineBackup();
+                toast(downloaded ? `تم تنزيل النسخة الاحتياطية (${getOfflineBackupKeyCount()} عناصر محلية)` : "تعذر إنشاء النسخة الاحتياطية على هذا الجهاز.");
+              }}
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-teal-950/8 bg-white px-3 text-xs font-bold text-teal-800 transition hover:bg-teal-50"
+              aria-label="تنزيل نسخة احتياطية"
+              title="تنزيل نسخة احتياطية من البيانات المحلية"
+            >
+              <Download className="h-4 w-4" />
+              {!isMobile ? <span>نسخة احتياطية</span> : null}
+            </button>
             <InstallAppButton compact={isMobile} />
             {!isMobile ? (
               <button onClick={toggleSidebar} className="grid h-10 w-10 place-items-center rounded-xl border border-teal-950/8 bg-white text-teal-800 transition hover:bg-teal-50" aria-label="طي القائمة الجانبية">
