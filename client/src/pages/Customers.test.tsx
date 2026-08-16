@@ -69,13 +69,17 @@ describe("ترابط تعديل بيانات العميل", () => {
       data: [
         { id: 12, name: "عميل اليوم", phone: "01000000000", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000012", followUp: { nextVisitDate: new Date("2026-08-15T09:00:00Z"), daysRemaining: 0 } },
         { id: 13, name: "عميل متأخر", phone: "01000000001", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000013", followUp: { nextVisitDate: new Date("2026-08-10T09:00:00Z"), daysRemaining: -5 } },
+        { id: 14, name: "عميل قريب", phone: "01000000002", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000014", followUp: { nextVisitDate: new Date("2026-08-18T09:00:00Z"), daysRemaining: 3 } },
+        { id: 15, name: "عميل بعيد", phone: "01000000003", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000015", followUp: { nextVisitDate: new Date("2026-09-10T09:00:00Z"), daysRemaining: 26 } },
       ],
       isLoading: false,
       isError: false,
     });
     render(<Customers />);
-    expect(screen.getByLabelText("موعد متابعة العميل اليوم")).toBeTruthy();
+    expect(screen.getByLabelText("موعد متابعة العميل قريب وهو اليوم")).toBeTruthy();
     expect(screen.getByLabelText("العميل متأخر عن موعد المتابعة")).toBeTruthy();
+    expect(screen.getByLabelText("موعد متابعة العميل قريب")).toBeTruthy();
+    expect(screen.getByLabelText("موعد متابعة العميل بعيد")).toBeTruthy();
   });
 
   it("يوفر تسجيل زيارة وسجل العميل من بطاقة العميل", () => {
