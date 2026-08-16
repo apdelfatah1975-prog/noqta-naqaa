@@ -80,7 +80,8 @@ describe("تفاصيل المنصرف في المخزون", () => {
     expect(dialog.getByText("نوع الصنف")).toBeTruthy();
     expect(dialog.getByText("وحدة القياس")).toBeTruthy();
     expect(dialog.getByText("حد التنبيه")).toBeTruthy();
-    expect(dialog.getByText("سعر الشراء الافتراضي")).toBeTruthy();
+    expect(dialog.queryByText("سعر الشراء الافتراضي")).toBeNull();
+    expect(dialog.queryByText("سعر شراء الوحدة")).toBeNull();
   });
 
   it("يعرض واجهة المخزن الفارغة عند فشل الاستعلام دون رسالة تعذر التحميل", () => {

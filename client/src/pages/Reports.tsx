@@ -6,7 +6,7 @@ import { CalendarDays, Download, FileBarChart, PackageSearch, Printer, RefreshCw
 import { labelVisitType } from "@/lib/filterUi";
 import * as XLSX from "xlsx";
 
-const money = (amount: number) => new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR", maximumFractionDigits: 2 }).format(amount / 100);
+const money = (amount: number) => new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 2 }).format(amount / 100);
 const number = (value: number) => new Intl.NumberFormat("ar-SA").format(value);
 const dateLabel = (value: string | Date) => new Intl.DateTimeFormat("ar-SA", { dateStyle: "medium" }).format(new Date(value));
 const isoDate = (date: Date) => { const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, "0"); const day = String(date.getDate()).padStart(2, "0"); return `${year}-${month}-${day}`; };

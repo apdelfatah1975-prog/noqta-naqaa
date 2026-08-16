@@ -16,7 +16,7 @@ describe("TechnicianPayroll", () => {
 
   it("يضيف فنيًا جديدًا بإعدادات صفرية ويمنع التكرار", () => {
     const first = upsertTechnicianProfile({}, "  أحمد  ");
-    expect(first).toEqual({ أحمد: { monthlySalary: 0, installationPercent: 0, maintenancePercent: 0 } });
+    expect(first).toEqual({ أحمد: { monthlySalary: 0, installationPercent: 0, maintenancePercent: 0, phone: "" } });
     expect(upsertTechnicianProfile(first, "أحمد")).toBe(first);
   });
 
