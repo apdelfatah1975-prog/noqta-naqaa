@@ -15,6 +15,7 @@ import {
   queueOfflineVisit,
   rememberOfflineSession,
   removePendingVisit,
+  restoreOfflineBackup,
 } from "./offlineSync";
 
 describe("التخزين المحلي للمزامنة", () => {
@@ -79,6 +80,20 @@ describe("التخزين المحلي للمزامنة", () => {
     expect(backup.storage["purepoint-offline-session"]).toMatchObject({ id: 5 });
     expect(backup.storage["purepoint-offline-customers"]).toEqual([expect.objectContaining({ name: "عميل محفوظ" })]);
     expect(Object.keys(backup.storage).some(key => key.startsWith("purepoint-pending-cash-5"))).toBe(true);
+  });
+
+  it("يستعيد النسخة الاحتياطية محليًا ويرفض الملف غير الصالح", () => {
+    rememberOfflineSession({ id: 5, name: "قديم", email: "old@example.com", openId: "owner-5", role: "admin" });
+    cacheOfflineCustomers([{ id: 1, name: "عميل قديم", phone: "01000000000" }]);
+    const backup = createOfflineBackup(new Date("2026-08-16T12:00:00.000Z"));
+    cacheOfflineCustomers([{ id: 2, name: "بيانات مؤقتة", phone: "01000000001" }]);
+
+    expect(() => restoreOfflineBackup({ format: "invalid" })).toThrow();
+    const result = restoreOfflineBackup(backup);
+
+    expect(result.restoredKeys).toBeGreaterThan(0);
+    expect(getOfflineSession()).toMatchObject({ id: 5, name: "قديم" });
+    expect(getOfflineCustomers()).toEqual([{ id: 1, name: "عميل قديم", phone: "01000000000" }]);
   });
 
   it("يمسح بيانات الجهاز وطابور مزامنته عند تسجيل الخروج", () => {

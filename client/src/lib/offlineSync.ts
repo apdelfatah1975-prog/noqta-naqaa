@@ -338,3 +338,35 @@ export function downloadOfflineBackup(now = new Date()) {
 export function getOfflineBackupKeyCount() {
   return Object.keys(createOfflineBackup().storage).length;
 }
+
+export type OfflineRestoreResult = { restoredKeys: number; exportedAt: string };
+
+function isOfflineBackup(value: unknown): value is OfflineBackup {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<OfflineBackup>;
+  return candidate.format === "purepoint-offline-backup" && candidate.version === 1 && typeof candidate.exportedAt === "string" && !!candidate.storage && typeof candidate.storage === "object" && !Array.isArray(candidate.storage);
+}
+
+export function restoreOfflineBackup(value: unknown): OfflineRestoreResult {
+  if (!available()) throw new Error("التخزين المحلي غير متاح على هذا الجهاز.");
+  if (!isOfflineBackup(value)) throw new Error("ملف النسخة الاحتياطية غير صالح أو غير مدعوم.");
+  const entries = Object.entries(value.storage).filter(([key, storedValue]) => key.startsWith("purepoint-") && storedValue !== undefined);
+  if (entries.length === 0) throw new Error("النسخة الاحتياطية لا تحتوي على بيانات نقطة نقاء.");
+  const currentKeys: string[] = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key?.startsWith("purepoint-")) currentKeys.push(key);
+  }
+  for (const key of currentKeys) localStorage.removeItem(key);
+  for (const [key, storedValue] of entries) localStorage.setItem(key, JSON.stringify(storedValue));
+  return { restoredKeys: entries.length, exportedAt: value.exportedAt };
+}
+
+export function restoreOfflineBackupFromText(text: string): OfflineRestoreResult {
+  try {
+    return restoreOfflineBackup(JSON.parse(text));
+  } catch (error) {
+    if (error instanceof SyntaxError) throw new Error("تعذر قراءة ملف النسخة الاحتياطية؛ تأكد من أنه ملف JSON صحيح.");
+    throw error;
+  }
+}
