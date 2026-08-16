@@ -1,10 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CustomerContactActions } from "@/components/CustomerContactActions";
 import { PinVerificationDialog } from "@/components/PinVerificationDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
-import { customerMapUrl, formatDateTime, reminderStatusLabels, toDateTimeLocal, visitTypeLabels } from "@/lib/filterUi";
-import { ArrowRight, BellRing, CalendarClock, CalendarPlus, Edit3, Loader2, MapPinned, Phone } from "lucide-react";
+import { formatDateTime, reminderStatusLabels, toDateTimeLocal, visitTypeLabels } from "@/lib/filterUi";
+import { ArrowRight, BellRing, CalendarClock, CalendarPlus, Edit3, Loader2 } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useRoute } from "wouter";
@@ -57,7 +58,6 @@ export default function CustomerProfile() {
   if (!data) return <div className="soft-card p-8 text-center"><p className="font-bold">تعذر العثور على العميل.</p><Button onClick={() => setLocation("/customers")} variant="outline" className="mt-4 rounded-xl">العودة للعملاء</Button></div>;
 
   const { customer } = data;
-  const mapUrl = customerMapUrl(customer);
   const followUp = customer.followUp;
 
   function submitVisit(event: FormEvent) {
@@ -80,7 +80,7 @@ export default function CustomerProfile() {
         <div className="grid gap-4 p-6 sm:grid-cols-3">
           <div><p className="text-xs font-bold text-muted-foreground">العنوان</p><p className="mt-2 text-sm leading-6">{customer.address || "غير مسجل"}</p></div>
           <div><p className="text-xs font-bold text-muted-foreground">الموقع GPS</p><p className="mt-2 text-sm" dir="ltr">{customer.latitude && customer.longitude ? `${customer.latitude}, ${customer.longitude}` : "غير مسجل"}</p></div>
-          <div className="flex items-end gap-2"><a href={`tel:${customer.phone}`} className="inline-flex h-10 items-center rounded-xl bg-teal-50 px-3 text-sm font-bold text-teal-800 hover:bg-teal-100"><Phone className="ml-2 h-4 w-4" />اتصال</a>{mapUrl ? <a href={mapUrl} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center rounded-xl bg-sky-50 px-3 text-sm font-bold text-sky-800 hover:bg-sky-100"><MapPinned className="ml-2 h-4 w-4" />الخريطة</a> : null}</div>
+          <CustomerContactActions customer={customer} labels className="items-end" />
         </div>
         {customer.notes ? <div className="border-t border-teal-950/6 bg-teal-50/35 px-6 py-4 text-sm leading-7 text-muted-foreground"><span className="font-bold text-teal-950">ملاحظات: </span>{customer.notes}</div> : null}
       </section>
