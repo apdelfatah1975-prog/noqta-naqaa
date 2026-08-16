@@ -144,17 +144,13 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(mocks.remindersInvalidate).toHaveBeenCalled();
   });
 
-  it("يرسل فلاتر تاريخ آخر زيارة والمبلغ المحصل إلى قائمة العملاء", () => {
+  it("يرسل حالة المتابعة من الفلتر السريع إلى قائمة العملاء", () => {
     render(<Customers />);
-    fireEvent.change(screen.getByLabelText("آخر زيارة من تاريخ"), { target: { value: "2026-08-01" } });
-    fireEvent.change(screen.getByLabelText("آخر زيارة إلى تاريخ"), { target: { value: "2026-08-31" } });
-    fireEvent.change(screen.getByLabelText("الحد الأدنى للمبلغ المحصل"), { target: { value: "250" } });
-    fireEvent.change(screen.getByLabelText("الحد الأعلى للمبلغ المحصل"), { target: { value: "500.50" } });
+    fireEvent.click(screen.getByRole("button", { name: "متأخر" }));
     const latestInput = mocks.list.mock.calls.at(-1)?.[0];
-    expect(latestInput.visitDateFrom).toBe("2026-08-01");
-    expect(latestInput.visitDateTo).toBe("2026-08-31");
-    expect(latestInput.collectedAmountMin).toBe(25000);
-    expect(latestInput.collectedAmountMax).toBe(50050);
+    expect(latestInput.followUpStatus).toBe("overdue");
+    expect(latestInput.visitDateFrom).toBeUndefined();
+    expect(latestInput.collectedAmountMin).toBeUndefined();
   });
 });
 
