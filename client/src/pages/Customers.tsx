@@ -38,7 +38,7 @@ export default function Customers() {
   const updateCustomer = trpc.filters.customers.update.useMutation({ onSuccess: () => { utils.filters.customers.list.invalidate(); utils.filters.customers.get.invalidate(); utils.filters.dashboard.invalidate(); utils.filters.reminders.due.invalidate(); toast.success("تم تعديل بيانات العميل"); setDialogOpen(false); }, onError: error => toast.error(error.message || "تعذر تعديل بيانات العميل. يرجى المحاولة مرة أخرى.") });
   const saving = createCustomer.isPending || updateCustomer.isPending;
   const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
-  const displayedCustomers = customers ?? ((isOffline || isError) ? offlineCustomers.map(customer => ({
+  const displayedCustomers = customers ?? offlineCustomers.map(customer => ({
     ...customer,
     address: customer.address ?? null,
     latitude: customer.latitude ?? null,
@@ -54,7 +54,7 @@ export default function Customers() {
     lastVisitDate: new Date(0),
     collectedAmount: 0,
     collectedCurrency: "SAR" as const,
-  })) : undefined);
+  }));
 
   useEffect(() => { if (customers) { cacheOfflineCustomers(customers); setOfflineCustomers(getOfflineCustomers()); } }, [customers]);
   useEffect(() => {
@@ -92,8 +92,8 @@ export default function Customers() {
     }
     createCustomer.mutate(payload);
   }
-  function exportCustomers() { if (!customers?.length) { toast.info("لا توجد بيانات مطابقة للتصدير"); return; } downloadRowsAsExcel(`عملاء-نقطة-نقاء-${new Date().toISOString().slice(0, 10)}.xlsx`, "العملاء", withArabicHeaders(customerRowsForExcel(customers), customerExcelHeaders)); toast.success("تم تجهيز ملف العملاء للتنزيل"); }
-  function exportCustomersPdf() { if (!customers?.length) { toast.info("لا توجد بيانات مطابقة للتصدير"); return; } const rows = customerRowsForExcel(customers); const opened = printArabicPdf("تقرير العملاء", rows, Object.entries(customerExcelHeaders).map(([key, label]) => ({ key, label }))); if (opened) toast.success("تم فتح تقرير PDF للطباعة أو الحفظ"); else toast.error("تعذر فتح نافذة PDF. اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى"); }
+  function exportCustomers() { if (!displayedCustomers?.length) { toast.info("لا توجد بيانات مطابقة للتصدير"); return; } downloadRowsAsExcel(`عملاء-نقطة-نقاء-${new Date().toISOString().slice(0, 10)}.xlsx`, "العملاء", withArabicHeaders(customerRowsForExcel(displayedCustomers), customerExcelHeaders)); toast.success("تم تجهيز ملف العملاء للتنزيل"); }
+  function exportCustomersPdf() { if (!displayedCustomers?.length) { toast.info("لا توجد بيانات مطابقة للتصدير"); return; } const rows = customerRowsForExcel(displayedCustomers); const opened = printArabicPdf("تقرير العملاء", rows, Object.entries(customerExcelHeaders).map(([key, label]) => ({ key, label }))); if (opened) toast.success("تم فتح تقرير PDF للطباعة أو الحفظ"); else toast.error("تعذر فتح نافذة PDF. اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى"); }
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">

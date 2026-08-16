@@ -6,6 +6,7 @@ import {
   clearOfflineState,
   getOfflineCustomers,
   getOfflineReport,
+  getLatestOfflineReport,
   getOfflineSession,
   getPendingCustomers,
   queueOfflineCash,
@@ -56,6 +57,14 @@ describe("التخزين المحلي للمزامنة", () => {
     cacheOfflineReport(5, "2026-08-01", "2026-08-16", report);
     expect(getOfflineReport(5, "2026-08-01", "2026-08-16")).toEqual(report);
     expect(getOfflineReport(5, "2026-07-01", "2026-07-31")).toBeNull();
+  });
+
+  it("يسترجع أحدث تقرير محلي عند عدم وجود الفترة المطلوبة", () => {
+    const older = { period: { dateFrom: "2026-07-01", dateTo: "2026-07-31" }, summary: { income: 700 } };
+    const latest = { period: { dateFrom: "2026-08-01", dateTo: "2026-08-16" }, summary: { income: 1000 } };
+    cacheOfflineReport(5, "2026-07-01", "2026-07-31", older);
+    cacheOfflineReport(5, "2026-08-01", "2026-08-16", latest);
+    expect(getLatestOfflineReport(5)).toEqual(latest);
   });
 
   it("يجمع كل بيانات التطبيق المحلية في نسخة احتياطية واحدة", () => {

@@ -210,6 +210,24 @@ export function getOfflineReport<T>(ownerId: number, dateFrom: string, dateTo: s
   return readJson<T | null>(`${REPORT_KEY_PREFIX}-${ownerId}-${dateFrom}-${dateTo}`, null);
 }
 
+export function getLatestOfflineReport<T extends { period?: { dateFrom?: string; dateTo?: string } }>(ownerId: number) {
+  if (!available()) return null;
+  let latest: T | null = null;
+  let latestDate = "";
+  const prefix = `${REPORT_KEY_PREFIX}-${ownerId}-`;
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(prefix)) continue;
+    const value = readJson<T | null>(key, null);
+    const dateTo = value?.period?.dateTo ?? "";
+    if (value && dateTo >= latestDate) {
+      latest = value;
+      latestDate = dateTo;
+    }
+  }
+  return latest;
+}
+
 export function cacheOfflineCash<T>(ownerId: number, value: T) {
   writeJson(ownerDataKey(CASH_KEY_PREFIX, ownerId), value);
 }
