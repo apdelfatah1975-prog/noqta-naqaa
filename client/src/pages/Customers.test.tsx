@@ -6,6 +6,7 @@ import Customers from "./Customers";
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   createUseMutation: vi.fn(),
+  visitUseMutation: vi.fn(),
   updateUseMutation: vi.fn(),
   deleteUseMutation: vi.fn(),
   listInvalidate: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock("@/lib/trpc", () => ({
         update: { useMutation: mocks.updateUseMutation },
         delete: { useMutation: mocks.deleteUseMutation },
       },
-      visits: { create: { useMutation: mocks.createUseMutation } },
+      visits: { create: { useMutation: mocks.visitUseMutation } },
       dashboard: { invalidate: mocks.dashboardInvalidate },
       reminders: { due: { invalidate: mocks.remindersInvalidate } },
     },
@@ -52,6 +53,7 @@ describe("ترابط تعديل بيانات العميل", () => {
       isError: false,
     });
     mocks.createUseMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    mocks.visitUseMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
     mocks.deleteUseMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
     mocks.updateUseMutation.mockImplementation((options: { onSuccess?: () => void }) => {
       mocks.updateOptions = options;
@@ -93,6 +95,17 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(mocks.location).toHaveBeenCalledWith("/customers/12");
   });
 
+
+  it("يرسل الفني والمبلغ المحصل عند حفظ الزيارة", () => {
+    const mutate = vi.fn();
+    mocks.visitUseMutation.mockReturnValue({ mutate, isPending: false });
+    render(<Customers />);
+    fireEvent.click(screen.getByRole("button", { name: "زيارة" }));
+    fireEvent.change(screen.getByLabelText("اسم الفني"), { target: { value: "أحمد" } });
+    fireEvent.change(screen.getByLabelText("المبلغ المحصل (بالريال السعودي)"), { target: { value: "250" } });
+    fireEvent.click(screen.getByRole("button", { name: "حفظ الزيارة" }));
+    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ customerId: 12, technicianName: "أحمد", collectedAmount: 25000, collectedCurrency: "SAR" }));
+  });
 
   it("يرسل خيار الفرز حسب أقرب موعد إلى قائمة العملاء", () => {
     render(<Customers />);
