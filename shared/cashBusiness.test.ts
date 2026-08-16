@@ -61,6 +61,7 @@ describe("calculateCompanyFinancialOverview", () => {
     expect(calculateCompanyFinancialOverview([
       { transactionType: "income", amount: 100000, category: "تحصيل صيانة" },
       { transactionType: "income", amount: 25000, category: "نقدية خارج إيرادات العمل" },
+      { transactionType: "expense", amount: 50000, category: "مستحق فني", recipientName: "أحمد" },
       { transactionType: "expense", amount: 30000, category: "راتب فني", recipientName: "أحمد" },
       { transactionType: "expense", amount: 10000, category: "بنزين" },
     ])).toEqual({
@@ -68,9 +69,21 @@ describe("calculateCompanyFinancialOverview", () => {
       externalIncome: 25000,
       totalIncome: 125000,
       technicianPayments: 30000,
+      technicianRequired: 50000,
+      technicianRemaining: 20000,
       otherExpenses: 10000,
       companyNet: 85000,
-      technicianPaymentsByName: [{ technician: "أحمد", totalPaid: 30000, transactionCount: 1 }],
+      technicianPaymentsByName: [{ technician: "أحمد", requiredAmount: 50000, totalPaid: 30000, remainingAmount: 20000, status: "remaining", transactionCount: 2 }],
     });
+  });
+});
+
+describe("حالة راتب الفني", () => {
+  it("يعرض مدفوعًا عندما يساوي المدفوع أو يتجاوز المستحق", () => {
+    const result = calculateCompanyFinancialOverview([
+      { transactionType: "expense", amount: 40000, category: "مستحق فني", recipientName: "محمود" },
+      { transactionType: "expense", amount: 40000, category: "راتب فني", recipientName: "محمود" },
+    ]);
+    expect(result.technicianPaymentsByName[0]).toMatchObject({ technician: "محمود", requiredAmount: 40000, totalPaid: 40000, remainingAmount: 0, status: "paid" });
   });
 });

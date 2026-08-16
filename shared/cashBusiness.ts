@@ -61,13 +61,15 @@ export type CashAnalytics = {
   technicianExpenses: CashTechnicianRow[];
 };
 
-export type TechnicianPaymentRow = { technician: string; totalPaid: number; transactionCount: number };
+export type TechnicianPaymentRow = { technician: string; requiredAmount: number; totalPaid: number; remainingAmount: number; status: "paid" | "remaining"; transactionCount: number };
 
 export type CompanyFinancialOverview = {
   serviceIncome: number;
   externalIncome: number;
   totalIncome: number;
   technicianPayments: number;
+  technicianRequired: number;
+  technicianRemaining: number;
   otherExpenses: number;
   companyNet: number;
   technicianPaymentsByName: TechnicianPaymentRow[];
@@ -151,6 +153,7 @@ export function calculateCompanyFinancialOverview(transactions: Array<CashTransa
   let serviceIncome = 0;
   let externalIncome = 0;
   let technicianPayments = 0;
+  let technicianRequired = 0;
   let otherExpenses = 0;
   const technicianMap = new Map<string, TechnicianPaymentRow>();
   for (const transaction of transactions) {
@@ -159,10 +162,17 @@ export function calculateCompanyFinancialOverview(transactions: Array<CashTransa
       if (category === externalIncomeCategory) externalIncome += transaction.amount;
       else if (serviceCategories.has(category)) serviceIncome += transaction.amount;
     } else if (technicianCategories.has(category) || Boolean(transaction.recipientName?.trim() && category.includes("فني"))) {
-      technicianPayments += transaction.amount;
       const technician = transaction.recipientName?.trim() || "فني غير محدد";
-      const current = technicianMap.get(technician) ?? { technician, totalPaid: 0, transactionCount: 0 };
-      current.totalPaid += transaction.amount;
+      const current = technicianMap.get(technician) ?? { technician, requiredAmount: 0, totalPaid: 0, remainingAmount: 0, status: "paid" as const, transactionCount: 0 };
+      if (category === "مستحق فني") {
+        technicianRequired += transaction.amount;
+        current.requiredAmount += transaction.amount;
+      } else {
+        technicianPayments += transaction.amount;
+        current.totalPaid += transaction.amount;
+      }
+      current.remainingAmount = Math.max(current.requiredAmount - current.totalPaid, 0);
+      current.status = current.remainingAmount > 0 ? "remaining" : "paid";
       current.transactionCount += 1;
       technicianMap.set(technician, current);
     } else {
@@ -170,7 +180,9 @@ export function calculateCompanyFinancialOverview(transactions: Array<CashTransa
     }
   }
   const totalIncome = serviceIncome + externalIncome;
-  return { serviceIncome, externalIncome, totalIncome, technicianPayments, otherExpenses, companyNet: totalIncome - technicianPayments - otherExpenses, technicianPaymentsByName: Array.from(technicianMap.values()).sort((a, b) => b.totalPaid - a.totalPaid) };
+  const technicianPaymentsByName = Array.from(technicianMap.values()).sort((a, b) => b.remainingAmount - a.remainingAmount || b.requiredAmount - a.requiredAmount || b.totalPaid - a.totalPaid);
+  const technicianRemaining = technicianPaymentsByName.reduce((total, row) => total + row.remainingAmount, 0);
+  return { serviceIncome, externalIncome, totalIncome, technicianPayments, technicianRequired, technicianRemaining, otherExpenses, companyNet: totalIncome - technicianPayments - otherExpenses, technicianPaymentsByName };
 }
 
 export function currencyLabel(currency: CashCurrency | null | undefined) {

@@ -432,7 +432,7 @@ export const filterManagementRouter = router({
       return {
         period: { dateFrom: input.dateFrom, dateTo: input.dateTo },
         summary: { visits: periodVisits.length, customers: customerIds.length, income, expense, balance: income - expense, pendingReminders: pendingReminders.length, lowStock: inventory.items.filter(item => item.currentBalance <= 2).length },
-        financial: { serviceIncome: financial.serviceIncome, externalIncome: financial.externalIncome, totalIncome: financial.totalIncome, technicianPayments: financial.technicianPayments, otherExpenses: financial.otherExpenses, companyNet: financial.companyNet, technicianPaymentsByName: financial.technicianPaymentsByName },
+        financial: { serviceIncome: financial.serviceIncome, externalIncome: financial.externalIncome, totalIncome: financial.totalIncome, technicianPayments: financial.technicianPayments, technicianRequired: financial.technicianRequired, technicianRemaining: financial.technicianRemaining, otherExpenses: financial.otherExpenses, companyNet: financial.companyNet, technicianPaymentsByName: financial.technicianPaymentsByName },
         incomeByCategory: groupMoney(periodCash.filter(transaction => transaction.transactionType === "income"), row => row.category),
         expenseByCategory: groupMoney(periodCash.filter(transaction => transaction.transactionType === "expense"), row => row.category),
         visitsByType: groupVisits,
