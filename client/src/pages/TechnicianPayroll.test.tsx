@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateTechnicianCommission, monthBounds } from "./TechnicianPayroll";
+import { calculateTechnicianCommission, monthBounds, updateTechnicianProfile, upsertTechnicianProfile } from "./TechnicianPayroll";
 
 describe("TechnicianPayroll", () => {
   it("يحسب بداية ونهاية الشهر المحدد", () => {
@@ -12,5 +12,18 @@ describe("TechnicianPayroll", () => {
     expect(calculateTechnicianCommission(10000, "maintenance", 10, 5)).toBe(500);
     expect(calculateTechnicianCommission(10000, "follow_up", 10, 5)).toBe(0);
     expect(calculateTechnicianCommission(10000, "installation", 0, 5)).toBe(0);
+  });
+
+  it("يضيف فنيًا جديدًا بإعدادات صفرية ويمنع التكرار", () => {
+    const first = upsertTechnicianProfile({}, "  أحمد  ");
+    expect(first).toEqual({ أحمد: { monthlySalary: 0, installationPercent: 0, maintenancePercent: 0 } });
+    expect(upsertTechnicianProfile(first, "أحمد")).toBe(first);
+  });
+
+  it("يحدّث راتب الفني ونسبه ضمن الحدود الآمنة", () => {
+    const payroll = { أحمد: { monthlySalary: 0, installationPercent: 0, maintenancePercent: 0 } };
+    expect(updateTechnicianProfile(payroll, "أحمد", "monthlySalary", 250000)).toEqual({ أحمد: { monthlySalary: 250000, installationPercent: 0, maintenancePercent: 0 } });
+    expect(updateTechnicianProfile(payroll, "أحمد", "installationPercent", 150).أحمد.installationPercent).toBe(100);
+    expect(updateTechnicianProfile(payroll, "أحمد", "maintenancePercent", -5).أحمد.maintenancePercent).toBe(0);
   });
 });
