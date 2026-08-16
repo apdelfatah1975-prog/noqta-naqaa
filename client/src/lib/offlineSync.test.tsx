@@ -84,16 +84,24 @@ describe("التخزين المحلي للمزامنة", () => {
     expect(Object.keys(backup.storage).some(key => key.startsWith("purepoint-pending-cash-5"))).toBe(true);
   });
 
-  it("ينشئ نسخة Excel محلية باسم xlsx قابلة للتنزيل", () => {
+  it("ينشئ نسخة Excel محلية بأوراق ورؤوس عربية قابلة للقراءة", async () => {
     rememberOfflineSession({ id: 5, name: "مدير", email: "manager@example.com", openId: "owner-5", role: "admin" });
+    cacheOfflineCustomers([{ id: 8, name: "عميل Excel", phone: "01000000000" }]);
     const click = vi.fn();
     const anchor = { click, href: "", download: "" };
+    let downloaded: Blob | undefined;
     vi.spyOn(document, "createElement").mockReturnValue(anchor as unknown as HTMLElement);
-    vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:test"), revokeObjectURL: vi.fn() });
+    vi.stubGlobal("URL", { createObjectURL: vi.fn((blob: Blob) => { downloaded = blob; return "blob:test"; }), revokeObjectURL: vi.fn() });
 
     expect(downloadOfflineBackup(new Date("2026-08-16T12:00:00.000Z"))).toBe(true);
     expect(anchor.download).toMatch(/\.xlsx$/);
     expect(click).toHaveBeenCalled();
+    expect(downloaded).toBeDefined();
+    const workbook = (await import("xlsx")).read(await downloaded!.arrayBuffer(), { type: "array" });
+    expect(workbook.SheetNames).toContain("العملاء");
+    const rows = (await import("xlsx")).utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets["العملاء"]);
+    expect(rows[0]).toMatchObject({ الاسم: "عميل Excel", الهاتف: "01000000000" });
+    expect(rows[0]).not.toHaveProperty("البيانات");
   });
 
   it("يستعيد مفاتيح البيانات من ورقة Excel المحلية", async () => {

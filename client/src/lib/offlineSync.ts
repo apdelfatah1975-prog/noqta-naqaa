@@ -2,6 +2,7 @@ const SESSION_KEY = "purepoint-offline-session";
 import * as XLSX from "xlsx";
 
 const CUSTOMERS_KEY = "purepoint-offline-customers";
+const VISITS_KEY = "purepoint-offline-visits";
 const CUSTOMER_QUEUE_PREFIX = "purepoint-pending-customers";
 const VISIT_QUEUE_PREFIX = "purepoint-pending-visits";
 const DASHBOARD_KEY = "purepoint-offline-dashboard";
@@ -34,11 +35,23 @@ export type PendingCustomer = Omit<OfflineCustomer, "id"> & {
   createdAt: string;
 };
 
+export type OfflineVisit = {
+  id: number;
+  customerId: number;
+  visitType: "installation" | "maintenance" | "cartridge_change" | "follow_up" | "other";
+  visitDate: string;
+  technicianName?: string | null;
+  notes?: string | null;
+  collectedAmount?: number;
+  collectedCurrency?: "SAR";
+};
+
 export type PendingVisit = {
   clientOperationId: string;
   customerId: number;
   visitType: "installation" | "maintenance" | "cartridge_change" | "follow_up" | "other";
   visitDate: string;
+  technicianName?: string | null;
   notes: string | null;
   collectedAmount?: number;
   collectedCurrency?: "SAR";
@@ -144,6 +157,7 @@ export function clearOfflineState() {
   const session = getOfflineSession();
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(CUSTOMERS_KEY);
+  localStorage.removeItem(VISITS_KEY);
   if (session) {
     localStorage.removeItem(queueKey(CUSTOMER_QUEUE_PREFIX, session.id));
     localStorage.removeItem(queueKey(VISIT_QUEUE_PREFIX, session.id));
@@ -156,6 +170,14 @@ export function cacheOfflineCustomers(customers: OfflineCustomer[]) {
 
 export function getOfflineCustomers() {
   return readJson<OfflineCustomer[]>(CUSTOMERS_KEY, []);
+}
+
+export function cacheOfflineVisits(visits: OfflineVisit[]) {
+  writeJson(VISITS_KEY, visits);
+}
+
+export function getOfflineVisits() {
+  return readJson<OfflineVisit[]>(VISITS_KEY, []);
 }
 
 export function cacheOfflineDashboard<T>(dashboard: T) {
@@ -343,6 +365,26 @@ function localizeReadableValue(value: unknown): unknown {
   return Object.fromEntries(Object.entries(value).map(([key, nested], index) => [arabicFieldLabels[key] ?? `حقل إضافي ${index + 1}`, localizeReadableValue(nested)]));
 }
 
+function readableRecordRow(key: string, record: unknown, index: number): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    "مفتاح البيانات": key,
+    "رقم السجل": index + 1,
+  };
+  if (!record || typeof record !== "object" || Array.isArray(record)) {
+    base["القيمة"] = typeof record === "string" ? record : serializeStoredValue(record);
+    return base;
+  }
+  for (const [field, value] of Object.entries(record)) {
+    const label = arabicFieldLabels[field] ?? field;
+    if (value && typeof value === "object") {
+      base[label] = serializeStoredValue(localizeReadableValue(value));
+    } else {
+      base[label] = value ?? "";
+    }
+  }
+  return base;
+}
+
 function readableSheetRows(storage: Record<string, unknown>) {
   const groups: Record<string, Array<Record<string, unknown>>> = {
     "العملاء": [],
@@ -357,9 +399,8 @@ function readableSheetRows(storage: Record<string, unknown>) {
   };
 
   for (const [key, value] of Object.entries(storage)) {
-    const serialized = serializeStoredValue(value);
     // هذه الورقة هي المصدر الكامل للاستعادة، لذلك تضم كل مفتاح purepoint بلا استثناء.
-    groups["بيانات محلية"].push({ "مفتاح البيانات": key, "القيمة": serialized });
+    groups["بيانات محلية"].push({ "مفتاح البيانات": key, "القيمة": serializeStoredValue(value) });
 
     let groupName = "بيانات محلية";
     if (key.includes("customers")) groupName = "العملاء";
@@ -371,28 +412,27 @@ function readableSheetRows(storage: Record<string, unknown>) {
     else if (key.includes("session")) groupName = "بيانات الحساب";
 
     if (Array.isArray(value)) {
-      value.forEach((record, index) => {
-        groups[groupName].push({
-          "مفتاح البيانات": key,
-          "رقم السجل": index + 1,
-          "البيانات": serializeStoredValue(localizeReadableValue(record)),
-        });
-      });
-    } else if (value && typeof value === "object") {
-      groups[groupName].push({
-        "مفتاح البيانات": key,
-        "رقم السجل": 1,
-        "البيانات": serialized,
-      });
+      value.forEach((record, index) => groups[groupName].push(readableRecordRow(key, record, index)));
     } else {
-      groups[groupName].push({
-        "مفتاح البيانات": key,
-        "رقم السجل": 1,
-        "البيانات": serialized,
-      });
+      groups[groupName].push(readableRecordRow(key, value, 0));
     }
   }
   return groups;
+}
+
+function setArabicSheetLayout(sheet: XLSX.WorkSheet) {
+  sheet["!rtl"] = true;
+  const range = sheet["!ref"] ? XLSX.utils.decode_range(sheet["!ref"]) : { s: { c: 0, r: 0 }, e: { c: 0, r: 0 } };
+  const widths: XLSX.ColInfo[] = [];
+  for (let column = range.s.c; column <= range.e.c; column += 1) {
+    let maxLength = 12;
+    for (let row = range.s.r; row <= Math.min(range.e.r, range.s.r + 80); row += 1) {
+      const cell = sheet[XLSX.utils.encode_cell({ c: column, r: row })];
+      maxLength = Math.max(maxLength, String(cell?.v ?? "").length);
+    }
+    widths.push({ wch: Math.min(42, Math.max(12, maxLength + 2)) });
+  }
+  sheet["!cols"] = widths;
 }
 
 export function downloadOfflineBackup(now = new Date()) {
@@ -407,9 +447,13 @@ export function downloadOfflineBackup(now = new Date()) {
     "عدد مفاتيح البيانات": Object.keys(backup.storage).length,
     "طريقة الاستعادة": "من زر استعادة ثم اختيار ملف Excel هذا",
   }];
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summary), "ملخص النسخة");
+  const summarySheet = XLSX.utils.json_to_sheet(summary);
+  setArabicSheetLayout(summarySheet);
+  XLSX.utils.book_append_sheet(workbook, summarySheet, "ملخص النسخة");
   for (const [sheetName, rows] of Object.entries(groups)) {
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.length ? rows : [{ "مفتاح البيانات": "لا توجد بيانات", "البيانات": "", "القيمة": "" }]), sheetName);
+    const sheet = XLSX.utils.json_to_sheet(rows.length ? rows : [{ "مفتاح البيانات": "لا توجد بيانات", "القيمة": "" }]);
+    setArabicSheetLayout(sheet);
+    XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
   }
   const output = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
   const blob = new Blob([output], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });

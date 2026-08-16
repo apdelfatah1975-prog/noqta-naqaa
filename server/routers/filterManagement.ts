@@ -599,6 +599,26 @@ export const filterManagementRouter = router({
   }),
 
   visits: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const db = await databaseOrThrow();
+      const [visitRows, customerRows, incomeRows] = await Promise.all([
+        db.select().from(visits).where(eq(visits.ownerId, ctx.user.id)).orderBy(desc(visits.visitDate)),
+        db.select().from(customers).where(eq(customers.ownerId, ctx.user.id)),
+        db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.transactionType, "income"))),
+      ]);
+      const customerById = new Map(customerRows.map(customer => [customer.id, customer]));
+      const incomeByVisit = new Map(incomeRows.filter(row => row.sourceVisitId).map(row => [row.sourceVisitId!, row]));
+      return visitRows.map(visit => {
+        const customer = customerById.get(visit.customerId);
+        const income = incomeByVisit.get(visit.id);
+        return {
+          ...visit,
+          customer: customer ? { id: customer.id, name: customer.name, phone: customer.phone, address: customer.address, latitude: customer.latitude, longitude: customer.longitude, manualCode: customer.manualCode } : null,
+          collectedAmount: income?.amount ?? 0,
+          collectedCurrency: income?.currency ?? "SAR",
+        };
+      });
+    }),
     create: protectedProcedure.input(visitInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       if (input.clientOperationId) {
