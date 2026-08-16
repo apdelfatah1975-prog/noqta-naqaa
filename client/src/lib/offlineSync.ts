@@ -1,4 +1,6 @@
 const SESSION_KEY = "purepoint-offline-session";
+import * as XLSX from "xlsx";
+
 const CUSTOMERS_KEY = "purepoint-offline-customers";
 const CUSTOMER_QUEUE_PREFIX = "purepoint-pending-customers";
 const VISIT_QUEUE_PREFIX = "purepoint-pending-visits";
@@ -321,15 +323,57 @@ export function createOfflineBackup(now = new Date()): OfflineBackup {
   };
 }
 
+function readableSheetRows(storage: Record<string, unknown>) {
+  const groups: Record<string, Array<Record<string, unknown>>> = {
+    "العملاء": [],
+    "الزيارات": [],
+    "التذكيرات": [],
+    "الخزينة": [],
+    "المخزن": [],
+    "التقارير": [],
+    "العمليات المعلقة": [],
+    "بيانات الحساب": [],
+    "بيانات محلية": [],
+  };
+
+  for (const [key, value] of Object.entries(storage)) {
+    const serialized = typeof value === "string" ? value : JSON.stringify(value);
+    const row = { "مفتاح البيانات": key, "القيمة": serialized ?? "" };
+    if (key.includes("customers")) groups["العملاء"].push(row);
+    else if (key.includes("visits")) groups["الزيارات"].push(row);
+    else if (key.includes("report")) groups["التقارير"].push(row);
+    else if (key.includes("cash")) groups["الخزينة"].push(row);
+    else if (key.includes("inventory")) groups["المخزن"].push(row);
+    else if (key.includes("pending")) groups["العمليات المعلقة"].push(row);
+    else if (key.includes("session")) groups["بيانات الحساب"].push(row);
+    else groups["بيانات محلية"].push(row);
+  }
+  return groups;
+}
+
 export function downloadOfflineBackup(now = new Date()) {
   if (!available()) return false;
   const backup = createOfflineBackup(now);
-  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json;charset=utf-8" });
+  const workbook = XLSX.utils.book_new();
+  const groups = readableSheetRows(backup.storage);
+  const summary = [{
+    "اسم التطبيق": backup.app,
+    "نوع النسخة": "نسخة احتياطية محلية Excel",
+    "تاريخ الإنشاء": now.toLocaleString("ar-EG"),
+    "عدد مفاتيح البيانات": Object.keys(backup.storage).length,
+    "طريقة الاستعادة": "من زر استعادة ثم اختيار ملف Excel هذا",
+  }];
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summary), "ملخص النسخة");
+  for (const [sheetName, rows] of Object.entries(groups)) {
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.length ? rows : [{ "مفتاح البيانات": "لا توجد بيانات", "القيمة": "" }]), sheetName);
+  }
+  const output = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([output], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   const stamp = now.toISOString().replace(/[:.]/g, "-");
   anchor.href = url;
-  anchor.download = `pure-point-backup-${stamp}.json`;
+  anchor.download = `pure-point-backup-${stamp}.xlsx`;
   anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
   return true;
@@ -368,5 +412,34 @@ export function restoreOfflineBackupFromText(text: string): OfflineRestoreResult
   } catch (error) {
     if (error instanceof SyntaxError) throw new Error("تعذر قراءة ملف النسخة الاحتياطية؛ تأكد من أنه ملف JSON صحيح.");
     throw error;
+  }
+}
+
+export function restoreOfflineBackupFromExcel(data: ArrayBuffer): OfflineRestoreResult {
+  if (!available()) throw new Error("التخزين المحلي غير متاح على هذا الجهاز.");
+  try {
+    const workbook = XLSX.read(data, { type: "array" });
+    const sheet = workbook.Sheets["بيانات محلية"];
+    if (!sheet) throw new Error("ملف Excel لا يحتوي على ورقة البيانات المحلية المطلوبة.");
+    const rows = XLSX.utils.sheet_to_json<{ "مفتاح البيانات"?: string; "القيمة"?: string }>(sheet);
+    const entries: Array<[string, unknown]> = [];
+    for (const row of rows) {
+      const key = row["مفتاح البيانات"];
+      const raw = row["القيمة"];
+      if (!key || key === "لا توجد بيانات" || !key.startsWith("purepoint-") || raw === undefined) continue;
+      try { entries.push([key, JSON.parse(String(raw))]); } catch { entries.push([key, raw]); }
+    }
+    if (entries.length === 0) throw new Error("النسخة الاحتياطية لا تحتوي على بيانات نقطة نقاء قابلة للاستعادة.");
+    const currentKeys: string[] = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith("purepoint-")) currentKeys.push(key);
+    }
+    for (const key of currentKeys) localStorage.removeItem(key);
+    for (const [key, value] of entries) localStorage.setItem(key, JSON.stringify(value));
+    return { restoredKeys: entries.length, exportedAt: new Date().toISOString() };
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("لا يحتوي")) throw error;
+    throw new Error("تعذر قراءة ملف Excel؛ تأكد من أنه ملف نسخة احتياطية صادر من تطبيق نقطة نقاء.");
   }
 }

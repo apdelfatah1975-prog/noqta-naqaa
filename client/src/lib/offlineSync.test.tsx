@@ -16,6 +16,8 @@ import {
   rememberOfflineSession,
   removePendingVisit,
   restoreOfflineBackup,
+  downloadOfflineBackup,
+  restoreOfflineBackupFromExcel,
 } from "./offlineSync";
 
 describe("التخزين المحلي للمزامنة", () => {
@@ -80,6 +82,32 @@ describe("التخزين المحلي للمزامنة", () => {
     expect(backup.storage["purepoint-offline-session"]).toMatchObject({ id: 5 });
     expect(backup.storage["purepoint-offline-customers"]).toEqual([expect.objectContaining({ name: "عميل محفوظ" })]);
     expect(Object.keys(backup.storage).some(key => key.startsWith("purepoint-pending-cash-5"))).toBe(true);
+  });
+
+  it("ينشئ نسخة Excel محلية باسم xlsx قابلة للتنزيل", () => {
+    rememberOfflineSession({ id: 5, name: "مدير", email: "manager@example.com", openId: "owner-5", role: "admin" });
+    const click = vi.fn();
+    const anchor = { click, href: "", download: "" };
+    vi.spyOn(document, "createElement").mockReturnValue(anchor as unknown as HTMLElement);
+    vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:test"), revokeObjectURL: vi.fn() });
+
+    expect(downloadOfflineBackup(new Date("2026-08-16T12:00:00.000Z"))).toBe(true);
+    expect(anchor.download).toMatch(/\.xlsx$/);
+    expect(click).toHaveBeenCalled();
+  });
+
+  it("يستعيد مفاتيح البيانات من ورقة Excel المحلية", async () => {
+    rememberOfflineSession({ id: 5, name: "مدير", email: "manager@example.com", openId: "owner-5", role: "admin" });
+    cacheOfflineCustomers([{ id: 8, name: "عميل Excel", phone: "01000000000" }]);
+    const workbook = (await import("xlsx")).utils.book_new();
+    const sheet = (await import("xlsx")).utils.json_to_sheet([{ "مفتاح البيانات": "purepoint-offline-customers", "القيمة": JSON.stringify([{ id: 8, name: "عميل Excel", phone: "01000000000" }]) }]);
+    (await import("xlsx")).utils.book_append_sheet(workbook, sheet, "بيانات محلية");
+    const bytes = (await import("xlsx")).write(workbook, { bookType: "xlsx", type: "array" });
+
+    cacheOfflineCustomers([{ id: 9, name: "بيانات مؤقتة", phone: "01000000001" }]);
+    const result = restoreOfflineBackupFromExcel(bytes);
+    expect(result.restoredKeys).toBe(1);
+    expect(getOfflineCustomers()).toEqual([{ id: 8, name: "عميل Excel", phone: "01000000000" }]);
   });
 
   it("يستعيد النسخة الاحتياطية محليًا ويرفض الملف غير الصالح", () => {
