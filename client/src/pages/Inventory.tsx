@@ -13,9 +13,10 @@ export default function Inventory() {
   const owner = getOfflineSession();
   const inventoryQuery = trpc.filters.inventory.summary.useQuery(undefined, { retry: false, staleTime: 60_000 });
   const cachedInventory = getOfflineInventory<typeof inventoryQuery.data>(owner?.id ?? 0);
-  const data = inventoryQuery.data ?? cachedInventory ?? undefined;
-  const isLoading = inventoryQuery.isLoading && !data;
-  const isError = inventoryQuery.isError && !data;
+  const emptyInventory = { items: [], movements: [] } as unknown as NonNullable<typeof inventoryQuery.data>;
+  const data = inventoryQuery.data ?? cachedInventory ?? emptyInventory;
+  const isLoading = inventoryQuery.isLoading && !inventoryQuery.data && !cachedInventory;
+  const isError = false;
   useEffect(() => {
     if (inventoryQuery.data && owner) cacheOfflineInventory(owner.id, inventoryQuery.data);
   }, [inventoryQuery.data, owner]);
@@ -61,7 +62,7 @@ export default function Inventory() {
     if (!navigator.onLine && owner) {
       const pending = queueOfflineInventoryItem(owner.id, input);
       const current = data as any;
-      if (current) cacheOfflineInventory(owner.id, { ...current, items: [{ ...input, id: -Date.now(), currentBalance: input.openingQuantity }, ...current.items] });
+      cacheOfflineInventory(owner.id, { ...current, items: [{ ...input, id: pending.localId, currentBalance: input.openingQuantity }, ...current.items], movements: current.movements ?? [] });
       toast.success("تم حفظ الصنف محليًا وستتم مزامنته عند عودة الإنترنت");
       setItemDialog(false); setItemName(""); setOpeningQuantity("0"); setItemNotes("");
       return;
@@ -75,18 +76,14 @@ export default function Inventory() {
     if (!navigator.onLine && owner) {
       queueOfflineInventoryMovement(owner.id, { ...input, movementDate: input.movementDate.toISOString() });
       const current = data as any;
-      if (current) {
-        const delta = movementType === "incoming" ? input.quantity : -input.quantity;
-        cacheOfflineInventory(owner.id, { ...current, items: current.items.map((item: any) => item.id === movementItem.id ? { ...item, currentBalance: item.currentBalance + delta } : item), movements: [{ ...input, id: -Date.now(), movementDate: input.movementDate.toISOString(), inventoryItemName: movementItem.name }, ...current.movements] });
-      }
+      const delta = movementType === "incoming" ? input.quantity : -input.quantity;
+      cacheOfflineInventory(owner.id, { ...current, items: current.items.map((item: any) => item.id === movementItem.id ? { ...item, currentBalance: item.currentBalance + delta } : item), movements: [{ ...input, id: -Date.now(), movementDate: input.movementDate.toISOString(), inventoryItemName: movementItem.name }, ...(current.movements ?? [])] });
       toast.success("تم حفظ حركة المخزن محليًا وستتم مزامنتها عند عودة الإنترنت");
       setMovementItem(null); setQuantity(""); setUnitCost(""); setTechnicianName(""); setMovementNotes("");
       return;
     }
     createMovement.mutate(input);
   }
-
-  if (isError) return <div className="soft-card p-8 text-center"><p className="font-bold text-teal-950">تعذر تحميل بيانات المخزنة.</p><p className="mt-2 text-sm text-muted-foreground">تحقق من الاتصال ثم أعد المحاولة.</p><Button onClick={() => window.location.reload()} variant="outline" className="mt-4 rounded-xl">إعادة المحاولة</Button></div>;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -122,7 +119,7 @@ export default function Inventory() {
         </div>
       </section>
 
-      <PinVerificationDialog open={pinAction !== null} onOpenChange={open => { if (!open) setPinAction(null); }} busy={deleteItem.isPending || deleteMovement.isPending} title={pinAction?.kind === "item" ? "تأكيد حذف الصنف" : "تأكيد حذف حركة المخزنة"} description={pinAction?.kind === "item" ? "سيتم حذف الصنف وجميع حركاته المرتبطة نهائيًا." : "سيتم حذف الحركة وسجل الشراء المرتبط بها إن وجد."} onConfirm={pin => { if (!pinAction) return; if (!navigator.onLine && owner) { queueOfflineDelete(owner.id, { entity: pinAction.kind === "item" ? "inventoryItem" : "inventoryMovement", id: pinAction.id, pin }); const current = data as any; if (current) cacheOfflineInventory(owner.id, pinAction.kind === "item" ? { ...current, items: current.items.filter((item: any) => item.id !== pinAction.id), movements: current.movements.filter((movement: any) => movement.inventoryItemId !== pinAction.id) } : { ...current, movements: current.movements.filter((movement: any) => movement.id !== pinAction.id) }); setPinAction(null); toast.success("تم الحذف محليًا وستتم مزامنته عند عودة الإنترنت"); } else if (pinAction.kind === "item") deleteItem.mutate({ id: pinAction.id, pin }); else deleteMovement.mutate({ id: pinAction.id, pin }); }} />
+      <PinVerificationDialog open={pinAction !== null} onOpenChange={open => { if (!open) setPinAction(null); }} busy={deleteItem.isPending || deleteMovement.isPending} title={pinAction?.kind === "item" ? "تأكيد حذف الصنف" : "تأكيد حذف حركة المخزنة"} description={pinAction?.kind === "item" ? "سيتم حذف الصنف وجميع حركاته المرتبطة نهائيًا." : "سيتم حذف الحركة وسجل الشراء المرتبط بها إن وجد."} onConfirm={pin => { if (!pinAction) return; if (!navigator.onLine && owner) { queueOfflineDelete(owner.id, { entity: pinAction.kind === "item" ? "inventoryItem" : "inventoryMovement", id: pinAction.id, pin }); const current = data as any; cacheOfflineInventory(owner.id, pinAction.kind === "item" ? { ...current, items: current.items.filter((item: any) => item.id !== pinAction.id), movements: (current.movements ?? []).filter((movement: any) => movement.inventoryItemId !== pinAction.id) } : { ...current, movements: (current.movements ?? []).filter((movement: any) => movement.id !== pinAction.id), items: current.items.map((item: any) => item) }); setPinAction(null); toast.success("تم الحذف محليًا وستتم مزامنته عند عودة الإنترنت"); } else if (pinAction.kind === "item") deleteItem.mutate({ id: pinAction.id, pin }); else deleteMovement.mutate({ id: pinAction.id, pin }); }} />
       <Dialog open={itemDialog} onOpenChange={setItemDialog}><DialogContent dir="rtl"><DialogHeader><DialogTitle>إضافة صنف للمخزنة</DialogTitle></DialogHeader><form onSubmit={submitItem} className="space-y-4 py-2"><label><span className="field-label">اسم الصنف</span><input className="field-input" value={itemName} onChange={event => setItemName(event.target.value)} required placeholder="مثال: شمعة كربون" /></label><label><span className="field-label">الرصيد الافتتاحي</span><input type="number" min="0" className="field-input" value={openingQuantity} onChange={event => setOpeningQuantity(event.target.value)} required /></label><label><span className="field-label">ملاحظات</span><textarea className="field-textarea" value={itemNotes} onChange={event => setItemNotes(event.target.value)} /></label><div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => setItemDialog(false)} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={createItem.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">{createItem.isPending ? "جارٍ الحفظ…" : "إضافة الصنف"}</Button></div></form></DialogContent></Dialog>
       <Dialog open={Boolean(movementItem)} onOpenChange={open => !open && setMovementItem(null)}><DialogContent dir="rtl"><DialogHeader><DialogTitle>حركة مخزنة: {movementItem?.name}</DialogTitle></DialogHeader><form onSubmit={submitMovement} className="grid gap-4 py-2 sm:grid-cols-2"><label><span className="field-label">نوع الحركة</span><select className="field-input" value={movementType} onChange={event => setMovementType(event.target.value as "incoming" | "outgoing")}><option value="incoming">وارد</option><option value="outgoing">منصرف</option></select></label><label><span className="field-label">الكمية</span><input type="number" min="1" className="field-input" value={quantity} onChange={event => setQuantity(event.target.value)} required /></label><label><span className="field-label">تاريخ الحركة</span><input type="datetime-local" className="field-input" value={movementDate} onChange={event => setMovementDate(event.target.value)} required /></label>{movementType === "incoming" ? <><label><span className="field-label">سعر شراء الوحدة</span><input type="number" min="0" step="0.01" className="field-input" value={unitCost} onChange={event => setUnitCost(event.target.value)} placeholder="اختياري" /><p className="mt-1 text-xs text-muted-foreground">سيُسجل إجمالي الشراء تلقائيًا في الخزينة.</p></label><label><span className="field-label">عملة الشراء</span><select className="field-input" value={movementCurrency} onChange={() => setMovementCurrency("SAR")}><option value="SAR">ريال سعودي</option></select></label></> : null}<label><span className="field-label">اسم الفني المستلم</span><input className="field-input" value={technicianName} onChange={event => setTechnicianName(event.target.value)} placeholder="يُفضّل للمنصرف" /></label><label className="sm:col-span-2"><span className="field-label">ملاحظات</span><textarea className="field-textarea" value={movementNotes} onChange={event => setMovementNotes(event.target.value)} /></label><div className="flex justify-end gap-3 sm:col-span-2"><Button type="button" variant="outline" onClick={() => setMovementItem(null)} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={createMovement.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">{createMovement.isPending ? "جارٍ الحفظ…" : "حفظ الحركة"}</Button></div></form></DialogContent></Dialog>
     </div>

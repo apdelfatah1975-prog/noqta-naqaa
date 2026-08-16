@@ -1,6 +1,6 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Reports from "./Reports";
 
 const mocks = vi.hoisted(() => ({ monthly: vi.fn(), refetch: vi.fn() }));
@@ -15,6 +15,8 @@ vi.mock("xlsx", () => ({
 }));
 
 describe("تقارير نقطة نقاء", () => {
+  afterEach(cleanup);
+
   beforeEach(() => {
     mocks.monthly.mockReset();
     mocks.refetch.mockReset();
@@ -48,4 +50,13 @@ describe("تقارير نقطة نقاء", () => {
     fireEvent.change(screen.getByLabelText("من تاريخ"), { target: { value: "2026-07-01" } });
     expect(mocks.monthly.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ dateFrom: "2026-07-01" }));
   });
+});
+
+
+it("تعرض تقريرًا محليًا فارغًا عند فشل الشبكة دون شاشة تعذر", () => {
+  mocks.monthly.mockReturnValue({ isLoading: false, isError: true, refetch: mocks.refetch, data: undefined });
+  render(<Reports />);
+  expect(screen.getAllByText("التقارير والتحليلات").length).toBeGreaterThan(0);
+  expect(screen.getByText("الزيارات المنفذة")).toBeTruthy();
+  expect(screen.queryByText("تعذر تحميل التقرير")).toBeNull();
 });

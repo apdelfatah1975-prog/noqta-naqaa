@@ -33,9 +33,23 @@ export default function Cash() {
   const owner = getOfflineSession();
   const cashQuery = trpc.filters.cash.summary.useQuery(cashQueryInput, { retry: false, staleTime: 60_000 });
   const cachedCash = getOfflineCash<typeof cashQuery.data>(owner?.id ?? 0);
-  const data = cashQuery.data ?? cachedCash ?? undefined;
-  const isLoading = cashQuery.isLoading && !data;
-  const isError = cashQuery.isError && !data;
+  const emptyCash = {
+    summaries: { SAR: { incomeTotal: 0, expenseTotal: 0, balance: 0 } },
+    transactions: [],
+    breakdown: { SAR: { income: [], expense: [], analytics: { installationIncome: 0, serviceIncome: 0, expenseByCategory: [], technicianExpenses: [] } } },
+    purchases: { SAR: { total: 0, items: [] } },
+    incomeTotal: 0,
+    expenseTotal: 0,
+    balance: 0,
+    incomeFilter: "all",
+    categoryFilter: {},
+    availableCategories: [],
+    availableTechnicians: [],
+    availableItemNames: [],
+    search: "",
+  } as unknown as NonNullable<typeof cashQuery.data>;
+  const data = cashQuery.data ?? cachedCash ?? emptyCash;
+  const isLoading = cashQuery.isLoading && !cashQuery.data && !cachedCash;
   useEffect(() => {
     if (cashQuery.data && owner) cacheOfflineCash(owner.id, cashQuery.data);
   }, [cashQuery.data, owner]);
@@ -97,12 +111,13 @@ export default function Cash() {
     createTransaction.mutate(input);
   }
 
-  if (isError) return <div className="soft-card p-8 text-center"><p className="font-bold text-teal-950">تعذر تحميل بيانات الخزينة.</p><p className="mt-2 text-sm text-muted-foreground">تحقق من الاتصال ثم أعد المحاولة.</p><Button onClick={() => window.location.reload()} variant="outline" className="mt-4 rounded-xl">إعادة المحاولة</Button></div>;
+  const showingLocalData = Boolean(!cashQuery.data && cachedCash);
 
-  const summaries = data?.summaries ?? { SAR: { incomeTotal: data?.incomeTotal ?? 0, expenseTotal: data?.expenseTotal ?? 0, balance: data?.balance ?? 0 } };
+
+  const summaries = data.summaries ?? { SAR: { incomeTotal: data.incomeTotal ?? 0, expenseTotal: data.expenseTotal ?? 0, balance: data.balance ?? 0 } };
   const emptyAnalytics = { installationIncome: 0, serviceIncome: 0, expenseByCategory: [], technicianExpenses: [] };
-  const breakdown = data?.breakdown ?? { SAR: { income: [], expense: [], analytics: emptyAnalytics } };
-  const purchases = data?.purchases ?? { SAR: { total: 0, items: [] } };
+  const breakdown = data.breakdown ?? { SAR: { income: [], expense: [], analytics: emptyAnalytics } };
+  const purchases = data.purchases ?? { SAR: { total: 0, items: [] } };
   const summaryCards = (Object.entries(summaries) as Array<[Currency, typeof summaries.SAR]>).flatMap(([cardCurrency, summary]) => [
     { label: `إجمالي الإيرادات (${currencyLabel(cardCurrency)})`, amount: summary.incomeTotal, currency: cardCurrency, icon: ArrowDownRight, tone: "bg-teal-50 text-teal-800" },
     { label: `إجمالي المصروفات (${currencyLabel(cardCurrency)})`, amount: summary.expenseTotal, currency: cardCurrency, icon: ArrowUpLeft, tone: "bg-amber-50 text-amber-800" },

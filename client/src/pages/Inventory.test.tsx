@@ -72,4 +72,12 @@ describe("تفاصيل المنصرف في المخزون", () => {
     expect(screen.getAllByText("صرف لتركيب جديد").length).toBeGreaterThan(0);
     expect(screen.getAllByText("الفني / المستلم").length).toBeGreaterThan(0);
   });
+
+  it("يعرض واجهة المخزن الفارغة عند فشل الاستعلام دون رسالة تعذر التحميل", () => {
+    mocks.summary.mockReturnValue({ isLoading: false, isError: true, data: undefined });
+    render(<Inventory />);
+    expect(screen.getByText("إدارة المخزنة")).toBeTruthy();
+    expect(screen.queryByText("تعذر تحميل بيانات المخزنة.")).toBeNull();
+    expect(screen.getAllByText("لا توجد حركات مخزنة بعد.").length).toBeGreaterThan(0);
+  });
 });
