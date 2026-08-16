@@ -109,7 +109,7 @@ export default function Home() {
           <Button onClick={() => setLocation("/customers?new=1")} className="h-11 rounded-xl bg-white px-5 font-bold text-teal-800 hover:bg-teal-50">
             <Plus className="ml-2 h-5 w-5" /> تسجيل عميل جديد
           </Button>
-          <Button onClick={() => setLocation("/visits")} variant="outline" className="h-11 rounded-xl border-white/40 bg-white/10 px-5 font-bold text-white hover:bg-white/20 hover:text-white">
+          <Button onClick={() => setLocation("/customers?visit=1")} variant="outline" className="h-11 rounded-xl border-white/40 bg-white/10 px-5 font-bold text-white hover:bg-white/20 hover:text-white">
             <CalendarDays className="ml-2 h-5 w-5" /> تسجيل زيارة جديدة
           </Button>
           <Button onClick={() => setLocation("/cash?entry=expense")} variant="outline" className="h-11 rounded-xl border-white/40 bg-white/10 px-5 font-bold text-white hover:bg-white/20 hover:text-white">

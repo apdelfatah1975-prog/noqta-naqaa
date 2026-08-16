@@ -57,7 +57,7 @@ describe("تقارير نقطة نقاء", () => {
     expect(screen.getByText("إجمالي المنصرف")).toBeTruthy();
     expect(screen.getByText("قيمة المشتريات")).toBeTruthy();
     expect(screen.getByText("الكميات التي دخلت المخزن خلال الفترة")).toBeTruthy();
-    expect(screen.getByText("إجمالي تكلفة الأصناف المشتراة بالريال")).toBeTruthy();
+    expect(screen.getByText("إجمالي تكلفة الأصناف المشتراة")).toBeTruthy();
     expect(screen.queryByText("تكلفة المشتريات")).toBeNull();
   });
 
