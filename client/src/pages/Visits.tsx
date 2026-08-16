@@ -29,6 +29,14 @@ export default function Visits() {
     return visibleCustomers.filter(customer => `${customer.name} ${customer.phone} ${customer.manualCode ?? ""}`.toLowerCase().includes(query)).slice(0, 8);
   }, [customerQuery, visibleCustomers]);
   const selectedCustomer = visibleCustomers.find(customer => String(customer.id) === customerId);
+  useEffect(() => {
+    const requestedCustomerId = new URLSearchParams(window.location.search).get("customerId");
+    if (!requestedCustomerId || !visibleCustomers.length) return;
+    if (!visibleCustomers.some(customer => String(customer.id) === requestedCustomerId)) return;
+    setCustomerId(requestedCustomerId);
+    setCustomerQuery("");
+    window.history.replaceState({}, "", "/visits");
+  }, [visibleCustomers]);
   const [visitType, setVisitType] = useState<keyof typeof visitTypeLabels>("maintenance");
   const [visitDate, setVisitDate] = useState(toDateTimeLocal());
   const [notes, setNotes] = useState("");

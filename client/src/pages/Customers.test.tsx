@@ -78,6 +78,14 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(screen.getByLabelText("العميل متأخر عن موعد المتابعة")).toBeTruthy();
   });
 
+  it("يوفر تسجيل زيارة وسجل العميل من بطاقة العميل", () => {
+    render(<Customers />);
+    fireEvent.click(screen.getByRole("button", { name: "زيارة" }));
+    expect(mocks.location).toHaveBeenCalledWith("/visits?customerId=12");
+    fireEvent.click(screen.getByRole("button", { name: "السجل" }));
+    expect(mocks.location).toHaveBeenCalledWith("/customers/12");
+  });
+
   it("يرسل خيار الفرز حسب أقرب موعد إلى قائمة العملاء", () => {
     render(<Customers />);
     fireEvent.change(screen.getByLabelText("ترتيب العملاء"), { target: { value: "next_asc" } });
