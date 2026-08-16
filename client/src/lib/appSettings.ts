@@ -26,6 +26,7 @@ export type AppSettings = {
   backupReminderDays: number;
   confirmDestructiveActions: boolean;
   compactTables: boolean;
+  technicianPayroll: Record<string, { monthlySalary: number; installationPercent: number; maintenancePercent: number }>;
 };
 
 export const defaultAppSettings: AppSettings = {
@@ -54,6 +55,7 @@ export const defaultAppSettings: AppSettings = {
   backupReminderDays: 7,
   confirmDestructiveActions: true,
   compactTables: false,
+  technicianPayroll: {},
 };
 
 function canUseStorage() {
