@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { cacheOfflineDashboard, getOfflineDashboard } from "@/lib/offlineSync";
+import { cacheOfflineDashboard, getOfflineDashboard, getOfflineSession, getPendingOperationCount } from "@/lib/offlineSync";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
-import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, Info, PackageSearch, Plus, RefreshCw, UsersRound } from "lucide-react";
+import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, CloudOff, CloudUpload, Info, PackageSearch, Plus, RefreshCw, UsersRound } from "lucide-react";
 import React from "react";
 import { useLocation } from "wouter";
 
@@ -18,6 +18,24 @@ const statStyles = [
 export default function Home() {
   const { data, isLoading: dashboardLoading } = trpc.filters.dashboard.useQuery();
   type DashboardData = NonNullable<typeof data>;
+  const offlineSession = getOfflineSession();
+  const offlineOwnerId = offlineSession?.id;
+  const [online, setOnline] = React.useState(() => typeof navigator === "undefined" || navigator.onLine);
+  const [pendingCount, setPendingCount] = React.useState(() => offlineOwnerId ? getPendingOperationCount(offlineOwnerId) : 0);
+  React.useEffect(() => {
+    const refreshStatus = () => setPendingCount(offlineOwnerId ? getPendingOperationCount(offlineOwnerId) : 0);
+    const goOnline = () => setOnline(true);
+    const goOffline = () => setOnline(false);
+    refreshStatus();
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    const interval = window.setInterval(refreshStatus, 1500);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+      window.clearInterval(interval);
+    };
+  }, [offlineOwnerId]);
   const [offlineDashboard, setOfflineDashboard] = React.useState<DashboardData | null>(() => getOfflineDashboard<DashboardData>());
   React.useEffect(() => {
     if (!data) return;
@@ -67,6 +85,17 @@ export default function Home() {
             <CircleDollarSign className="ml-2 h-5 w-5" /> تسجيل مصروف
           </Button>
         </div>
+      </section>
+
+      <section className={`soft-card flex flex-col gap-3 border px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${online ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/80"}`} role="status" aria-live="polite">
+        <div className="flex items-start gap-3">
+          <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white ${online ? "bg-emerald-600" : "bg-amber-500"}`}>{online ? <CloudUpload className="h-5 w-5" /> : <CloudOff className="h-5 w-5" />}</div>
+          <div>
+            <p className={`font-extrabold ${online ? "text-emerald-900" : "text-amber-900"}`}>{online ? "متصل — التطبيق جاهز للعمل دون إنترنت" : "وضع دون إنترنت — يمكنك التسجيل بأمان"}</p>
+            <p className={`mt-1 text-xs font-semibold ${online ? "text-emerald-700" : "text-amber-800"}`}>{pendingCount > 0 ? `${pendingCount} عملية محفوظة محليًا ${online ? "وتنتظر المزامنة" : "وستتزامن عند عودة الاتصال"}` : online ? "البيانات متزامنة ولا توجد عمليات معلقة" : "ستُحفظ البيانات محليًا وتتم مزامنتها عند عودة الاتصال"}</p>
+          </div>
+        </div>
+        <span className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${pendingCount > 0 ? "bg-sky-100 text-sky-800" : online ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{pendingCount > 0 ? "بانتظار المزامنة" : online ? "جاهز" : "حفظ محلي"}</span>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
