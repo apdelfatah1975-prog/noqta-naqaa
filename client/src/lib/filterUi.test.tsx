@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildWhatsAppNextVisitMessage,
   buildWhatsAppReminderMessage,
   buildWhatsAppUrl,
   normalizeEgyptianWhatsAppPhone,
@@ -18,6 +19,14 @@ describe("رسائل واتساب اليدوية للتذكيرات", () => {
     expect(whatsappReminderStage(dueDate, new Date(2026, 7, 19, 10, 0, 0))).toBe("before");
     expect(whatsappReminderStage(dueDate, new Date(2026, 7, 20, 10, 0, 0))).toBe("today");
     expect(whatsappReminderStage(dueDate, new Date(2026, 7, 18, 10, 0, 0))).toBeNull();
+  });
+
+  it("يبني رسالة موعد الصيانة القادمة باسم العميل وتاريخ الموعد", () => {
+    const message = buildWhatsAppNextVisitMessage("أحمد", dueDate);
+    expect(message).toContain("أحمد");
+    expect(message).toContain("موعد الصيانة الدورية القادم");
+    expect(message).toContain("يسعدنا خدمتكم");
+    expect(message).toContain("٢٠٢٦");
   });
 
   it("يبني رسالة عربية ورابط واتساب قابلًا للفتح", () => {

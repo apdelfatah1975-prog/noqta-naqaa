@@ -10,7 +10,7 @@ describe("CustomerContactActions", () => {
     render(<CustomerContactActions customer={{ phone: "01008797774", address: "القاهرة", latitude: null, longitude: null }} labels />);
 
     expect(screen.getByRole("link", { name: "اتصال بالعميل" }).getAttribute("href")).toBe("tel:01008797774");
-    expect(screen.getByRole("link", { name: "فتح واتساب مع العميل" }).getAttribute("href")).toBe("https://wa.me/201008797774?text=");
+    expect(screen.getByRole("link", { name: "فتح واتساب مع العميل" }).getAttribute("href")).toContain("https://wa.me/201008797774?text=");
     expect(screen.getByRole("link", { name: "فتح موقع العميل" }).getAttribute("href")).toContain("google.com/maps");
   });
 

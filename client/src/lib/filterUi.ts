@@ -66,6 +66,10 @@ export function buildWhatsAppReminderMessage(customerName: string, reminderDate:
   return `مرحبًا ${customerName}،\nكان موعد الصيانة الدورية لفلتر المياه اليوم ${date}.\nنرجو تأكيد مناسبة الزيارة أو الرد لطلب تغيير الموعد.\nشركة نقطة نقاء`;
 }
 
+export function buildWhatsAppNextVisitMessage(customerName: string, nextVisitDate: Date | string) {
+  return `مرحبًا ${customerName}،\nنود تذكيركم بأن موعد الصيانة الدورية القادم لفلتر المياه هو ${formatDate(nextVisitDate)}.\nيسعدنا خدمتكم والحفاظ على جودة مياهكم، ونرجو تأكيد الموعد أو التواصل معنا إذا احتجتم إلى تغييره.\nشركة نقطة نقاء`;
+}
+
 export function buildWhatsAppUrl(phone: string | null | undefined, message: string) {
   const normalized = normalizeEgyptianWhatsAppPhone(phone);
   return normalized ? `https://wa.me/${normalized}?text=${encodeURIComponent(message)}` : null;
