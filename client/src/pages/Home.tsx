@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
-import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, Info, PackageSearch, RefreshCw, UsersRound } from "lucide-react";
+import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, Info, PackageSearch, Plus, RefreshCw, UsersRound } from "lucide-react";
 import React from "react";
 import { useLocation } from "wouter";
 
@@ -47,7 +47,10 @@ export default function Home() {
           <p className="mt-2 text-sm text-teal-50/80">تابع الزيارات والعملاء والمخزنة بسرعة ووضوح.</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button onClick={() => setLocation("/visits")} className="h-11 rounded-xl bg-white px-5 font-bold text-teal-800 hover:bg-teal-50">
+          <Button onClick={() => setLocation("/customers?new=1")} className="h-11 rounded-xl bg-white px-5 font-bold text-teal-800 hover:bg-teal-50">
+            <Plus className="ml-2 h-5 w-5" /> تسجيل عميل جديد
+          </Button>
+          <Button onClick={() => setLocation("/visits")} variant="outline" className="h-11 rounded-xl border-white/40 bg-white/10 px-5 font-bold text-white hover:bg-white/20 hover:text-white">
             <CalendarDays className="ml-2 h-5 w-5" /> تسجيل زيارة جديدة
           </Button>
           <Button onClick={() => setLocation("/cash?entry=expense")} variant="outline" className="h-11 rounded-xl border-white/40 bg-white/10 px-5 font-bold text-white hover:bg-white/20 hover:text-white">

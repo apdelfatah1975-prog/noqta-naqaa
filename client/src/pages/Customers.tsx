@@ -44,7 +44,7 @@ export default function Customers() {
   const { data: customers, isLoading, isError } = trpc.filters.customers.list.useQuery(input);
   const [offlineCustomers, setOfflineCustomers] = useState(() => getOfflineCustomers());
   const utils = trpc.useUtils();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const createCustomer = trpc.filters.customers.create.useMutation({ onSuccess: () => { utils.filters.customers.list.invalidate(); utils.filters.dashboard.invalidate(); toast.success("تمت إضافة العميل بنجاح"); setDialogOpen(false); }, onError: error => toast.error(error.message || "تعذر إضافة العميل. يرجى المحاولة مرة أخرى.") });
   const deleteCustomer = trpc.filters.customers.delete.useMutation({ onSuccess: () => { utils.filters.customers.list.invalidate(); utils.filters.dashboard.invalidate(); setDeleteId(null); toast.success("تم حذف العميل وسجلاته المرتبطة"); }, onError: error => toast.error(error.message || "تعذر حذف العميل.") });
 
@@ -70,6 +70,13 @@ export default function Customers() {
   })) : undefined);
 
   useEffect(() => { if (customers) { cacheOfflineCustomers(customers); setOfflineCustomers(getOfflineCustomers()); } }, [customers]);
+  useEffect(() => {
+    if (location.includes("new=1")) {
+      setForm(emptyCustomer);
+      setDialogOpen(true);
+      window.history.replaceState({}, "", "/customers");
+    }
+  }, [location]);
 
   if (isError && !displayedCustomers) return <div className="soft-card p-8 text-center"><p className="font-bold text-teal-950">تعذر تحميل قائمة العملاء من الخادم.</p><p className="mt-2 text-sm text-muted-foreground">لا توجد نسخة محلية محفوظة على هذا الجهاز بعد. افتح التطبيق مرة واحدة مع الإنترنت لمزامنة البيانات ثم يمكنك استخدامه دون اتصال.</p><Button onClick={() => window.location.reload()} variant="outline" className="mt-4 rounded-xl">إعادة المحاولة</Button></div>;
 
