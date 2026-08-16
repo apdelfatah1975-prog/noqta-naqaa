@@ -228,7 +228,16 @@ async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "al
     .from(cashTransactions)
     .where(and(...filters))
     .orderBy(desc(cashTransactions.transactionDate));
-  const filteredTransactions = transactions.filter(transaction => {
+  const sourceVisitIds = Array.from(new Set(transactions.map(transaction => transaction.sourceVisitId).filter((id): id is number => Boolean(id))));
+  const sourceVisits = sourceVisitIds.length
+    ? await db.select({ id: visits.id, technicianName: visits.technicianName }).from(visits).where(and(eq(visits.ownerId, ownerId), inArray(visits.id, sourceVisitIds)))
+    : [];
+  const technicianByVisitId = new Map(sourceVisits.map(visit => [visit.id, visit.technicianName]));
+  const displayTransactions = transactions.map(transaction => {
+    const technicianName = transaction.sourceVisitId ? technicianByVisitId.get(transaction.sourceVisitId) : undefined;
+    return technicianName !== undefined ? { ...transaction, recipientName: technicianName } : transaction;
+  });
+  const filteredTransactions = displayTransactions.filter(transaction => {
     const isInstallationIncome = transaction.category === "تحصيل تركيب";
     const isMaintenanceIncome = transaction.category === "تحصيل صيانة";
     const isServiceIncome = isInstallationIncome || isMaintenanceIncome;
@@ -256,7 +265,7 @@ async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "al
   const breakdown = calculateCashBreakdown(filteredTransactions);
   const purchases = calculatePurchaseBreakdown(filteredPurchaseMovements);
   const availableCategories = Array.from(new Set(transactions.map(transaction => transaction.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ar"));
-  const availableTechnicians = Array.from(new Set(transactions.map(transaction => transaction.recipientName).filter((name): name is string => Boolean(name?.trim())))).sort((a, b) => a.localeCompare(b, "ar"));
+  const availableTechnicians = Array.from(new Set(displayTransactions.map(transaction => transaction.recipientName).filter((name): name is string => Boolean(name?.trim())))).sort((a, b) => a.localeCompare(b, "ar"));
   const availableItemNames = Array.from(new Set(itemNames.values())).sort((a, b) => a.localeCompare(b, "ar"));
   return { transactions: filteredTransactions, ...summaries.SAR, summaries, breakdown, purchases, incomeFilter, categoryFilter, availableCategories, availableTechnicians, availableItemNames, search: search?.trim() ?? "" };
 }
@@ -550,7 +559,7 @@ export const filterManagementRouter = router({
       }
       if (firstCollectedAmount > 0) {
         const category = firstVisitType === "installation" ? "تحصيل تركيب" : firstVisitType === "maintenance" ? "تحصيل صيانة" : firstVisitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-        await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: firstCollectedCurrency, amount: firstCollectedAmount, category, transactionDate: visitDate, sourceVisitId: visitId, recipientName: input.name, notes: firstTechnicianName ? `إيراد أُنشئ تلقائيًا من أول زيارة بواسطة ${firstTechnicianName}` : "إيراد أُنشئ تلقائيًا من أول زيارة" });
+        await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: firstCollectedCurrency, amount: firstCollectedAmount, category, transactionDate: visitDate, sourceVisitId: visitId, recipientName: firstTechnicianName ?? null, notes: firstTechnicianName ? `العميل: ${input.name} | إيراد أُنشئ تلقائيًا من أول زيارة بواسطة ${firstTechnicianName}` : `العميل: ${input.name} | إيراد أُنشئ تلقائيًا من أول زيارة` });
       }
       await refreshOwnerBackup(ctx.user.id);
       return { id: customerId, alreadySynced: false, firstVisitCreated: true, reminderCreated: needsAutomaticReminder(firstVisitType) };
@@ -573,7 +582,7 @@ export const filterManagementRouter = router({
             await db.update(cashTransactions).set({ amount: collectedAmount }).where(and(eq(cashTransactions.id, linkedIncome[0].id), eq(cashTransactions.ownerId, ctx.user.id)));
           } else if (collectedAmount > 0) {
             const category = latestForAmount[0].visitType === "installation" ? "تحصيل تركيب" : latestForAmount[0].visitType === "maintenance" ? "تحصيل صيانة" : latestForAmount[0].visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-            await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: "SAR", amount: collectedAmount, category, transactionDate: latestForAmount[0].visitDate, sourceVisitId: latestForAmount[0].id, recipientName: customer.name, notes: "إيراد أُنشئ من تعديل مبلغ الخدمة" });
+            await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: "SAR", amount: collectedAmount, category, transactionDate: latestForAmount[0].visitDate, sourceVisitId: latestForAmount[0].id, recipientName: latestForAmount[0].technicianName ?? null, notes: latestForAmount[0].technicianName ? `العميل: ${customer.name} | إيراد أُنشئ من تعديل مبلغ الخدمة بواسطة ${latestForAmount[0].technicianName}` : `العميل: ${customer.name} | إيراد أُنشئ من تعديل مبلغ الخدمة` });
           }
         }
       }
@@ -660,7 +669,7 @@ export const filterManagementRouter = router({
         const existingIncome = await db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.sourceVisitId, visitId))).limit(1);
         if (!existingIncome[0]) {
           const category = input.visitType === "installation" ? "تحصيل تركيب" : input.visitType === "maintenance" ? "تحصيل صيانة" : input.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-          await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: collectedCurrency, amount: collectedAmount, category, transactionDate: input.visitDate, sourceVisitId: visitId, recipientName: customer.name, notes: "إيراد أُنشئ تلقائيًا من تسجيل الزيارة" });
+          await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: collectedCurrency, amount: collectedAmount, category, transactionDate: input.visitDate, sourceVisitId: visitId, recipientName: input.technicianName ?? null, notes: input.technicianName ? `العميل: ${customer.name} | إيراد أُنشئ تلقائيًا من تسجيل الزيارة بواسطة ${input.technicianName}` : `العميل: ${customer.name} | إيراد أُنشئ تلقائيًا من تسجيل الزيارة` });
         }
       }
       await refreshOwnerBackup(ctx.user.id);

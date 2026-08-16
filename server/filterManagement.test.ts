@@ -443,12 +443,13 @@ describe("واجهات إدارة فلاتر المياه", () => {
       customerId: 7,
       visitType: "follow_up",
       visitDate: new Date("2026-08-15T09:00:00.000Z"),
+      technicianName: "الفني أحمد",
       collectedAmount: 27500,
       collectedCurrency: "SAR",
     })).resolves.toEqual({ id: 123, reminderCreated: false, alreadySynced: false });
 
     expect(insertCalls).toEqual(expect.arrayContaining([
-      expect.objectContaining({ table: cashTransactions, values: expect.objectContaining({ ownerId: 1, transactionType: "income", amount: 27500, currency: "SAR", sourceVisitId: 123, recipientName: "عميل التحصيل" }) }),
+      expect.objectContaining({ table: cashTransactions, values: expect.objectContaining({ ownerId: 1, transactionType: "income", amount: 27500, currency: "SAR", sourceVisitId: 123, recipientName: "الفني أحمد", notes: "العميل: عميل التحصيل | إيراد أُنشئ تلقائيًا من تسجيل الزيارة بواسطة الفني أحمد" }) }),
     ]));
   });
 
