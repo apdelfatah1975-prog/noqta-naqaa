@@ -143,6 +143,19 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(mocks.dashboardInvalidate).toHaveBeenCalled();
     expect(mocks.remindersInvalidate).toHaveBeenCalled();
   });
+
+  it("يرسل فلاتر تاريخ آخر زيارة والمبلغ المحصل إلى قائمة العملاء", () => {
+    render(<Customers />);
+    fireEvent.change(screen.getByLabelText("آخر زيارة من تاريخ"), { target: { value: "2026-08-01" } });
+    fireEvent.change(screen.getByLabelText("آخر زيارة إلى تاريخ"), { target: { value: "2026-08-31" } });
+    fireEvent.change(screen.getByLabelText("الحد الأدنى للمبلغ المحصل"), { target: { value: "250" } });
+    fireEvent.change(screen.getByLabelText("الحد الأعلى للمبلغ المحصل"), { target: { value: "500.50" } });
+    const latestInput = mocks.list.mock.calls.at(-1)?.[0];
+    expect(latestInput.visitDateFrom).toBe("2026-08-01");
+    expect(latestInput.visitDateTo).toBe("2026-08-31");
+    expect(latestInput.collectedAmountMin).toBe(25000);
+    expect(latestInput.collectedAmountMax).toBe(50050);
+  });
 });
 
 export {};

@@ -381,6 +381,10 @@ export const filterManagementRouter = router({
       search: z.string().trim().max(160).optional(),
       followUpStatus: z.enum(["all", "overdue", "today", "upcoming", "none"]).default("all"),
       followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      visitDateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      visitDateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      collectedAmountMin: z.number().int().nonnegative().optional(),
+      collectedAmountMax: z.number().int().nonnegative().optional(),
       sortBy: z.enum(["created_desc", "next_asc", "next_desc", "status"]).default("created_desc"),
     })).query(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
@@ -389,12 +393,27 @@ export const filterManagementRouter = router({
         db.select().from(customers).where(ownerFilter).orderBy(desc(customers.createdAt)),
         db.select().from(visits).where(eq(visits.ownerId, ctx.user.id)).orderBy(desc(visits.visitDate)),
       ]);
+      const visitIds = ownerVisits.map(visit => visit.id);
+      const ownerIncome = visitIds.length
+        ? await db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.transactionType, "income"), inArray(cashTransactions.sourceVisitId, visitIds)))
+        : [];
       const customerNumbers = customerNumberMap([...customerRows].sort(compareCustomersByCreation));
       const visitsByCustomer = new Map<number, Array<typeof visits.$inferSelect>>();
       ownerVisits.forEach(visit => visitsByCustomer.set(visit.customerId, [...(visitsByCustomer.get(visit.customerId) ?? []), visit]));
+      const incomeByVisit = new Map(ownerIncome.map(transaction => [transaction.sourceVisitId, transaction]));
       const search = input.search?.toLocaleLowerCase("ar-EG");
       return customerRows
-        .map(customer => withCustomerFollowUp(customer, visitsByCustomer.get(customer.id) ?? [], customerNumbers.get(customer.id) ?? customer.id))
+        .map(customer => {
+          const shaped = withCustomerFollowUp(customer, visitsByCustomer.get(customer.id) ?? [], customerNumbers.get(customer.id) ?? customer.id);
+          const latestVisit = (visitsByCustomer.get(customer.id) ?? [])[0];
+          const latestIncome = latestVisit ? incomeByVisit.get(latestVisit.id) : undefined;
+          return {
+            ...shaped,
+            lastVisitDate: latestVisit?.visitDate ?? null,
+            collectedAmount: latestIncome?.amount ?? 0,
+            collectedCurrency: latestIncome?.currency ?? "SAR",
+          };
+        })
         .filter(customer => {
           const matchesSearch = !search || customer.name.toLocaleLowerCase("ar-EG").includes(search) || customer.phone.includes(search) || (customer.customerCode ?? "").toLowerCase().includes(search);
           const followUp = customer.followUp;
@@ -403,8 +422,13 @@ export const filterManagementRouter = router({
             || (input.followUpStatus === "overdue" && Boolean(followUp && followUp.daysRemaining < 0))
             || (input.followUpStatus === "today" && Boolean(followUp && followUp.daysRemaining === 0))
             || (input.followUpStatus === "upcoming" && Boolean(followUp && followUp.daysRemaining > 0));
+          const lastVisitDate = customer.lastVisitDate?.toISOString().slice(0, 10);
           const matchesDate = !input.followUpDate || Boolean(followUp && followUp.nextVisitDate.toISOString().slice(0, 10) === input.followUpDate);
-          return matchesSearch && matchesStatus && matchesDate;
+          const matchesVisitDateFrom = !input.visitDateFrom || Boolean(lastVisitDate && lastVisitDate >= input.visitDateFrom);
+          const matchesVisitDateTo = !input.visitDateTo || Boolean(lastVisitDate && lastVisitDate <= input.visitDateTo);
+          const matchesCollectedMin = input.collectedAmountMin === undefined || customer.collectedAmount >= input.collectedAmountMin;
+          const matchesCollectedMax = input.collectedAmountMax === undefined || customer.collectedAmount <= input.collectedAmountMax;
+          return matchesSearch && matchesStatus && matchesDate && matchesVisitDateFrom && matchesVisitDateTo && matchesCollectedMin && matchesCollectedMax;
         })
         .sort((left, right) => {
           if (input.sortBy === "next_asc" || input.sortBy === "next_desc") {
