@@ -13,7 +13,7 @@ import {
   reminders,
   visits,
 } from "../../drizzle/schema";
-import { calculateCashBreakdown, calculateCashSummaries, calculatePurchaseBreakdown, cashCurrencies, cashTransactionTypes, matchesCashTransactionSearch } from "../../shared/cashBusiness";
+import { calculateCashBreakdown, calculateCashSummaries, calculateCompanyFinancialOverview, calculatePurchaseBreakdown, cashCurrencies, cashTransactionTypes, matchesCashTransactionSearch } from "../../shared/cashBusiness";
 import {
   DEFAULT_ALERT_HOUR,
   DEFAULT_ALERT_LEAD_DAYS,
@@ -425,12 +425,14 @@ export const filterManagementRouter = router({
       const customerNames = new Map(periodCustomers.map(customer => [customer.id, customer.name]));
       const income = periodCash.filter(transaction => transaction.transactionType === "income").reduce((sum, transaction) => sum + transaction.amount, 0);
       const expense = periodCash.filter(transaction => transaction.transactionType === "expense").reduce((sum, transaction) => sum + transaction.amount, 0);
+      const financial = calculateCompanyFinancialOverview(periodCash);
       const groupMoney = (rows: typeof periodCash, key: (row: typeof periodCash[number]) => string) => Array.from(rows.reduce((map, row) => map.set(key(row) || "غير مصنف", (map.get(key(row) || "غير مصنف") ?? 0) + row.amount), new Map<string, number>())).map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total);
       const groupVisits = Array.from(periodVisits.reduce((map, visit) => map.set(visit.visitType, (map.get(visit.visitType) ?? 0) + 1), new Map<string, number>())).map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total);
       const technicianVisits = Array.from(periodVisits.reduce((map, visit) => { const label = visit.technicianName?.trim() || "غير محدد"; return map.set(label, (map.get(label) ?? 0) + 1); }, new Map<string, number>())).map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total);
       return {
         period: { dateFrom: input.dateFrom, dateTo: input.dateTo },
         summary: { visits: periodVisits.length, customers: customerIds.length, income, expense, balance: income - expense, pendingReminders: pendingReminders.length, lowStock: inventory.items.filter(item => item.currentBalance <= 2).length },
+        financial: { serviceIncome: financial.serviceIncome, externalIncome: financial.externalIncome, totalIncome: financial.totalIncome, technicianPayments: financial.technicianPayments, otherExpenses: financial.otherExpenses, companyNet: financial.companyNet, technicianPaymentsByName: financial.technicianPaymentsByName },
         incomeByCategory: groupMoney(periodCash.filter(transaction => transaction.transactionType === "income"), row => row.category),
         expenseByCategory: groupMoney(periodCash.filter(transaction => transaction.transactionType === "expense"), row => row.category),
         visitsByType: groupVisits,

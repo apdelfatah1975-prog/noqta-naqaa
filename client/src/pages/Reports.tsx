@@ -27,6 +27,7 @@ export default function Reports() {
     recentVisits: [],
   } as unknown as NonNullable<typeof query.data>;
   const data = query.data ?? cachedReport ?? latestCachedReport ?? emptyReport;
+  const financial = data.financial ?? { serviceIncome: 0, externalIncome: 0, totalIncome: 0, technicianPayments: 0, otherExpenses: 0, companyNet: 0, technicianPaymentsByName: [] };
   useEffect(() => {
     if (query.data && user) cacheOfflineReport(user.id, dateFrom, dateTo, query.data);
   }, [dateFrom, dateTo, query.data, user]);
@@ -46,6 +47,15 @@ export default function Reports() {
       { البيان: "الأصناف منخفضة الرصيد", القيمة: data.summary.lowStock },
     ]), "الملخص");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.incomeByCategory.map(row => ({ البند: row.label, "الإجمالي بالريال": row.total / 100 }))), "الإيرادات");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([
+      { البيان: "إيرادات الخدمات", "الإجمالي بالريال": financial.serviceIncome / 100 },
+      { البيان: "نقدية خارج إيرادات العمل", "الإجمالي بالريال": financial.externalIncome / 100 },
+      { البيان: "إجمالي الداخل", "الإجمالي بالريال": financial.totalIncome / 100 },
+      { البيان: "مدفوعات الفنيين", "الإجمالي بالريال": financial.technicianPayments / 100 },
+      { البيان: "المصروفات الأخرى", "الإجمالي بالريال": financial.otherExpenses / 100 },
+      { البيان: "صافي إيراد الشركة", "الإجمالي بالريال": financial.companyNet / 100 },
+    ]), "مالية الشركة");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(financial.technicianPaymentsByName.map(row => ({ الفني: row.technician, "إجمالي المستلم بالريال": row.totalPaid / 100, "عدد العمليات": row.transactionCount }))), "مستحقات الفنيين");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.expenseByCategory.map(row => ({ البند: row.label, "الإجمالي بالريال": row.total / 100 }))), "المصروفات");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.visitsByType.map(row => ({ النوع: row.label, العدد: row.total }))), "أنواع الزيارات");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.visitsByTechnician.map(row => ({ الفني: row.label, "عدد الزيارات": row.total }))), "الفنيون");
@@ -78,6 +88,8 @@ export default function Reports() {
       {!query.data ? <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 print:hidden">يُعرض التقرير من البيانات المحلية؛ يمكنك التصدير والطباعة دون اتصال.</div> : null}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{cards.map(card => <article key={card.label} className={`rounded-2xl p-5 shadow-sm ${card.tone}`}><div className="flex items-center justify-between"><p className="text-sm font-bold opacity-80">{card.label}</p><card.icon className="h-5 w-5 opacity-80" /></div><p className="mt-4 text-2xl font-black">{card.value}</p></article>)}</div>
       <div className="hidden border-b pb-4 print:block"><h1 className="text-2xl font-black">تقرير نقطة نقاء</h1><p className="mt-2 text-sm">الفترة: {dateLabel(`${data.period.dateFrom}T00:00:00`)} — {dateLabel(`${data.period.dateTo}T00:00:00`)}</p></div>
+      <section className="soft-card p-5"><div className="mb-4 flex items-center justify-between"><div><h2 className="font-black">الملخص المالي للشركة</h2><p className="mt-1 text-xs text-muted-foreground">يفصل إيرادات الخدمات عن النقدية الخارجية، ويخصم مدفوعات الفنيين والمصروفات الأخرى.</p></div><WalletCards className="h-5 w-5 text-teal-700" /></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Metric label="إيرادات الخدمات" value={money(financial.serviceIncome)} /><Metric label="نقدية خارج إيرادات العمل" value={money(financial.externalIncome)} /><Metric label="إجمالي الداخل" value={money(financial.totalIncome)} /><Metric label="إجمالي ما استلمه الفنيون" value={money(financial.technicianPayments)} /><Metric label="المصروفات الأخرى" value={money(financial.otherExpenses)} /><Metric label="صافي إيراد الشركة" value={money(financial.companyNet)} /></div></section>
+      <section className="soft-card overflow-hidden p-5"><div className="mb-4"><h2 className="font-black">كشف ما استلمه كل فني</h2><p className="mt-1 text-xs text-muted-foreground">سجل المدفوعات المصنفة كراتب أو مستحق أو سلفة أو مصروف فني.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[520px] text-right text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="px-3 py-3">الفني</th><th className="px-3 py-3">إجمالي المستلم</th><th className="px-3 py-3">عدد العمليات</th></tr></thead><tbody className="divide-y">{financial.technicianPaymentsByName.length ? financial.technicianPaymentsByName.map(row => <tr key={row.technician}><td className="px-3 py-3 font-bold">{row.technician}</td><td className="px-3 py-3 font-black text-teal-800">{money(row.totalPaid)}</td><td className="px-3 py-3">{number(row.transactionCount)}</td></tr>) : <tr><td colSpan={3} className="p-8 text-center text-muted-foreground">لا توجد مدفوعات فنيين في هذه الفترة.</td></tr>}</tbody></table></div></section>
       <div className="grid gap-6 lg:grid-cols-2">
         <ReportList title="الإيرادات حسب البند" rows={data.incomeByCategory} moneyRows />
         <ReportList title="المصروفات حسب البند" rows={data.expenseByCategory} moneyRows />

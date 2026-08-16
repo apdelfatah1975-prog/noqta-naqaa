@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateCashBreakdown, calculateCashSummaries, calculateCashSummary, matchesCashTransactionSearch, primaryCashCurrency } from "./cashBusiness";
+import { calculateCashBreakdown, calculateCashSummaries, calculateCashSummary, calculateCompanyFinancialOverview, matchesCashTransactionSearch, primaryCashCurrency } from "./cashBusiness";
 
 describe("matchesCashTransactionSearch", () => {
   it("يبحث باسم العميل أو الملاحظات مع تجاهل حالة الأحرف والمسافات", () => {
@@ -50,8 +50,27 @@ describe("calculateCashBreakdown", () => {
       { transactionType: "expense", amount: 10000, category: "بنزين", currency: "SAR" },
       { transactionType: "expense", amount: 1000, category: "بنزين", currency: "SAR", recipientName: "الفني أحمد" },
     ])).toEqual({
-      SAR: { income: [{ category: "تحصيل تركيب", total: 200000 }, { category: "تحصيل صيانة", total: 80000 }], expense: [{ category: "بنزين", total: 31000 }], analytics: { installationIncome: 200000, serviceIncome: 80000, expenseByCategory: [{ category: "بنزين", total: 31000 }], technicianExpenses: [{ technician: "الفني أحمد", total: 1000 }] } },
+      SAR: { income: [{ category: "تحصيل تركيب", total: 200000 }, { category: "تحصيل صيانة", total: 80000 }], expense: [{ category: "بنزين", total: 31000 }], analytics: { installationIncome: 200000, serviceIncome: 80000, externalIncome: 0, expenseByCategory: [{ category: "بنزين", total: 31000 }], technicianExpenses: [{ technician: "الفني أحمد", total: 1000 }] } },
     });
   });
 });
 
+
+describe("calculateCompanyFinancialOverview", () => {
+  it("يفصل إيراد الخدمات عن النقدية الخارجية ويجمع مدفوعات الفنيين وصافي الشركة", () => {
+    expect(calculateCompanyFinancialOverview([
+      { transactionType: "income", amount: 100000, category: "تحصيل صيانة" },
+      { transactionType: "income", amount: 25000, category: "نقدية خارج إيرادات العمل" },
+      { transactionType: "expense", amount: 30000, category: "راتب فني", recipientName: "أحمد" },
+      { transactionType: "expense", amount: 10000, category: "بنزين" },
+    ])).toEqual({
+      serviceIncome: 100000,
+      externalIncome: 25000,
+      totalIncome: 125000,
+      technicianPayments: 30000,
+      otherExpenses: 10000,
+      companyNet: 85000,
+      technicianPaymentsByName: [{ technician: "أحمد", totalPaid: 30000, transactionCount: 1 }],
+    });
+  });
+});

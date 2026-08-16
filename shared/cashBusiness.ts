@@ -56,9 +56,25 @@ export type PurchaseBreakdown = Record<CashCurrency, { total: number; items: Pur
 export type CashAnalytics = {
   installationIncome: number;
   serviceIncome: number;
+  externalIncome: number;
   expenseByCategory: CashBreakdownRow[];
   technicianExpenses: CashTechnicianRow[];
 };
+
+export type TechnicianPaymentRow = { technician: string; totalPaid: number; transactionCount: number };
+
+export type CompanyFinancialOverview = {
+  serviceIncome: number;
+  externalIncome: number;
+  totalIncome: number;
+  technicianPayments: number;
+  otherExpenses: number;
+  companyNet: number;
+  technicianPaymentsByName: TechnicianPaymentRow[];
+};
+
+export const externalIncomeCategory = "نقدية خارج إيرادات العمل";
+export const technicianPaymentCategories = ["راتب فني", "مستحق فني", "سلفة فني", "مصروف فني"] as const;
 export type CashBreakdown = Record<CashCurrency, { income: CashBreakdownRow[]; expense: CashBreakdownRow[]; analytics: CashAnalytics }>;
 
 function addToRows(rows: CashBreakdownRow[], category: string, amount: number) {
@@ -102,7 +118,7 @@ export function calculatePurchaseBreakdown(movements: Array<{ itemName?: string 
 
 export function calculateCashBreakdown(transactions: CashTransactionForSummary[]): CashBreakdown {
   const result: CashBreakdown = {
-    SAR: { income: [], expense: [], analytics: { installationIncome: 0, serviceIncome: 0, expenseByCategory: [], technicianExpenses: [] } },
+    SAR: { income: [], expense: [], analytics: { installationIncome: 0, serviceIncome: 0, externalIncome: 0, expenseByCategory: [], technicianExpenses: [] } },
   };
   for (const transaction of transactions) {
     const currency: CashCurrency = "SAR";
@@ -112,6 +128,7 @@ export function calculateCashBreakdown(transactions: CashTransactionForSummary[]
       addToRows(current.income, category, transaction.amount);
       if (category === "تحصيل تركيب") current.analytics.installationIncome += transaction.amount;
       if (category === "تحصيل صيانة") current.analytics.serviceIncome += transaction.amount;
+      if (category === externalIncomeCategory) current.analytics.externalIncome += transaction.amount;
     } else {
       addToRows(current.expense, category, transaction.amount);
       addToRows(current.analytics.expenseByCategory, category, transaction.amount);
@@ -126,6 +143,34 @@ export function calculateCashBreakdown(transactions: CashTransactionForSummary[]
     result[currency].analytics.technicianExpenses.sort((a, b) => b.total - a.total);
   }
   return result;
+}
+
+export function calculateCompanyFinancialOverview(transactions: Array<CashTransactionForSummary & { transactionDate?: string | Date | null }>): CompanyFinancialOverview {
+  const serviceCategories = new Set(["تحصيل تركيب", "تحصيل صيانة", "تحصيل تغيير شمعات", "تحصيل زيارة"]);
+  const technicianCategories = new Set<string>(technicianPaymentCategories);
+  let serviceIncome = 0;
+  let externalIncome = 0;
+  let technicianPayments = 0;
+  let otherExpenses = 0;
+  const technicianMap = new Map<string, TechnicianPaymentRow>();
+  for (const transaction of transactions) {
+    const category = transaction.category?.trim() || "غير مصنف";
+    if (transaction.transactionType === "income") {
+      if (category === externalIncomeCategory) externalIncome += transaction.amount;
+      else if (serviceCategories.has(category)) serviceIncome += transaction.amount;
+    } else if (technicianCategories.has(category) || Boolean(transaction.recipientName?.trim() && category.includes("فني"))) {
+      technicianPayments += transaction.amount;
+      const technician = transaction.recipientName?.trim() || "فني غير محدد";
+      const current = technicianMap.get(technician) ?? { technician, totalPaid: 0, transactionCount: 0 };
+      current.totalPaid += transaction.amount;
+      current.transactionCount += 1;
+      technicianMap.set(technician, current);
+    } else {
+      otherExpenses += transaction.amount;
+    }
+  }
+  const totalIncome = serviceIncome + externalIncome;
+  return { serviceIncome, externalIncome, totalIncome, technicianPayments, otherExpenses, companyNet: totalIncome - technicianPayments - otherExpenses, technicianPaymentsByName: Array.from(technicianMap.values()).sort((a, b) => b.totalPaid - a.totalPaid) };
 }
 
 export function currencyLabel(currency: CashCurrency | null | undefined) {
