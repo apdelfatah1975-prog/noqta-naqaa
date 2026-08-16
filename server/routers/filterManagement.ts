@@ -205,8 +205,16 @@ async function inventorySummary(ownerId: number) {
 }
 
 type CashIncomeFilter = "all" | "service" | "installation" | "maintenance";
+export type CashPartyType = "all" | "technician" | "customer" | "entity";
 type CashDateFilter = { month?: string; startDate?: string; endDate?: string };
-type CashCategoryFilter = { category?: string; technician?: string; itemName?: string };
+type CashCategoryFilter = { category?: string; technician?: string; itemName?: string; partyType?: CashPartyType };
+
+export function classifyCashParty(transaction: { sourceVisitId?: number | null; category: string; recipientName?: string | null; notes?: string | null }): Exclude<CashPartyType, "all"> {
+  if (transaction.sourceVisitId || transaction.category.startsWith("تحصيل")) return "customer";
+  const searchable = `${transaction.category} ${transaction.recipientName ?? ""} ${transaction.notes ?? ""}`;
+  if (/فني|راتب|عمولة/.test(searchable)) return "technician";
+  return "entity";
+}
 
 function matchesCashDateFilter(date: Date, dateFilter?: CashDateFilter) {
   if (!dateFilter?.month && !dateFilter?.startDate && !dateFilter?.endDate) return true;
@@ -247,7 +255,8 @@ async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "al
       || (incomeFilter === "maintenance" && transaction.transactionType === "income" && isMaintenanceIncome);
     const matchesCategory = !categoryFilter.category || transaction.category === categoryFilter.category;
     const matchesTechnician = !categoryFilter.technician || transaction.recipientName === categoryFilter.technician;
-    return matchesIncome && matchesCategory && matchesTechnician
+    const matchesPartyType = !categoryFilter.partyType || categoryFilter.partyType === "all" || classifyCashParty(transaction) === categoryFilter.partyType;
+    return matchesIncome && matchesCategory && matchesTechnician && matchesPartyType
       && matchesCashDateFilter(new Date(transaction.transactionDate), dateFilter)
       && matchesCashTransactionSearch(transaction, search);
   });
@@ -267,7 +276,7 @@ async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "al
   const availableCategories = Array.from(new Set(transactions.map(transaction => transaction.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ar"));
   const availableTechnicians = Array.from(new Set(displayTransactions.map(transaction => transaction.recipientName).filter((name): name is string => Boolean(name?.trim())))).sort((a, b) => a.localeCompare(b, "ar"));
   const availableItemNames = Array.from(new Set(itemNames.values())).sort((a, b) => a.localeCompare(b, "ar"));
-  return { transactions: filteredTransactions, ...summaries.SAR, summaries, breakdown, purchases, incomeFilter, categoryFilter, availableCategories, availableTechnicians, availableItemNames, search: search?.trim() ?? "" };
+  return { transactions: filteredTransactions, ...summaries.SAR, summaries, breakdown, purchases, incomeFilter, categoryFilter, availableCategories, availableTechnicians, availablePartyTypes: ["technician", "customer", "entity"] as const, availableItemNames, search: search?.trim() ?? "" };
 }
 
 async function remindersWithCustomers(ownerId: number, onlyDue: boolean, withinDays?: number) {
@@ -893,7 +902,7 @@ export const filterManagementRouter = router({
   }),
 
   cash: router({
-    summary: adminProcedure.input(z.object({ incomeFilter: z.enum(["all", "service", "installation", "maintenance"]).default("all"), category: z.string().max(100).optional(), technician: z.string().max(160).optional(), itemName: z.string().max(160).optional(), month: z.string().regex(/^\d{4}-\d{2}$/).optional(), startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), search: z.string().max(160).optional() }).optional()).query(({ ctx, input }) => cashSummary(ctx.user.id, input?.incomeFilter ?? "all", input ? { month: input.month, startDate: input.startDate, endDate: input.endDate } : undefined, input?.search, { category: input?.category, technician: input?.technician, itemName: input?.itemName })),
+    summary: adminProcedure.input(z.object({ incomeFilter: z.enum(["all", "service", "installation", "maintenance"]).default("all"), category: z.string().max(100).optional(), technician: z.string().max(160).optional(), partyType: z.enum(["all", "technician", "customer", "entity"]).default("all").optional(), itemName: z.string().max(160).optional(), month: z.string().regex(/^\d{4}-\d{2}$/).optional(), startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), search: z.string().max(160).optional() }).optional()).query(({ ctx, input }) => cashSummary(ctx.user.id, input?.incomeFilter ?? "all", input ? { month: input.month, startDate: input.startDate, endDate: input.endDate } : undefined, input?.search, { category: input?.category, technician: input?.technician, partyType: input?.partyType, itemName: input?.itemName })),
     create: adminProcedure.input(cashTransactionInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       if (input.clientOperationId) {

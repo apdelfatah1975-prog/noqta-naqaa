@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { cashTransactions, customers, inventoryItems, inventoryMovements, notificationSettings, reminders, visits } from "../drizzle/schema";
 import { appRouter } from "./routers";
+import { classifyCashParty } from "./routers/filterManagement";
 import { getDb } from "./db";
 import type { TrpcContext } from "./_core/context";
 
@@ -28,6 +29,11 @@ function createContext(): TrpcContext {
 }
 
 describe("واجهات إدارة فلاتر المياه", () => {
+  it("يصنف نوع الطرف في عمليات الخزينة بشكل مستقل", () => {
+    expect(classifyCashParty({ sourceVisitId: 12, category: "تحصيل صيانة", recipientName: "أحمد", notes: "عميل" })).toBe("customer");
+    expect(classifyCashParty({ category: "راتب فني", recipientName: "أحمد", notes: null })).toBe("technician");
+    expect(classifyCashParty({ category: "بنزين", recipientName: "محطة الوقود", notes: null })).toBe("entity");
+  });
   it("ينشئ العميل وأول زيارة والفني والتذكير وإيراد التركيب تلقائيًا", async () => {
     const insertCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
     const db = {
