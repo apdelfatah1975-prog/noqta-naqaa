@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { trpc } from "@/lib/trpc";
 import { formatDateTime, reminderStatusLabels, toDateTimeLocal, visitTypeLabels } from "@/lib/filterUi";
 import { ArrowRight, BellRing, CalendarClock, CalendarPlus, Edit3, Loader2 } from "lucide-react";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useRoute } from "wouter";
 
@@ -41,6 +41,17 @@ export default function CustomerProfile() {
     },
     onError: error => toast.error(error.message || "تعذر تعديل الخدمة"),
   });
+  useEffect(() => {
+    const shouldOpenVisit = new URLSearchParams(window.location.search).get("openVisit") === "1";
+    if (shouldOpenVisit && data) {
+      setDialogOpen(true);
+      setVisitType("maintenance");
+      setVisitDate(toDateTimeLocal());
+      setNotes("");
+      window.history.replaceState({}, "", `/customers/${customerId}`);
+    }
+  }, [customerId, data]);
+
   const createVisit = trpc.filters.visits.create.useMutation({
     onSuccess: result => {
       utils.filters.customers.get.invalidate(queryInput);
@@ -75,7 +86,7 @@ export default function CustomerProfile() {
             <div className="mt-1 flex flex-wrap items-center gap-2"><h1 className="text-2xl font-extrabold">{customer.name}</h1><span className="text-lg font-extrabold text-white" dir="ltr">{customer.customerCode}</span></div>
             <p className="mt-2 text-sm text-teal-50/80" dir="ltr">{customer.phone}</p>
           </div>
-          <Button onClick={() => setDialogOpen(true)} className="mt-5 rounded-xl bg-white text-teal-800 hover:bg-teal-50 sm:mt-0"><CalendarPlus className="ml-2 h-4 w-4" />تسجيل زيارة</Button>
+          <Button onClick={() => { setVisitType("maintenance"); setVisitDate(toDateTimeLocal()); setNotes(""); setDialogOpen(true); }} className="mt-5 rounded-xl bg-white text-teal-800 hover:bg-teal-50 sm:mt-0"><CalendarPlus className="ml-2 h-4 w-4" />تسجيل زيارة</Button>
         </div>
         <div className="grid gap-4 p-6 sm:grid-cols-3">
           <div><p className="text-xs font-bold text-muted-foreground">العنوان</p><p className="mt-2 text-sm leading-6">{customer.address || "غير مسجل"}</p></div>

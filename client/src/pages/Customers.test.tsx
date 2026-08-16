@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import Customers from "./Customers";
+import Customers, { customerVisitRegistrationPath } from "./Customers";
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -85,9 +85,13 @@ describe("ترابط تعديل بيانات العميل", () => {
   it("يوفر تسجيل زيارة وسجل العميل من بطاقة العميل", () => {
     render(<Customers />);
     fireEvent.click(screen.getByRole("button", { name: "زيارة" }));
-    expect(mocks.location).toHaveBeenCalledWith("/visits?customerId=12");
+    expect(mocks.location).toHaveBeenCalledWith(customerVisitRegistrationPath(12));
     fireEvent.click(screen.getByRole("button", { name: "السجل" }));
     expect(mocks.location).toHaveBeenCalledWith("/customers/12");
+  });
+
+  it("يبني مسار تسجيل الزيارة مع معرّف العميل وإشارة فتح النموذج", () => {
+    expect(customerVisitRegistrationPath(12)).toBe("/customers/12?openVisit=1");
   });
 
   it("يرسل خيار الفرز حسب أقرب موعد إلى قائمة العملاء", () => {
