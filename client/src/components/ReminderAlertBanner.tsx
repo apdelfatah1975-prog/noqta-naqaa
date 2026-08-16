@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { formatDateTime } from "@/lib/filterUi";
+import { AppSettings, getAppSettings } from "@/lib/appSettings";
 import { BellRing } from "lucide-react";
 import { mergeDashboardReminderAlerts } from "@shared/filterBusiness";
 import React from "react";
@@ -10,9 +11,15 @@ export function ReminderAlertBanner() {
   const { data: dueReminders } = trpc.filters.reminders.due.useQuery();
   const { data: upcomingAlerts } = trpc.filters.reminders.alerts.useQuery();
   const [, setLocation] = useLocation();
+  const [appSettings, setAppSettings] = React.useState<AppSettings>(() => getAppSettings());
+  React.useEffect(() => {
+    const onSettingsChange = (event: Event) => setAppSettings((event as CustomEvent<AppSettings>).detail);
+    window.addEventListener("purepoint-settings-changed", onSettingsChange);
+    return () => window.removeEventListener("purepoint-settings-changed", onSettingsChange);
+  }, []);
   const alerts = mergeDashboardReminderAlerts(dueReminders ?? [], upcomingAlerts ?? []);
 
-  if (!alerts.length) return null;
+  if (!appSettings.remindersEnabled || !alerts.length) return null;
 
   const firstAlert = alerts[0];
   const dueCount = alerts.filter(alert => alert.isDue).length;

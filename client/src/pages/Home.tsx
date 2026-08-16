@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { cacheOfflineCash, cacheOfflineDashboard, downloadOfflineBackup, getOfflineBackupKeyCount, getOfflineDashboard, getOfflineSession, getPendingOperationCount, restoreOfflineBackupFromExcel } from "@/lib/offlineSync";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
+import { AppSettings, getAppSettings } from "@/lib/appSettings";
 import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
 import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, CloudOff, CloudUpload, Download, Info, PackageSearch, Plus, RefreshCw, Upload, UsersRound } from "lucide-react";
 import React from "react";
@@ -25,9 +26,15 @@ export default function Home() {
   type DashboardData = NonNullable<typeof data>;
   const offlineSession = getOfflineSession();
   const offlineOwnerId = offlineSession?.id;
+  const [appSettings, setAppSettings] = React.useState<AppSettings>(() => getAppSettings());
   const [online, setOnline] = React.useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [pendingCount, setPendingCount] = React.useState(() => offlineOwnerId ? getPendingOperationCount(offlineOwnerId) : 0);
   const restoreInputRef = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => {
+    const onSettingsChange = (event: Event) => setAppSettings((event as CustomEvent<AppSettings>).detail);
+    window.addEventListener("purepoint-settings-changed", onSettingsChange);
+    return () => window.removeEventListener("purepoint-settings-changed", onSettingsChange);
+  }, []);
   React.useEffect(() => {
     const refreshStatus = () => setPendingCount(offlineOwnerId ? getPendingOperationCount(offlineOwnerId) : 0);
     const goOnline = () => setOnline(true);
@@ -94,7 +101,7 @@ export default function Home() {
     <div className="mx-auto max-w-7xl space-y-6">
       <section className="flex flex-col justify-between gap-4 rounded-3xl bg-[linear-gradient(135deg,#064e4a,#0f766e)] px-6 py-7 text-white shadow-[0_16px_40px_rgba(6,78,74,.22)] sm:flex-row sm:items-center sm:px-8">
         <div>
-          <p className="text-sm font-bold text-teal-100">لوحة التحكم</p>
+          <p className="text-sm font-bold text-teal-100">{appSettings.companyName}</p>
           <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">كل عملياتك في مكان واحد</h1>
           <p className="mt-2 text-sm text-teal-50/80">تابع الزيارات والعملاء والمخزنة بسرعة ووضوح.</p>
         </div>
@@ -123,7 +130,7 @@ export default function Home() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {statStyles.map(({ icon: Icon, color, label, key, href }) => (
+        {statStyles.filter(card => card.key !== "upcoming" || appSettings.dashboardShowUpcoming).filter(card => card.key !== "due" || appSettings.dashboardShowDue).filter(card => card.key !== "cash" || appSettings.dashboardShowCash).filter(card => card.key !== "inventory" || appSettings.dashboardShowInventory).map(({ icon: Icon, color, label, key, href }) => (
           <button
             key={key}
             type="button"
@@ -162,7 +169,7 @@ export default function Home() {
 
         <div className="soft-card xl:col-span-2">
           <div className="flex items-center justify-between border-b border-teal-950/6 p-5">
-            <div><div className="flex items-center gap-2"><h2 className="font-extrabold">المتابعة المستحقة</h2><span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-800">{displayData?.dueReminders.length ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">تذكيرات أنشأها التطبيق بعد 120 يومًا من آخر تركيب أو صيانة</p></div>
+            <div><div className="flex items-center gap-2"><h2 className="font-extrabold">المتابعة المستحقة</h2><span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-800">{displayData?.dueReminders.length ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">تذكيرات أنشأها التطبيق بعد {appSettings.followUpDays} يومًا من آخر تركيب أو صيانة</p></div>
             <div className="flex items-center gap-2"><span title="هذه القائمة تحتاج إجراء منك: اتصل بالعميل وحدد الزيارة" className="inline-flex items-center gap-1 text-xs font-bold text-amber-700"><Info className="h-3.5 w-3.5" />تحتاج متابعة</span><BellRing className="h-5 w-5 text-amber-500" /></div>
           </div>
           <div className="divide-y divide-teal-950/6">
