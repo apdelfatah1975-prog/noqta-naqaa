@@ -50,6 +50,8 @@ const menuItems = [
   { icon: FileBarChart, label: "التقارير", path: "/reports" },
 ];
 
+const mobileNavItems = menuItems.filter(item => ["/", "/customers", "/visits", "/reminders"].includes(item.path));
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { loading, user } = useAuth();
 
@@ -174,8 +176,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             ) : null}
           </div>
         </header>
-        <main className="min-w-0 min-h-[calc(100vh-4rem)] p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="min-w-0 min-h-[calc(100vh-4rem)] pb-24 p-4 sm:p-6 lg:p-8 lg:pb-8">{children}</main>
       </SidebarInset>
+      {isMobile ? <nav aria-label="التنقل السريع" className="fixed inset-x-0 bottom-0 z-40 border-t border-teal-950/10 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(13,82,76,.10)] backdrop-blur-lg">
+        <div className="mx-auto grid max-w-lg grid-cols-4 gap-1">
+          {mobileNavItems.map(item => { const active = activeMenuItem.path === item.path; return <button key={item.path} type="button" onClick={() => setLocation(item.path)} className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-bold transition ${active ? "bg-teal-50 text-teal-800" : "text-slate-500 hover:bg-slate-50 hover:text-teal-700"}`} aria-current={active ? "page" : undefined}><item.icon className="h-5 w-5" /><span>{item.path === "/visits" ? "زيارة جديدة" : item.label}</span></button>; })}
+        </div>
+      </nav> : null}
     </>
+
   );
 }
