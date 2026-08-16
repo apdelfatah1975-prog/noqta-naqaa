@@ -2,6 +2,7 @@ const SESSION_KEY = "purepoint-offline-session";
 const CUSTOMERS_KEY = "purepoint-offline-customers";
 const CUSTOMER_QUEUE_PREFIX = "purepoint-pending-customers";
 const VISIT_QUEUE_PREFIX = "purepoint-pending-visits";
+const DASHBOARD_KEY = "purepoint-offline-dashboard";
 
 export type OfflineCustomer = {
   id: number;
@@ -97,6 +98,14 @@ export function cacheOfflineCustomers(customers: OfflineCustomer[]) {
 
 export function getOfflineCustomers() {
   return readJson<OfflineCustomer[]>(CUSTOMERS_KEY, []);
+}
+
+export function cacheOfflineDashboard<T>(dashboard: T) {
+  writeJson(DASHBOARD_KEY, dashboard);
+}
+
+export function getOfflineDashboard<T>() {
+  return readJson<T | null>(DASHBOARD_KEY, null);
 }
 
 export function getPendingCustomers(ownerId: number) {

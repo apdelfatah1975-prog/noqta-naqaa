@@ -65,10 +65,14 @@ export function useAuth(options?: UseAuthOptions) {
     // fails, which lets the protected shell render and use local data offline.
     const cachedUser = getOfflineSession();
     const networkUnavailable = typeof navigator !== "undefined" && !navigator.onLine;
-    const currentUser = meQuery.data ?? ((networkUnavailable || meQuery.error) ? cachedUser : null);
+    // A remembered session is enough to render the protected shell while the
+    // network auth check is pending. The server still authorizes every remote
+    // mutation; this only prevents an offline/slow connection from blocking the
+    // local-first UI behind an endless loading state.
+    const currentUser = meQuery.data ?? cachedUser;
     return {
       user: currentUser,
-      loading: (!currentUser && meQuery.isLoading) || logoutMutation.isPending,
+      loading: (!currentUser && meQuery.isLoading && !networkUnavailable) || logoutMutation.isPending,
       error: currentUser ? logoutMutation.error ?? null : meQuery.error ?? logoutMutation.error ?? null,
       isAuthenticated: Boolean(currentUser),
     };

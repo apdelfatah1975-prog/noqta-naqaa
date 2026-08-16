@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
+import { cacheOfflineDashboard, getOfflineDashboard } from "@/lib/offlineSync";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
 import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, Info, PackageSearch, Plus, RefreshCw, UsersRound } from "lucide-react";
@@ -15,21 +16,30 @@ const statStyles = [
 ] as const;
 
 export default function Home() {
-  const { data, isLoading } = trpc.filters.dashboard.useQuery();
+  const { data, isLoading: dashboardLoading } = trpc.filters.dashboard.useQuery();
+  type DashboardData = NonNullable<typeof data>;
+  const [offlineDashboard, setOfflineDashboard] = React.useState<DashboardData | null>(() => getOfflineDashboard<DashboardData>());
+  React.useEffect(() => {
+    if (!data) return;
+    cacheOfflineDashboard(data);
+    setOfflineDashboard(data);
+  }, [data]);
+  const displayData = data ?? offlineDashboard;
+  const isLoading = !displayData && dashboardLoading;
   const { data: cash } = trpc.filters.cash.summary.useQuery();
   const { data: backupStatus, isLoading: backupLoading } = trpc.filters.backup.status.useQuery();
   const backupMutation = trpc.filters.backup.createNow.useMutation();
   const backupUtils = trpc.useUtils();
   const [, setLocation] = useLocation();
   const counts = {
-    today: data?.todayVisits.length ?? 0,
-    upcoming: data?.upcomingVisits.length ?? 0,
-    due: data?.dueReminders.length ?? 0,
-    inventory: data?.inventory.totalItems ?? 0,
+    today: displayData?.todayVisits.length ?? 0,
+    upcoming: displayData?.upcomingVisits.length ?? 0,
+    due: displayData?.dueReminders.length ?? 0,
+    inventory: displayData?.inventory.totalItems ?? 0,
     cash: Math.round((cash?.balance ?? 0) / 100),
   };
-  const nextVisit = data?.upcomingVisits[0];
-  const nextDueReminder = data?.dueReminders[0];
+  const nextVisit = displayData?.upcomingVisits[0];
+  const nextDueReminder = displayData?.dueReminders[0];
   const cardDetails = {
     today: "الزيارات المسجلة لهذا اليوم",
     upcoming: nextVisit ? `${nextVisit.customer?.name || "عميل"} · ${formatDateTime(nextVisit.visitDate)}` : "لا توجد زيارات مسجلة",
@@ -83,11 +93,11 @@ export default function Home() {
       <section className="grid gap-6 xl:grid-cols-5">
         <div className="soft-card xl:col-span-3">
           <div className="flex items-center justify-between border-b border-teal-950/6 p-5">
-            <div><div className="flex items-center gap-2"><h2 className="font-extrabold">الزيارات القادمة</h2><span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-700">{data?.upcomingVisits.length ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">المواعيد المسجلة خلال الأيام الخمسة القادمة</p><p className="mt-1 text-[11px] font-semibold text-sky-700">تظهر من الغد وحتى خمسة أيام قبل الموعد</p></div>
+            <div><div className="flex items-center gap-2"><h2 className="font-extrabold">الزيارات القادمة</h2><span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-700">{displayData?.upcomingVisits.length ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">المواعيد المسجلة خلال الأيام الخمسة القادمة</p><p className="mt-1 text-[11px] font-semibold text-sky-700">تظهر من الغد وحتى خمسة أيام قبل الموعد</p></div>
             <div className="flex items-center gap-3"><span title="هذه مواعيد مسجلة خلال خمسة أيام قادمة" className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Info className="h-3.5 w-3.5" />خلال ٥ أيام</span><button onClick={() => setLocation("/visits")} className="text-sm font-bold text-teal-700 hover:text-teal-900">عرض الكل</button></div>
           </div>
           <div className="divide-y divide-teal-950/6">
-            {data?.upcomingVisits.length ? data.upcomingVisits.map(visit => {
+            {displayData?.upcomingVisits.length ? displayData.upcomingVisits.map(visit => {
               const days = daysUntil(visit.visitDate);
               return <button key={visit.id} onClick={() => setLocation(`/customers/${visit.customerId}`)} className="flex w-full items-center justify-between gap-3 p-4 text-right hover:bg-teal-50/55">
                 <div className="min-w-0"><p className="truncate font-bold">{visit.customer?.name || "عميل"}</p><p className="mt-1 text-xs text-muted-foreground">{visit.customer?.customerCode ? `${visit.customer.customerCode} · ` : ""}{visitTypeLabels[visit.visitType as keyof typeof visitTypeLabels] || "زيارة"} · {formatDateTime(visit.visitDate)}</p></div>
@@ -99,11 +109,11 @@ export default function Home() {
 
         <div className="soft-card xl:col-span-2">
           <div className="flex items-center justify-between border-b border-teal-950/6 p-5">
-            <div><div className="flex items-center gap-2"><h2 className="font-extrabold">المتابعة المستحقة</h2><span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-800">{data?.dueReminders.length ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">تذكيرات أنشأها التطبيق بعد 120 يومًا من آخر تركيب أو صيانة</p></div>
+            <div><div className="flex items-center gap-2"><h2 className="font-extrabold">المتابعة المستحقة</h2><span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-800">{displayData?.dueReminders.length ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">تذكيرات أنشأها التطبيق بعد 120 يومًا من آخر تركيب أو صيانة</p></div>
             <div className="flex items-center gap-2"><span title="هذه القائمة تحتاج إجراء منك: اتصل بالعميل وحدد الزيارة" className="inline-flex items-center gap-1 text-xs font-bold text-amber-700"><Info className="h-3.5 w-3.5" />تحتاج متابعة</span><BellRing className="h-5 w-5 text-amber-500" /></div>
           </div>
           <div className="divide-y divide-teal-950/6">
-            {data?.dueReminders.length ? data.dueReminders.slice(0, 4).map(reminder => (
+            {displayData?.dueReminders.length ? displayData.dueReminders.slice(0, 4).map(reminder => (
               <button key={reminder.id} onClick={() => setLocation(`/customers/${reminder.customerId}`)} className="flex w-full items-center justify-between gap-3 p-4 text-right hover:bg-amber-50/60">
                 <div className="min-w-0"><p className="truncate font-bold">{reminder.customer?.name || "عميل"}</p><p className="mt-1 text-xs text-amber-700">{reminder.customer?.customerCode ? `${reminder.customer.customerCode} · ` : ""}استحق في {formatDateTime(reminder.reminderDate)} · <strong>متأخر {reminder.daysOverdue} يوم</strong></p><p className="mt-1 text-[11px] font-bold text-teal-700">اضغط لفتح ملف العميل وتسجيل الزيارة</p></div>
                 <ChevronLeft className="h-5 w-5 shrink-0 text-amber-600" />
