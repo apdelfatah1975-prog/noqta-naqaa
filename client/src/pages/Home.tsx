@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { cacheOfflineCash, cacheOfflineDashboard, getOfflineDashboard, getOfflineSession, getPendingOperationCount } from "@/lib/offlineSync";
+import { cacheOfflineCash, cacheOfflineDashboard, downloadOfflineBackup, getOfflineBackupKeyCount, getOfflineDashboard, getOfflineSession, getPendingOperationCount, restoreOfflineBackupFromExcel } from "@/lib/offlineSync";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
-import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, CloudOff, CloudUpload, Info, PackageSearch, Plus, RefreshCw, UsersRound } from "lucide-react";
+import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, CloudOff, CloudUpload, Download, Info, PackageSearch, Plus, RefreshCw, Upload, UsersRound } from "lucide-react";
 import React from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -27,6 +27,7 @@ export default function Home() {
   const offlineOwnerId = offlineSession?.id;
   const [online, setOnline] = React.useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [pendingCount, setPendingCount] = React.useState(() => offlineOwnerId ? getPendingOperationCount(offlineOwnerId) : 0);
+  const restoreInputRef = React.useRef<HTMLInputElement>(null);
   React.useEffect(() => {
     const refreshStatus = () => setPendingCount(offlineOwnerId ? getPendingOperationCount(offlineOwnerId) : 0);
     const goOnline = () => setOnline(true);
@@ -188,17 +189,17 @@ export default function Home() {
           <div className="flex items-start gap-3">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-600/20"><CloudDownload className="h-5 w-5" /></div>
             <div>
-              <h2 className="font-extrabold text-slate-900">النسخة الاحتياطية السحابية</h2>
-              <p className="mt-1 text-xs leading-6 text-slate-600">تتحدث تلقائيًا بعد حفظ أي بيان، وتضم العملاء والزيارات والتذكيرات والمخزون والخزينة.</p>
-              <p className="mt-1 text-[11px] font-bold text-sky-700">{backupLoading ? "جارٍ فحص آخر نسخة…" : backupStatus?.generatedAt ? `آخر مزامنة: ${formatDateTime(backupStatus.generatedAt)}` : "لم تُنشأ نسخة بعد"}</p>
+              <h2 className="font-extrabold text-slate-900">النسخة الاحتياطية Excel</h2>
+              <p className="mt-1 text-xs leading-6 text-slate-600">تنزيل عربي شامل لكل العملاء والزيارات والتذكيرات والخزينة والمخزن والتعاملات المحلية.</p>
+              <p className="mt-1 text-[11px] font-bold text-sky-700">تُنشأ النسخة على هذا الجهاز وتعمل دون إنترنت.</p>
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:min-w-52 sm:flex-row">
-            {backupStatus?.downloadUrl ? <a href={backupStatus.downloadUrl} download="نقطة-نقاء-نسخة-احتياطية.xlsx" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-sky-700 px-4 text-sm font-extrabold text-white transition hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"><CloudDownload className="h-4 w-4" />تنزيل Excel</a> : null}
-            <button type="button" disabled={backupMutation.isPending} onClick={() => backupMutation.mutate(undefined, { onSuccess: () => backupUtils.filters.backup.status.invalidate() })} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sky-200 bg-white px-4 text-sm font-extrabold text-sky-800 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"><RefreshCw className={`h-4 w-4 ${backupMutation.isPending ? "animate-spin" : ""}`} />{backupStatus?.downloadUrl ? "تحديث النسخة" : "إنشاء النسخة الآن"}</button>
+            <input ref={restoreInputRef} type="file" accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx" className="hidden" onChange={async event => { const file = event.target.files?.[0]; event.target.value = ""; if (!file) return; if (!window.confirm("تحذير: ستستبدل الاستعادة البيانات المحلية الحالية. يفضل تنزيل نسخة حالية أولًا. هل تريد المتابعة؟")) return; try { const result = restoreOfflineBackupFromExcel(await file.arrayBuffer()); toast.success(`تمت استعادة ${result.restoredKeys} عناصر محلية. سيعاد تحميل التطبيق الآن.`); window.setTimeout(() => window.location.reload(), 700); } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر استعادة ملف Excel."); } }} aria-label="اختيار ملف Excel للاستعادة" />
+            <button type="button" onClick={() => { const downloaded = downloadOfflineBackup(); toast(downloaded ? `تم تنزيل ملف Excel العربي الشامل (${getOfflineBackupKeyCount()} عناصر محلية).` : "تعذر إنشاء ملف النسخة الاحتياطية."); }} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-sky-700 px-4 text-sm font-extrabold text-white transition hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"><Download className="h-4 w-4" />تنزيل Excel</button>
+            <button type="button" onClick={() => restoreInputRef.current?.click()} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sky-200 bg-white px-4 text-sm font-extrabold text-sky-800 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"><Upload className="h-4 w-4" />استعادة Excel</button>
           </div>
         </div>
-        {backupMutation.isSuccess ? <div className="flex items-center gap-2 border-t border-sky-200/70 px-5 py-3 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-4 w-4" />تم تحديث النسخة ويمكن تنزيلها الآن.</div> : null}
       </section>
     </div>
   );

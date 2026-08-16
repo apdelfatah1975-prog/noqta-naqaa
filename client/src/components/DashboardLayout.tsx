@@ -22,14 +22,11 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { useRef } from "react";
 import {
   BellRing,
   CalendarPlus,
   CircleDollarSign,
-  Download,
   FileBarChart,
-  Upload,
   Droplets,
   LayoutDashboard,
   LogOut,
@@ -38,8 +35,6 @@ import {
   UsersRound,
 } from "lucide-react";
 import { useLocation } from "wouter";
-import { toast } from "sonner";
-import { downloadOfflineBackup, getOfflineBackupKeyCount, restoreOfflineBackupFromExcel } from "@/lib/offlineSync";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { AutomaticReminderNotifications } from "./AutomaticReminderNotifications";
 import { InstallAppButton } from "./InstallAppButton";
@@ -100,22 +95,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     ?? (location.startsWith("/customers/") ? menuItems[1] : undefined)
     ?? menuItems[0];
   const initials = user?.name?.trim().slice(0, 1) || "م";
-  const restoreInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleRestoreBackup(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    const confirmed = window.confirm("تحذير: استعادة ملف Excel ستستبدل البيانات المحلية الحالية. نزّل نسخة احتياطية من الحالة الحالية أولًا إذا كانت مهمة. هل تريد المتابعة؟");
-    if (!confirmed) return;
-    try {
-      const result = restoreOfflineBackupFromExcel(await file.arrayBuffer());
-      toast.success(`تمت استعادة ${result.restoredKeys} عناصر محلية من ملف Excel. أعد تحميل التطبيق لإظهار البيانات.`);
-      window.setTimeout(() => window.location.reload(), 700);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "تعذر استعادة النسخة الاحتياطية.");
-    }
-  }
 
   return (
     <>
@@ -189,30 +169,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <input ref={restoreInputRef} type="file" accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx" className="hidden" onChange={handleRestoreBackup} aria-label="اختيار ملف Excel للنسخة الاحتياطية" />
-            <button
-              type="button"
-              onClick={() => restoreInputRef.current?.click()}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-950/8 bg-white px-3 text-xs font-bold text-amber-800 transition hover:bg-amber-50"
-              aria-label="استعادة نسخة احتياطية"
-              title="استعادة البيانات من ملف Excel احتياطي"
-            >
-              <Upload className="h-4 w-4" />
-              {!isMobile ? <span>استعادة</span> : null}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const downloaded = downloadOfflineBackup();
-                toast(downloaded ? `تم تنزيل النسخة الاحتياطية (${getOfflineBackupKeyCount()} عناصر محلية)` : "تعذر إنشاء النسخة الاحتياطية على هذا الجهاز.");
-              }}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-teal-950/8 bg-white px-3 text-xs font-bold text-teal-800 transition hover:bg-teal-50"
-              aria-label="تنزيل نسخة Excel احتياطية"
-              title="تنزيل نسخة Excel منظمة من البيانات المحلية"
-            >
-              <Download className="h-4 w-4" />
-              {!isMobile ? <span>نسخة احتياطية</span> : null}
-            </button>
             <InstallAppButton compact={isMobile} />
             {!isMobile ? (
               <button onClick={toggleSidebar} className="grid h-10 w-10 place-items-center rounded-xl border border-teal-950/8 bg-white text-teal-800 transition hover:bg-teal-50" aria-label="طي القائمة الجانبية">

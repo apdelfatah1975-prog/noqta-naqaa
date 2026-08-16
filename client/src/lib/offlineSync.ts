@@ -327,6 +327,22 @@ function serializeStoredValue(value: unknown) {
   return typeof value === "string" ? value : JSON.stringify(value) ?? "";
 }
 
+const arabicFieldLabels: Record<string, string> = {
+  id: "المعرّف", ownerId: "معرّف المستخدم", customerId: "معرّف العميل", inventoryItemId: "معرّف الصنف", manualCode: "كود العميل", customerCode: "كود العميل", localId: "المعرّف المحلي", clientOperationId: "معرّف العملية المحلية",
+  name: "الاسم", phone: "الهاتف", address: "العنوان", location: "الموقع", latitude: "خط العرض", longitude: "خط الطول", notes: "الملاحظات",
+  visitType: "نوع الزيارة", serviceOrderType: "نوع أمر الخدمة", visitDate: "تاريخ الزيارة", nextVisitDate: "موعد الزيارة القادمة", reminderDate: "تاريخ التذكير", reminderId: "معرّف التذكير", alertedAt: "وقت التنبيه", status: "الحالة",
+  technicianName: "اسم الفني", firstTechnicianName: "اسم فني الزيارة الأولى", recipientName: "اسم المستلم", receivedBy: "الفني المستلم",
+  collectedAmount: "المبلغ المحصل", firstCollectedAmount: "مبلغ الزيارة الأولى", amount: "المبلغ", currency: "العملة", category: "البند", description: "البيان", transactionType: "نوع العملية", transactionDate: "تاريخ العملية",
+  date: "التاريخ", dateFrom: "من تاريخ", dateTo: "إلى تاريخ", period: "الفترة", itemId: "معرّف الصنف", itemName: "اسم الصنف", quantity: "الكمية", openingQuantity: "الرصيد الافتتاحي", currentBalance: "الرصيد الحالي", incoming: "الوارد", outgoing: "المنصرف", movementType: "نوع الحركة", movementDate: "تاريخ الحركة", unitCost: "سعر الوحدة", unitPrice: "سعر الوحدة", total: "الإجمالي",
+  createdAt: "تاريخ الإنشاء", updatedAt: "آخر تحديث", pendingOperations: "العمليات المعلقة", data: "البيانات", entity: "نوع السجل", leadDays: "عدد أيام التنبيه", alertHour: "ساعة التنبيه", alertMinute: "دقيقة التنبيه", timezoneOffsetMinutes: "فرق التوقيت بالدقائق", scheduleCronTaskUid: "معرّف الجدولة", pinHash: "رمز الحماية المشفّر",
+};
+
+function localizeReadableValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(localizeReadableValue);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, nested], index) => [arabicFieldLabels[key] ?? `حقل إضافي ${index + 1}`, localizeReadableValue(nested)]));
+}
+
 function readableSheetRows(storage: Record<string, unknown>) {
   const groups: Record<string, Array<Record<string, unknown>>> = {
     "العملاء": [],
@@ -359,7 +375,7 @@ function readableSheetRows(storage: Record<string, unknown>) {
         groups[groupName].push({
           "مفتاح البيانات": key,
           "رقم السجل": index + 1,
-          "البيانات": serializeStoredValue(record),
+          "البيانات": serializeStoredValue(localizeReadableValue(record)),
         });
       });
     } else if (value && typeof value === "object") {
