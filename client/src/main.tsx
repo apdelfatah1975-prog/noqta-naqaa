@@ -10,7 +10,7 @@ import "./index.css";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js?version=7").then(registration => {
+    void navigator.serviceWorker.register("/sw.js?version=8").then(registration => {
       void registration.update();
     });
   });

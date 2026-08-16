@@ -71,7 +71,8 @@ export default function Customers() {
 
   useEffect(() => { if (customers) { cacheOfflineCustomers(customers); setOfflineCustomers(getOfflineCustomers()); } }, [customers]);
   useEffect(() => {
-    if (location.includes("new=1")) {
+    const queryRequestsNew = new URLSearchParams(window.location.search).get("new") === "1";
+    if (queryRequestsNew || location.includes("new=1")) {
       setForm(emptyCustomer);
       setDialogOpen(true);
       window.history.replaceState({}, "", "/customers");

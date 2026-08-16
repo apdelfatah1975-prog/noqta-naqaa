@@ -2,8 +2,9 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
+import { cacheOfflineChart, getOfflineChart, type OfflineChartSnapshot } from "@/lib/offlineSync";
 import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, Info, PackageSearch, Plus, RefreshCw, UsersRound } from "lucide-react";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
 const statStyles = [
@@ -18,6 +19,13 @@ export default function Home() {
   const { data, isLoading } = trpc.filters.dashboard.useQuery();
   const { data: cash } = trpc.filters.cash.summary.useQuery();
   const { data: backupStatus, isLoading: backupLoading } = trpc.filters.backup.status.useQuery();
+  const [offlineChart, setOfflineChart] = useState<OfflineChartSnapshot | null>(() => getOfflineChart());
+  useEffect(() => {
+    if (!data?.chart) return;
+    const snapshot = { days: data.chart.days, generatedAt: data.chart.generatedAt instanceof Date ? data.chart.generatedAt.toISOString() : String(data.chart.generatedAt ?? "") };
+    cacheOfflineChart(snapshot);
+    setOfflineChart(snapshot);
+  }, [data?.chart]);
   const backupMutation = trpc.filters.backup.createNow.useMutation();
   const backupUtils = trpc.useUtils();
   const [, setLocation] = useLocation();
@@ -77,6 +85,8 @@ export default function Home() {
           </button>
         ))}
       </section>
+
+      <DailySummaryChart chart={data?.chart ?? offlineChart} isOffline={!data?.chart && Boolean(offlineChart)} />
 
       <ReminderAlertBanner />
 
@@ -148,6 +158,27 @@ function daysUntil(value: Date | string) {
   const date = new Date(value);
   const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   return Math.max(0, Math.ceil((target.getTime() - today.getTime()) / 86_400_000));
+}
+
+function DailySummaryChart({ chart, isOffline }: { chart: { days: Array<{ date: string; expenses: number; newCustomers: number }> } | null | undefined; isOffline: boolean }) {
+  const days = chart?.days ?? [];
+  const maxExpenses = Math.max(...days.map(day => day.expenses), 1);
+  const maxCustomers = Math.max(...days.map(day => day.newCustomers), 1);
+  return <section className="soft-card overflow-hidden" aria-label="ملخص المصروفات والعملاء الجدد">
+    <div className="flex flex-col gap-3 border-b border-teal-950/6 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div><h2 className="font-extrabold">ملخص آخر ٧ أيام</h2><p className="mt-1 text-xs text-muted-foreground">المصروفات اليومية وعدد العملاء الجدد المسجلين</p></div>
+      <div className="flex flex-wrap items-center gap-3 text-[11px] font-bold"><span className="inline-flex items-center gap-1.5 text-amber-700"><i className="h-2.5 w-2.5 rounded-full bg-amber-500" />مصروفات</span><span className="inline-flex items-center gap-1.5 text-teal-700"><i className="h-2.5 w-2.5 rounded-full bg-teal-600" />عملاء جدد</span>{isOffline ? <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">بيانات محفوظة دون اتصال</span> : null}</div>
+    </div>
+    {days.length ? <div className="overflow-x-auto p-5"><div className="flex min-w-[560px] items-end justify-between gap-2" dir="ltr">{days.map(day => {
+      const expenseHeight = Math.max(4, Math.round((day.expenses / maxExpenses) * 132));
+      const customerHeight = Math.max(4, Math.round((day.newCustomers / maxCustomers) * 132));
+      const date = new Date(`${day.date}T00:00:00`);
+      return <div key={day.date} className="flex min-w-14 flex-1 flex-col items-center gap-2" title={`${date.toLocaleDateString("ar-SA", { weekday: "short", day: "numeric", month: "short" })}: ${ (day.expenses / 100).toLocaleString("ar-SA", { maximumFractionDigits: 2 }) } ر.س، ${day.newCustomers} عميل جديد`}>
+        <div className="flex h-36 items-end gap-1"><div className="w-3 rounded-t-md bg-amber-500 transition-all" style={{ height: `${expenseHeight}px` }} /><div className="w-3 rounded-t-md bg-teal-600 transition-all" style={{ height: `${customerHeight}px` }} /></div>
+        <span className="text-[10px] font-bold text-muted-foreground">{date.toLocaleDateString("ar-SA", { weekday: "short" })}</span><span className="text-[10px] text-muted-foreground">{date.getDate()}/{date.getMonth() + 1}</span>
+      </div>;
+    })}</div><div className="mt-3 flex justify-between text-[10px] text-muted-foreground"><span>المصروفات بالريال السعودي</span><span>ارتفاع العمود نسبي داخل الفترة</span></div></div> : <EmptyRow text="لا توجد بيانات كافية لعرض الملخص بعد." />}
+  </section>;
 }
 
 function EmptyRow({ text, action, onAction }: { text: string; action?: string; onAction?: () => void }) {

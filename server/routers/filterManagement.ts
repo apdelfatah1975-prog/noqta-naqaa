@@ -337,13 +337,14 @@ export const filterManagementRouter = router({
     const endOfUpcomingWindow = new Date(startOfToday);
     endOfUpcomingWindow.setDate(endOfUpcomingWindow.getDate() + 6);
     endOfUpcomingWindow.setMilliseconds(-1);
-    const [todayVisits, upcomingVisits, upcomingFollowUps, dueReminders, inventory, cash] = await Promise.all([
+    const [todayVisits, upcomingVisits, upcomingFollowUps, dueReminders, inventory, cash, chartTransactions] = await Promise.all([
       db.select().from(visits).where(and(eq(visits.ownerId, ownerId), gte(visits.visitDate, startOfToday), lte(visits.visitDate, endOfToday))).orderBy(visits.visitDate),
       db.select().from(visits).where(and(eq(visits.ownerId, ownerId), gte(visits.visitDate, endOfToday), lte(visits.visitDate, endOfUpcomingWindow))).orderBy(visits.visitDate).limit(20),
       remindersWithCustomers(ownerId, false, 5),
       remindersWithCustomers(ownerId, true),
       inventorySummary(ownerId),
       cashSummary(ownerId),
+      db.select().from(cashTransactions).where(eq(cashTransactions.ownerId, ownerId)),
     ]);
     const visitCustomerIds = Array.from(new Set([...todayVisits, ...upcomingVisits].map(visit => visit.customerId)));
     const [visitCustomers, allCustomers] = await Promise.all([
@@ -354,6 +355,26 @@ export const filterManagementRouter = router({
     ]);
     const customerById = new Map(visitCustomers.map(customer => [customer.id, customer]));
     const customerNumbers = customerNumberMap([...allCustomers].sort(compareCustomersByCreation));
+    const chartDays = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(startOfToday);
+      date.setDate(date.getDate() - (6 - index));
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      return { date: key, expenses: 0, newCustomers: 0 };
+    });
+    const chartByDate = new Map(chartDays.map(day => [day.date, day]));
+    for (const customer of allCustomers) {
+      const createdAt = new Date(customer.createdAt);
+      const key = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}-${String(createdAt.getDate()).padStart(2, "0")}`;
+      const day = chartByDate.get(key);
+      if (day) day.newCustomers += 1;
+    }
+    for (const transaction of chartTransactions) {
+      if (transaction.transactionType !== "expense") continue;
+      const transactionDate = new Date(transaction.transactionDate);
+      const key = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, "0")}-${String(transactionDate.getDate()).padStart(2, "0")}`;
+      const day = chartByDate.get(key);
+      if (day) day.expenses += transaction.amount;
+    }
     const lowStock = inventory.items.filter(item => item.currentBalance <= 2);
     return {
       todayVisits: todayVisits.map(visit => {
@@ -373,6 +394,7 @@ export const filterManagementRouter = router({
         items: inventory.items.map(item => ({ id: item.id, name: item.name, currentBalance: item.currentBalance })),
       },
       cash: { incomeTotal: cash.incomeTotal, expenseTotal: cash.expenseTotal, balance: cash.balance, summaries: cash.summaries },
+      chart: { days: chartDays, generatedAt: new Date() },
     };
   }),
 

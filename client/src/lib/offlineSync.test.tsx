@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  cacheOfflineChart,
   cacheOfflineCustomers,
   clearOfflineState,
+  getOfflineChart,
   getOfflineCustomers,
   getOfflineSession,
   getPendingCustomers,
@@ -24,6 +26,11 @@ describe("التخزين المحلي للمزامنة", () => {
 
     expect(getOfflineSession()).toMatchObject({ id: 5, name: "مدير" });
     expect(getOfflineCustomers()).toEqual([{ id: 8, name: "عميل اختبار", phone: "01000000000" }]);
+  });
+
+  it("يحفظ ملخص الرسم ويستعيده دون اتصال", () => {
+    cacheOfflineChart({ days: [{ date: "2026-08-16", expenses: 12500, newCustomers: 2 }], generatedAt: "2026-08-16T10:00:00.000Z" });
+    expect(getOfflineChart()).toEqual({ days: [{ date: "2026-08-16", expenses: 12500, newCustomers: 2 }], generatedAt: "2026-08-16T10:00:00.000Z" });
   });
 
   it("يضع العميل الجديد في طابور المزامنة ويظهر محليًا", () => {
