@@ -2,7 +2,6 @@ const SESSION_KEY = "purepoint-offline-session";
 const CUSTOMERS_KEY = "purepoint-offline-customers";
 const CUSTOMER_QUEUE_PREFIX = "purepoint-pending-customers";
 const VISIT_QUEUE_PREFIX = "purepoint-pending-visits";
-const DASHBOARD_CHART_KEY = "purepoint-dashboard-chart";
 
 export type OfflineCustomer = {
   id: number;
@@ -36,11 +35,6 @@ export type PendingVisit = {
   collectedAmount?: number;
   collectedCurrency?: "SAR";
   createdAt: string;
-};
-
-export type OfflineChartSnapshot = {
-  days: Array<{ date: string; expenses: number; newCustomers: number }>;
-  generatedAt?: string;
 };
 
 export type OfflineUser = {
@@ -91,19 +85,10 @@ export function clearOfflineState() {
   const session = getOfflineSession();
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(CUSTOMERS_KEY);
-  localStorage.removeItem(DASHBOARD_CHART_KEY);
   if (session) {
     localStorage.removeItem(queueKey(CUSTOMER_QUEUE_PREFIX, session.id));
     localStorage.removeItem(queueKey(VISIT_QUEUE_PREFIX, session.id));
   }
-}
-
-export function cacheOfflineChart(snapshot: OfflineChartSnapshot) {
-  writeJson(DASHBOARD_CHART_KEY, snapshot);
-}
-
-export function getOfflineChart() {
-  return readJson<OfflineChartSnapshot | null>(DASHBOARD_CHART_KEY, null);
 }
 
 export function cacheOfflineCustomers(customers: OfflineCustomer[]) {
