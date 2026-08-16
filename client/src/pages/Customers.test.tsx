@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import Customers, { customerVisitRegistrationPath } from "./Customers";
+import Customers from "./Customers";
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -25,6 +25,7 @@ vi.mock("@/lib/trpc", () => ({
         update: { useMutation: mocks.updateUseMutation },
         delete: { useMutation: mocks.deleteUseMutation },
       },
+      visits: { create: { useMutation: mocks.createUseMutation } },
       dashboard: { invalidate: mocks.dashboardInvalidate },
       reminders: { due: { invalidate: mocks.remindersInvalidate } },
     },
@@ -82,17 +83,16 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(screen.getByLabelText("موعد متابعة العميل بعيد")).toBeTruthy();
   });
 
-  it("يوفر تسجيل زيارة وسجل العميل من بطاقة العميل", () => {
+  it("يفتح بطاقة تسجيل الزيارة مباشرة من بطاقة العميل ويُبقي السجل مستقلًا", () => {
     render(<Customers />);
     fireEvent.click(screen.getByRole("button", { name: "زيارة" }));
-    expect(mocks.location).toHaveBeenCalledWith(customerVisitRegistrationPath(12));
+    expect(screen.getByText("تسجيل زيارة جديدة")).toBeTruthy();
+    expect(screen.getByText(/للعميل: عميل قديم/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "إلغاء" }));
     fireEvent.click(screen.getByRole("button", { name: "السجل" }));
     expect(mocks.location).toHaveBeenCalledWith("/customers/12");
   });
 
-  it("يبني مسار تسجيل الزيارة مع معرّف العميل وإشارة فتح النموذج", () => {
-    expect(customerVisitRegistrationPath(12)).toBe("/customers/12?openVisit=1");
-  });
 
   it("يرسل خيار الفرز حسب أقرب موعد إلى قائمة العملاء", () => {
     render(<Customers />);
