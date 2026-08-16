@@ -13,7 +13,7 @@ const statStyles = [
   { icon: BellRing, color: "bg-amber-500", label: "مستحقون للمتابعة", key: "due", href: "/reminders" },
   { icon: UsersRound, color: "bg-teal-700", label: "عملاء اليوم", key: "today", href: "/customers" },
   { icon: CalendarDays, color: "bg-sky-600", label: "زيارات قادمة", key: "upcoming", href: "/visits" },
-  { icon: CircleDollarSign, color: "bg-slate-800", label: "رصيد الخزينة (ر.س)", key: "cash", href: "/cash" },
+  { icon: CircleDollarSign, color: "bg-slate-800", label: "رصيد الخزينة", key: "cash", href: "/cash" },
   { icon: PackageSearch, color: "bg-violet-600", label: "أصناف بالمخزنة", key: "inventory", href: "/inventory" },
 ] as const;
 
@@ -94,7 +94,7 @@ export default function Home() {
     upcoming: nextVisit ? `${nextVisit.customer?.name || "عميل"} · ${formatDateTime(nextVisit.visitDate)}` : "لا توجد زيارات مسجلة",
     due: nextDueReminder ? `${nextDueReminder.customer?.name || "عميل"} · متأخر ${nextDueReminder.daysOverdue} يوم` : "لا توجد متابعة متأخرة",
     inventory: "عدد الأصناف المسجلة",
-    cash: "الرصيد بالريال السعودي",
+    cash: "الرصيد الحالي",
   };
 
   return (
