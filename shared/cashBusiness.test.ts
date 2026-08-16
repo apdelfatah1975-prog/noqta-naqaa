@@ -73,7 +73,7 @@ describe("calculateCompanyFinancialOverview", () => {
       technicianRemaining: 20000,
       otherExpenses: 10000,
       companyNet: 85000,
-      technicianPaymentsByName: [{ technician: "أحمد", requiredAmount: 50000, totalPaid: 30000, remainingAmount: 20000, status: "remaining", transactionCount: 2 }],
+      technicianPaymentsByName: [{ technician: "أحمد", requiredAmount: 50000, totalPaid: 30000, salaryPaidAmount: 30000, remainingAmount: 20000, status: "remaining", transactionCount: 2 }],
     });
   });
 });
@@ -84,6 +84,6 @@ describe("حالة راتب الفني", () => {
       { transactionType: "expense", amount: 40000, category: "مستحق فني", recipientName: "محمود" },
       { transactionType: "expense", amount: 40000, category: "راتب فني", recipientName: "محمود" },
     ]);
-    expect(result.technicianPaymentsByName[0]).toMatchObject({ technician: "محمود", requiredAmount: 40000, totalPaid: 40000, remainingAmount: 0, status: "paid" });
+    expect(result.technicianPaymentsByName[0]).toMatchObject({ technician: "محمود", requiredAmount: 40000, totalPaid: 40000, salaryPaidAmount: 40000, remainingAmount: 0, status: "paid" });
   });
 });

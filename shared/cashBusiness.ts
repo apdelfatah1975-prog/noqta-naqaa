@@ -61,7 +61,7 @@ export type CashAnalytics = {
   technicianExpenses: CashTechnicianRow[];
 };
 
-export type TechnicianPaymentRow = { technician: string; requiredAmount: number; totalPaid: number; remainingAmount: number; status: "paid" | "remaining"; transactionCount: number };
+export type TechnicianPaymentRow = { technician: string; requiredAmount: number; totalPaid: number; salaryPaidAmount: number; remainingAmount: number; status: "paid" | "remaining"; transactionCount: number };
 
 export type CompanyFinancialOverview = {
   serviceIncome: number;
@@ -163,7 +163,7 @@ export function calculateCompanyFinancialOverview(transactions: Array<CashTransa
       else if (serviceCategories.has(category)) serviceIncome += transaction.amount;
     } else if (technicianCategories.has(category) || Boolean(transaction.recipientName?.trim() && category.includes("فني"))) {
       const technician = transaction.recipientName?.trim() || "فني غير محدد";
-      const current = technicianMap.get(technician) ?? { technician, requiredAmount: 0, totalPaid: 0, remainingAmount: 0, status: "paid" as const, transactionCount: 0 };
+      const current = technicianMap.get(technician) ?? { technician, requiredAmount: 0, totalPaid: 0, salaryPaidAmount: 0, remainingAmount: 0, status: "paid" as const, transactionCount: 0 };
       if (category === "مستحق فني") {
         technicianRequired += transaction.amount;
         current.requiredAmount += transaction.amount;
@@ -174,6 +174,7 @@ export function calculateCompanyFinancialOverview(transactions: Array<CashTransa
       current.remainingAmount = Math.max(current.requiredAmount - current.totalPaid, 0);
       current.status = current.remainingAmount > 0 ? "remaining" : "paid";
       current.transactionCount += 1;
+      if (category === "راتب فني") current.salaryPaidAmount += transaction.amount;
       technicianMap.set(technician, current);
     } else {
       otherExpenses += transaction.amount;
