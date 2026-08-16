@@ -89,7 +89,8 @@ export function resetAppSettings(): AppSettings {
 }
 
 export function formatAppMoney(amountInHalalas: number, settings = getAppSettings()) {
-  return `${new Intl.NumberFormat(settings.dateFormat === "arabic" ? "ar-SA" : "en-US", { maximumFractionDigits: 2 }).format(amountInHalalas / 100)} ${settings.currencyLabel}`;
+  void settings;
+  return new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 2 }).format(amountInHalalas / 100);
 }
 
 export function formatAppDate(value: string | Date, settings = getAppSettings()) {

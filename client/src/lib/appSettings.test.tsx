@@ -16,7 +16,10 @@ describe("إعدادات التطبيق المحلية", () => {
     expect(localStorage.getItem("purepoint-offline-customers")).toBe("[]");
   });
 
-  it("تنسق المبلغ بالعملة التي اختارها المستخدم", () => {
-    expect(formatAppMoney(12550, { ...defaultAppSettings, currencyLabel: "ر.س" })).toContain("١٢٥٫٥");
+  it("تعرض المبلغ كرقم فقط دون رمز عملة", () => {
+    const formatted = formatAppMoney(12550, { ...defaultAppSettings, currencyLabel: "ر.س" });
+    expect(formatted).toContain("١٢٥٫٥");
+    expect(formatted).not.toContain("ر.س");
+    expect(formatted).not.toContain("ريال");
   });
 });
