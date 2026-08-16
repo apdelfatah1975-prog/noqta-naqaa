@@ -9,7 +9,8 @@ import {
   replaceOfflineCustomerId,
 } from "@/lib/offlineSync";
 import { CloudOff, CloudUpload } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 export function OfflineSyncManager() {
   const { user } = useAuth();
@@ -17,6 +18,7 @@ export function OfflineSyncManager() {
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [syncFailed, setSyncFailed] = useState(false);
+  const syncingRef = useRef(false);
   const utils = trpc.useUtils();
   const { mutateAsync: syncCustomer } = trpc.filters.customers.create.useMutation();
   const { mutateAsync: syncVisit } = trpc.filters.visits.create.useMutation();
@@ -26,9 +28,12 @@ export function OfflineSyncManager() {
   }, [user]);
 
   const syncPendingOperations = useCallback(async () => {
-    if (!user || !navigator.onLine) return;
+    if (!user || !navigator.onLine || syncingRef.current) return;
+    syncingRef.current = true;
     setSyncing(true);
     setSyncFailed(false);
+    let syncedCount = 0;
+    let batchFailed = false;
     const customerIdMap = new Map<number, number>();
     for (const customer of getPendingCustomers(user.id)) {
       try {
@@ -50,7 +55,9 @@ export function OfflineSyncManager() {
         customerIdMap.set(customer.localId, result.id);
         replaceOfflineCustomerId(customer.localId, result.id);
         removePendingCustomer(user.id, customer.clientOperationId);
+        syncedCount += 1;
       } catch {
+        batchFailed = true;
         setSyncFailed(true);
         break;
       }
@@ -67,13 +74,19 @@ export function OfflineSyncManager() {
           clientOperationId: visit.clientOperationId,
         });
         removePendingVisit(user.id, visit.clientOperationId);
+        syncedCount += 1;
       } catch {
+        batchFailed = true;
         setSyncFailed(true);
         break;
       }
     }
     setSyncing(false);
+    syncingRef.current = false;
     refreshCount();
+    if (syncedCount > 0 && !batchFailed) {
+      toast.success(`تمت مزامنة ${syncedCount} ${syncedCount === 1 ? "عملية" : "عمليات"} بنجاح بعد عودة الإنترنت.`);
+    }
     await Promise.all([
       utils.filters.dashboard.invalidate(),
       utils.filters.customers.list.invalidate(),
