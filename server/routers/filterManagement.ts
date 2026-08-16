@@ -376,6 +376,46 @@ export const filterManagementRouter = router({
     };
   }),
 
+  reports: router({
+    monthly: protectedProcedure.input(z.object({
+      dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    })).query(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const from = new Date(`${input.dateFrom}T00:00:00`);
+      const to = new Date(`${input.dateTo}T23:59:59.999`);
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "الفترة الزمنية غير صحيحة." });
+      }
+      const ownerId = ctx.user.id;
+      const [periodVisits, periodCash, periodMovements, pendingReminders, inventory] = await Promise.all([
+        db.select().from(visits).where(and(eq(visits.ownerId, ownerId), gte(visits.visitDate, from), lte(visits.visitDate, to))).orderBy(desc(visits.visitDate)),
+        db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ownerId), gte(cashTransactions.transactionDate, from), lte(cashTransactions.transactionDate, to))).orderBy(desc(cashTransactions.transactionDate)),
+        db.select().from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ownerId), gte(inventoryMovements.movementDate, from), lte(inventoryMovements.movementDate, to))).orderBy(desc(inventoryMovements.movementDate)),
+        db.select().from(reminders).where(and(eq(reminders.ownerId, ownerId), eq(reminders.status, "pending"), lte(reminders.reminderDate, to))).orderBy(asc(reminders.reminderDate)),
+        inventorySummary(ownerId),
+      ]);
+      const customerIds = Array.from(new Set(periodVisits.map(visit => visit.customerId)));
+      const periodCustomers = customerIds.length ? await db.select().from(customers).where(and(eq(customers.ownerId, ownerId), inArray(customers.id, customerIds))) : [];
+      const customerNames = new Map(periodCustomers.map(customer => [customer.id, customer.name]));
+      const income = periodCash.filter(transaction => transaction.transactionType === "income").reduce((sum, transaction) => sum + transaction.amount, 0);
+      const expense = periodCash.filter(transaction => transaction.transactionType === "expense").reduce((sum, transaction) => sum + transaction.amount, 0);
+      const groupMoney = (rows: typeof periodCash, key: (row: typeof periodCash[number]) => string) => Array.from(rows.reduce((map, row) => map.set(key(row) || "غير مصنف", (map.get(key(row) || "غير مصنف") ?? 0) + row.amount), new Map<string, number>())).map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total);
+      const groupVisits = Array.from(periodVisits.reduce((map, visit) => map.set(visit.visitType, (map.get(visit.visitType) ?? 0) + 1), new Map<string, number>())).map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total);
+      const technicianVisits = Array.from(periodVisits.reduce((map, visit) => { const label = visit.technicianName?.trim() || "غير محدد"; return map.set(label, (map.get(label) ?? 0) + 1); }, new Map<string, number>())).map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total);
+      return {
+        period: { dateFrom: input.dateFrom, dateTo: input.dateTo },
+        summary: { visits: periodVisits.length, customers: customerIds.length, income, expense, balance: income - expense, pendingReminders: pendingReminders.length, lowStock: inventory.items.filter(item => item.currentBalance <= 2).length },
+        incomeByCategory: groupMoney(periodCash.filter(transaction => transaction.transactionType === "income"), row => row.category),
+        expenseByCategory: groupMoney(periodCash.filter(transaction => transaction.transactionType === "expense"), row => row.category),
+        visitsByType: groupVisits,
+        visitsByTechnician: technicianVisits,
+        inventory: { incomingQuantity: periodMovements.filter(movement => movement.movementType === "incoming").reduce((sum, movement) => sum + movement.quantity, 0), outgoingQuantity: periodMovements.filter(movement => movement.movementType === "outgoing").reduce((sum, movement) => sum + movement.quantity, 0), purchaseCost: periodMovements.filter(movement => movement.movementType === "incoming").reduce((sum, movement) => sum + movement.quantity * movement.unitCost, 0), items: inventory.items.map(item => ({ name: item.name, currentBalance: item.currentBalance })) },
+        recentVisits: periodVisits.slice(0, 12).map(visit => ({ date: visit.visitDate, type: visit.visitType, technician: visit.technicianName || "غير محدد", customer: customerNames.get(visit.customerId) || "عميل غير معروف" })),
+      };
+    }),
+  }),
+
   customers: router({
     list: protectedProcedure.input(z.object({
       search: z.string().trim().max(160).optional(),

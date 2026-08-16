@@ -13,6 +13,7 @@ import Home from "./pages/Home";
 import Inventory from "./pages/Inventory";
 import NotFound from "./pages/NotFound";
 import Reminders from "./pages/Reminders";
+import Reports from "./pages/Reports";
 import Visits from "./pages/Visits";
 
 function AdminOnly({ children }: { children: ReactNode }) {
@@ -34,6 +35,7 @@ function AdminOnly({ children }: { children: ReactNode }) {
 
 function AdminInventory() { return <AdminOnly><Inventory /></AdminOnly>; }
 function AdminCash() { return <AdminOnly><Cash /></AdminOnly>; }
+function AdminReports() { return <AdminOnly><Reports /></AdminOnly>; }
 
 function Router() {
   return (
@@ -46,6 +48,7 @@ function Router() {
         <Route path="/reminders" component={Reminders} />
         <Route path="/inventory" component={AdminInventory} />
         <Route path="/cash" component={AdminCash} />
+        <Route path="/reports" component={AdminReports} />
         <Route component={NotFound} />
       </Switch>
     </DashboardLayout>
