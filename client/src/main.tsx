@@ -11,7 +11,12 @@ import "./index.css";
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     void navigator.serviceWorker.register("/sw.js?version=8").then(registration => {
-      void registration.update();
+      const update = () => void registration.update();
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(update, { timeout: 3000 });
+      } else {
+        globalThis.setTimeout(update, 1500);
+      }
     });
   });
 }

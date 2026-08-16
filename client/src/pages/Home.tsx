@@ -16,7 +16,11 @@ const statStyles = [
 ] as const;
 
 export default function Home() {
-  const { data, isLoading: dashboardLoading } = trpc.filters.dashboard.useQuery();
+  const { data, isLoading: dashboardLoading } = trpc.filters.dashboard.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+    networkMode: "offlineFirst",
+  });
   type DashboardData = NonNullable<typeof data>;
   const offlineSession = getOfflineSession();
   const offlineOwnerId = offlineSession?.id;
@@ -44,8 +48,16 @@ export default function Home() {
   }, [data]);
   const displayData = data ?? offlineDashboard;
   const isLoading = !displayData && dashboardLoading;
-  const { data: cash } = trpc.filters.cash.summary.useQuery();
-  const { data: backupStatus, isLoading: backupLoading } = trpc.filters.backup.status.useQuery();
+  const { data: cash } = trpc.filters.cash.summary.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+    networkMode: "offlineFirst",
+  });
+  const { data: backupStatus, isLoading: backupLoading } = trpc.filters.backup.status.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+    networkMode: "offlineFirst",
+  });
   const backupMutation = trpc.filters.backup.createNow.useMutation();
   const backupUtils = trpc.useUtils();
   const [, setLocation] = useLocation();
