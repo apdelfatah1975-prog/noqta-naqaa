@@ -6,6 +6,11 @@ export const visitTypeLabels = {
   other: "أخرى",
 } as const;
 
+export function labelVisitType(value: string | null | undefined) {
+  if (!value) return "—";
+  return visitTypeLabels[value as keyof typeof visitTypeLabels] ?? value;
+}
+
 export const reminderStatusLabels = {
   pending: "بانتظار المتابعة",
   completed: "تمت المتابعة",

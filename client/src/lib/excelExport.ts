@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { labelVisitType } from "@/lib/filterUi";
 
 export type CustomerExportRow = {
   customerCode: string;
@@ -29,7 +30,7 @@ export function customerRowsForExcel(customers: Array<any>): CustomerExportRow[]
     address: customer.address || "",
     followUpDate: customer.followUp?.nextVisitDate ? new Date(customer.followUp.nextVisitDate).toLocaleDateString("ar-EG") : "",
     followUpDays: customer.followUp ? (customer.followUp.daysRemaining < 0 ? `متأخر ${Math.abs(customer.followUp.daysRemaining)} يوم` : customer.followUp.daysRemaining === 0 ? "اليوم" : `${customer.followUp.daysRemaining} يوم`) : "لا يوجد موعد",
-    lastServiceType: customer.followUp?.lastServiceVisitType || "",
+    lastServiceType: labelVisitType(customer.followUp?.lastServiceVisitType),
   }));
 }
 
@@ -39,7 +40,7 @@ export function reminderRowsForExcel(reminders: Array<any>): ReminderExportRow[]
     customerName: reminder.customer?.name || "",
     phone: reminder.customer?.phone || "",
     reminderDate: new Date(reminder.reminderDate).toLocaleDateString("ar-EG"),
-    lastServiceType: reminder.lastServiceVisitType || "",
+    lastServiceType: labelVisitType(reminder.lastServiceVisitType),
     lastServiceDate: reminder.lastServiceVisitDate ? new Date(reminder.lastServiceVisitDate).toLocaleDateString("ar-EG") : "",
     daysOverdue: reminder.daysOverdue || 0,
     status: reminder.status === "pending" ? "معلق" : reminder.status || "",

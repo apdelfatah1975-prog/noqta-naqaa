@@ -18,7 +18,7 @@ describe("Excel export rows", () => {
         followUp: { nextVisitDate: "2026-08-20T00:00:00.000Z", daysRemaining: 5, lastServiceVisitType: "maintenance" },
       },
     ]);
-    expect(rows[0]).toMatchObject({ customerCode: "C-000001", name: "عميل تجريبي", followUpDays: "5 يوم" });
+    expect(rows[0]).toMatchObject({ customerCode: "C-000001", name: "عميل تجريبي", followUpDays: "5 يوم", lastServiceType: "صيانة" });
     expect(withArabicHeaders(rows, customerExcelHeaders)[0]["كود العميل"]).toBe("C-000001");
   });
 
@@ -33,6 +33,6 @@ describe("Excel export rows", () => {
       },
     ]);
     const arabicRows = withArabicHeaders(rows, reminderExcelHeaders);
-    expect(arabicRows[0]).toMatchObject({ "اسم العميل": "عميل آخر", "أيام التأخر": 2, الحالة: "معلق" });
+    expect(arabicRows[0]).toMatchObject({ "اسم العميل": "عميل آخر", "أيام التأخر": 2, "نوع آخر خدمة": "تركيب فلتر", الحالة: "معلق" });
   });
 });

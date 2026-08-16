@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { cacheOfflineReport, getLatestOfflineReport, getOfflineReport, getOfflineSession } from "@/lib/offlineSync";
 import { CalendarDays, Download, FileBarChart, PackageSearch, Printer, RefreshCw, WalletCards } from "lucide-react";
+import { labelVisitType } from "@/lib/filterUi";
 import * as XLSX from "xlsx";
 
 const money = (amount: number) => new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR", maximumFractionDigits: 2 }).format(amount / 100);
@@ -59,9 +60,9 @@ export default function Reports() {
     ]), "مالية الشركة");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(financial.technicianPaymentsByName.map(row => ({ الفني: row.technician, الحالة: row.status === "paid" ? "مدفوع" : "متبقي", "إجمالي المستحق بالريال": row.requiredAmount / 100, "إجمالي المدفوع بالريال": row.totalPaid / 100, "المتبقي بالريال": row.remainingAmount / 100, "عدد العمليات": row.transactionCount }))), "مستحقات الفنيين");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.expenseByCategory.map(row => ({ البند: row.label, "الإجمالي بالريال": row.total / 100 }))), "المصروفات");
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.visitsByType.map(row => ({ النوع: row.label, العدد: row.total }))), "أنواع الزيارات");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.visitsByType.map(row => ({ النوع: labelVisitType(row.label), العدد: row.total }))), "أنواع الزيارات");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.visitsByTechnician.map(row => ({ الفني: row.label, "عدد الزيارات": row.total }))), "الفنيون");
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.recentVisits.map(row => ({ التاريخ: dateLabel(row.date), العميل: row.customer, النوع: row.type, الفني: row.technician }))), "آخر الزيارات");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.recentVisits.map(row => ({ التاريخ: dateLabel(row.date), العميل: row.customer, النوع: labelVisitType(row.type), الفني: row.technician }))), "آخر الزيارات");
     XLSX.writeFile(workbook, `تقرير-نقطة-نقاء-${dateFrom}-${dateTo}.xlsx`);
   };
 
@@ -95,11 +96,11 @@ export default function Reports() {
       <div className="grid gap-6 lg:grid-cols-2">
         <ReportList title="الإيرادات حسب البند" rows={data.incomeByCategory} moneyRows />
         <ReportList title="المصروفات حسب البند" rows={data.expenseByCategory} moneyRows />
-        <ReportList title="الزيارات حسب النوع" rows={data.visitsByType} />
+        <ReportList title="الزيارات حسب النوع" rows={data.visitsByType.map(row => ({ ...row, label: labelVisitType(row.label) }))} />
         <ReportList title="الزيارات حسب الفني" rows={data.visitsByTechnician} />
       </div>
       <section className="soft-card p-5"><div className="mb-4 flex items-center justify-between"><div><h2 className="font-black">ملخص المخزون</h2><p className="mt-1 text-xs text-muted-foreground">الحركة خلال الفترة والرصيد الحالي.</p></div><PackageSearch className="h-5 w-5 text-teal-700" /></div><div className="grid gap-3 sm:grid-cols-3"><Metric label="الوارد" value={number(data.inventory.incomingQuantity)} /><Metric label="المنصرف" value={number(data.inventory.outgoingQuantity)} /><Metric label="تكلفة المشتريات" value={money(data.inventory.purchaseCost)} /></div><div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{data.inventory.items.map(item => <div key={item.name} className="rounded-xl bg-teal-50/60 p-3 text-sm"><span className="font-bold">{item.name}</span><span className="mr-2 text-muted-foreground">{number(item.currentBalance)}</span></div>)}</div></section>
-      <section className="soft-card overflow-hidden p-5"><h2 className="font-black">آخر الزيارات في الفترة</h2><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[620px] text-right text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="px-3 py-3">التاريخ</th><th className="px-3 py-3">العميل</th><th className="px-3 py-3">نوع الزيارة</th><th className="px-3 py-3">الفني</th></tr></thead><tbody className="divide-y">{data.recentVisits.length ? data.recentVisits.map((visit, index) => <tr key={`${visit.customer}-${index}`}><td className="px-3 py-3">{dateLabel(visit.date)}</td><td className="px-3 py-3 font-bold">{visit.customer}</td><td className="px-3 py-3">{visit.type}</td><td className="px-3 py-3">{visit.technician}</td></tr>) : <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">لا توجد زيارات في هذه الفترة.</td></tr>}</tbody></table></div></section>
+      <section className="soft-card overflow-hidden p-5"><h2 className="font-black">آخر الزيارات في الفترة</h2><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[620px] text-right text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="px-3 py-3">التاريخ</th><th className="px-3 py-3">العميل</th><th className="px-3 py-3">نوع الزيارة</th><th className="px-3 py-3">الفني</th></tr></thead><tbody className="divide-y">{data.recentVisits.length ? data.recentVisits.map((visit, index) => <tr key={`${visit.customer}-${index}`}><td className="px-3 py-3">{dateLabel(visit.date)}</td><td className="px-3 py-3 font-bold">{visit.customer}</td><td className="px-3 py-3">{labelVisitType(visit.type)}</td><td className="px-3 py-3">{visit.technician}</td></tr>) : <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">لا توجد زيارات في هذه الفترة.</td></tr>}</tbody></table></div></section>
     </> : null}
   </div>;
 }

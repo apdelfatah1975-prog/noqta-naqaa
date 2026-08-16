@@ -43,6 +43,8 @@ describe("تقارير نقطة نقاء", () => {
     expect(screen.getByText("الزيارات المنفذة")).toBeTruthy();
     expect(screen.getByText("عميل الاختبار")).toBeTruthy();
     expect(screen.getByText("بنزين")).toBeTruthy();
+    expect(screen.getAllByText("صيانة").length).toBeGreaterThan(0);
+    expect(screen.queryByText("maintenance")).toBeNull();
   });
 
   it("تغيّر مدخل الفترة يعيد طلب التقرير بالحد الجديد", () => {
