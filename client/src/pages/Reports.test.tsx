@@ -39,12 +39,15 @@ describe("تقارير نقطة نقاء", () => {
 
   it("تعرض مؤشرات التقرير وتجميعات الفترة", () => {
     render(<Reports />);
-    expect(screen.getByText("التقارير والتحليلات")).toBeTruthy();
+    expect(screen.getByText("التقارير")).toBeTruthy();
     expect(screen.getByText("الزيارات المنفذة")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "الزيارات" })).toBeTruthy();
+    expect(screen.queryByText("عميل الاختبار")).toBeNull();
+    expect(screen.queryByText("maintenance")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "الزيارات" }));
     expect(screen.getByText("عميل الاختبار")).toBeTruthy();
     expect(screen.getByText("بنزين")).toBeTruthy();
     expect(screen.getAllByText("صيانة").length).toBeGreaterThan(0);
-    expect(screen.queryByText("maintenance")).toBeNull();
   });
 
   it("تغيّر مدخل الفترة يعيد طلب التقرير بالحد الجديد", () => {
@@ -58,7 +61,8 @@ describe("تقارير نقطة نقاء", () => {
 it("تعرض تقريرًا محليًا فارغًا عند فشل الشبكة دون شاشة تعذر", () => {
   mocks.monthly.mockReturnValue({ isLoading: false, isError: true, refetch: mocks.refetch, data: undefined });
   render(<Reports />);
-  expect(screen.getAllByText("التقارير والتحليلات").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("التقارير").length).toBeGreaterThan(0);
   expect(screen.getByText("الزيارات المنفذة")).toBeTruthy();
+  expect(screen.getByText("نظرة عامة")).toBeTruthy();
   expect(screen.queryByText("تعذر تحميل التقرير")).toBeNull();
 });
