@@ -32,6 +32,7 @@ import {
   LogOut,
   Menu,
   PackageSearch,
+  Settings,
   UsersRound,
 } from "lucide-react";
 import { useLocation } from "wouter";
@@ -48,6 +49,7 @@ const menuItems = [
   { icon: PackageSearch, label: "المخزنة", path: "/inventory" },
   { icon: CircleDollarSign, label: "الخزينة والمصروفات", path: "/cash" },
   { icon: FileBarChart, label: "التقارير", path: "/reports" },
+  { icon: Settings, label: "الإعدادات", path: "/settings" },
 ];
 
 const mobileNavItems = menuItems.filter(item => ["/", "/customers", "/visits", "/reminders"].includes(item.path));
