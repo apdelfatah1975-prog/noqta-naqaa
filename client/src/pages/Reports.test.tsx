@@ -50,6 +50,17 @@ describe("تقارير نقطة نقاء", () => {
     expect(screen.getAllByText("صيانة").length).toBeGreaterThan(0);
   });
 
+  it("تعرض بطاقات المخزون أسماء وشرحًا عربيًا واضحًا", () => {
+    render(<Reports />);
+    fireEvent.click(screen.getByRole("button", { name: "المخزون" }));
+    expect(screen.getByText("إجمالي الوارد")).toBeTruthy();
+    expect(screen.getByText("إجمالي المنصرف")).toBeTruthy();
+    expect(screen.getByText("قيمة المشتريات")).toBeTruthy();
+    expect(screen.getByText("الكميات التي دخلت المخزن خلال الفترة")).toBeTruthy();
+    expect(screen.getByText("إجمالي تكلفة الأصناف المشتراة بالريال")).toBeTruthy();
+    expect(screen.queryByText("تكلفة المشتريات")).toBeNull();
+  });
+
   it("تغيّر مدخل الفترة يعيد طلب التقرير بالحد الجديد", () => {
     render(<Reports />);
     fireEvent.change(screen.getByLabelText("من تاريخ"), { target: { value: "2026-07-01" } });
