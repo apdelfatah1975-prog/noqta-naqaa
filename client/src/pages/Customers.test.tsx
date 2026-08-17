@@ -272,6 +272,13 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(screen.getByRole("button", { name: /فلترة حالة العميل: خلال ٥ أيام/ })).toBeTruthy();
   });
 
+  it("يمنع إضافة كمية تتجاوز الرصيد المتاح للصنف", () => {
+    const item = { id: 41, name: "فلتر جامبو", currentBalance: 2 };
+    const selected = addOrIncrementVisitItem([], item, 2);
+    expect(selected).toEqual([{ inventoryItemId: 41, quantity: 2, source: "manual" }]);
+    expect(addOrIncrementVisitItem(selected, item, 1)).toEqual(selected);
+  });
+
   it("يبحث عن العميل بالاسم أو الهاتف أو الكود قبل فتح بطاقة الزيارة", () => {
     mocks.list.mockReturnValue({
       data: [
