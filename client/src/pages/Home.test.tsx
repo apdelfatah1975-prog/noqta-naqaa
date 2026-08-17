@@ -55,23 +55,25 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     cleanup();
   });
 
-  it("تعرض بطاقة الزيارات القادمة اسم العميل وموعده وعدد الأيام", () => {
-    const upcomingDate = new Date();
-    upcomingDate.setDate(upcomingDate.getDate() + 3);
+  it("تعرض بطاقات المتابعة الثلاث وتفتح فلتر التواصل عند الضغط", () => {
     mocks.dashboard.mockReturnValue({
       isLoading: false,
       data: {
         todayVisits: [],
-        upcomingVisits: [{ id: 21, customerId: 7, visitDate: upcomingDate, visitType: "maintenance", customer: { name: "عميل بموعد مسجل", customerCode: "٧" } }],
-        upcomingFollowUps: [],
+        upcomingVisits: [],
+        upcomingFollowUps: [{ id: 21, customerId: 7, reminderDate: new Date(), customer: { name: "عميل يحتاج تواصل", customerCode: "٧" } }],
         dueReminders: [],
+        customerCount: 4,
         inventory: { totalItems: 0, lowStockCount: 0, lowStock: [] },
       },
     });
     render(<Home />);
-    expect(screen.getByText("عميل بموعد مسجل")).toBeTruthy();
-    expect(screen.getByText(/بعد 3 يوم/)).toBeTruthy();
-    expect(screen.getByText("تظهر من الغد وحتى خمسة أيام قبل الموعد")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "عرض تواصل الآن" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "عرض متأخرون" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "عرض تمت المتابعة" })).toBeTruthy();
+    expect(screen.getByText("تواصل الآن")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "عرض تواصل الآن" }));
+    expect(mocks.setLocation).toHaveBeenCalledWith("/customers?followUpStatus=upcoming");
   });
 
   it("تفتح بطاقة تسجيل الزيارة من الإجراء السريع في الصفحة الرئيسية", () => {

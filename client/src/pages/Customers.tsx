@@ -89,6 +89,10 @@ export default function Customers() {
   useEffect(() => { if (customers) { cacheOfflineCustomers(customers); setOfflineCustomers(getOfflineCustomers()); } }, [customers]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const requestedStatus = params.get("followUpStatus");
+    if (["all", "overdue", "today", "upcoming", "regular", "none"].includes(requestedStatus || "")) {
+      setFollowUpStatus(requestedStatus as "all" | "overdue" | "today" | "upcoming" | "regular" | "none");
+    }
     const queryRequestsNew = params.get("new") === "1";
     const queryRequestsVisit = params.get("visit") === "1";
     const requestedCustomerId = params.get("customerId");

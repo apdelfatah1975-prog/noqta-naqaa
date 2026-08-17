@@ -419,6 +419,7 @@ export const filterManagementRouter = router({
       }),
       upcomingFollowUps,
       dueReminders,
+      customerCount: allCustomers.length,
       inventory: {
         totalItems: inventory.items.length,
         lowStockCount: lowStock.length,

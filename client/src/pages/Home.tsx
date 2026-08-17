@@ -162,37 +162,26 @@ export default function Home() {
 
       <ReminderAlertBanner />
 
-      <section className="grid gap-6 xl:grid-cols-5">
-        <div className="soft-card border border-orange-200 bg-orange-50/35 xl:col-span-3">
-          <div className="flex items-center justify-between border-b border-teal-950/6 p-5">
-            <div><div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" aria-hidden="true" /><h2 className="font-extrabold text-orange-950">الزيارات القادمة</h2><span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-700">{displayData?.upcomingVisits.length ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">المواعيد المسجلة خلال الأيام الخمسة القادمة</p><p className="mt-1 text-[11px] font-semibold text-sky-700">تظهر من الغد وحتى خمسة أيام قبل الموعد</p></div>
-            <div className="flex items-center gap-3"><span title="هذه مواعيد مسجلة خلال خمسة أيام قادمة" className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Info className="h-3.5 w-3.5" />خلال ٥ أيام</span><button onClick={() => setLocation("/visits")} className="text-sm font-bold text-teal-700 hover:text-teal-900">عرض الكل</button></div>
-          </div>
-          <div className="divide-y divide-teal-950/6">
-            {displayData?.upcomingVisits.length ? displayData.upcomingVisits.map(visit => {
-              const days = daysUntil(visit.visitDate);
-              return <button key={visit.id} onClick={() => setLocation(`/customers/${visit.customerId}`)} className="flex w-full items-center justify-between gap-3 p-4 text-right hover:bg-orange-100/55">
-                <div className="min-w-0"><p className="truncate font-bold">{visit.customer?.name || "عميل"}</p><p className="mt-1 text-xs text-muted-foreground">{visit.customer?.customerCode ? `${visit.customer.customerCode} · ` : ""}{visitTypeLabels[visit.visitType as keyof typeof visitTypeLabels] || "زيارة"} · {formatDateTime(visit.visitDate)}</p></div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-extrabold ${days <= 0 ? "bg-amber-100 text-amber-800" : "bg-sky-50 text-sky-700"}`}>{days === 0 ? "اليوم" : `بعد ${days} يوم`}</span><ChevronLeft className="h-5 w-5 shrink-0 text-teal-600" />
+      <section className="grid gap-6">
+        {(() => {
+          const contactNowCount = displayData?.upcomingFollowUps.length ?? 0;
+          const overdueCount = displayData?.dueReminders.length ?? 0;
+          const regularCount = Math.max((displayData?.customerCount ?? 0) - contactNowCount - overdueCount, 0);
+          const followUpCards = [
+            { key: "upcoming", title: "تواصل الآن", description: "موعد العميل اليوم أو خلال ٥ أيام", count: contactNowCount, icon: BellRing, cardClass: "border-orange-200 bg-orange-50/70", iconClass: "bg-orange-500 text-white", countClass: "bg-orange-100 text-orange-800" },
+            { key: "overdue", title: "متأخرون", description: "تجاوزوا الموعد ويحتاجون متابعة", count: overdueCount, icon: BellRing, cardClass: "border-rose-200 bg-rose-50/70", iconClass: "bg-rose-600 text-white", countClass: "bg-rose-100 text-rose-800" },
+            { key: "regular", title: "تمت المتابعة", description: "لا توجد متابعة مستحقة حاليًا", count: regularCount, icon: CheckCircle2, cardClass: "border-emerald-200 bg-emerald-50/70", iconClass: "bg-emerald-600 text-white", countClass: "bg-emerald-100 text-emerald-800" },
+          ] as const;
+          return <div className="grid gap-4 md:grid-cols-3">
+            {followUpCards.map(card => {
+              const Icon = card.icon;
+              return <button key={card.key} type="button" onClick={() => setLocation(`/customers?followUpStatus=${card.key}`)} className={`soft-card flex min-h-32 items-center justify-between gap-4 border p-5 text-right transition hover:-translate-y-0.5 hover:shadow-md ${card.cardClass}`} aria-label={`عرض ${card.title}`}>
+                <div className="min-w-0"><div className="flex items-center gap-2"><h2 className="font-extrabold text-slate-900">{card.title}</h2><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${card.countClass}`}>{card.count}</span></div><p className="mt-2 text-xs font-semibold text-slate-600">{card.description}</p><p className="mt-2 text-[11px] font-bold text-teal-700">اضغط لعرض العملاء</p></div>
+                <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-sm ${card.iconClass}`}><Icon className="h-6 w-6" aria-hidden="true" /></span>
               </button>;
-            }) : <EmptyRow text="لا توجد زيارات مسجلة قادمة حاليًا." action="تسجيل زيارة" onAction={() => setLocation("/visits")} />}
-          </div>
-        </div>
-
-        <div className="soft-card border border-rose-200 bg-rose-50/35 xl:col-span-2">
-          <div className="flex items-center justify-between border-b border-teal-950/6 p-5">
-            <div><div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-rose-600" aria-hidden="true" /><h2 className="font-extrabold text-rose-950">المتابعة المستحقة</h2><span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-800">{displayData?.dueReminders.length ?? 0}</span></div><p className="mt-1 text-xs text-muted-foreground">تذكيرات أنشأها التطبيق بعد {appSettings.followUpDays} يومًا من آخر تركيب أو صيانة</p></div>
-            <div className="flex items-center gap-2"><span title="هذه القائمة تحتاج إجراء منك: اتصل بالعميل وحدد الزيارة" className="inline-flex items-center gap-1 text-xs font-bold text-amber-700"><Info className="h-3.5 w-3.5" />تحتاج متابعة</span><BellRing className="h-5 w-5 text-amber-500" /></div>
-          </div>
-          <div className="divide-y divide-teal-950/6">
-            {displayData?.dueReminders.length ? displayData.dueReminders.slice(0, 4).map(reminder => (
-              <button key={reminder.id} onClick={() => setLocation(`/customers/${reminder.customerId}`)} className="flex w-full items-center justify-between gap-3 p-4 text-right hover:bg-rose-100/55">
-                <div className="min-w-0"><p className="truncate font-bold">{reminder.customer?.name || "عميل"}</p><p className="mt-1 text-xs text-amber-700">{reminder.customer?.customerCode ? `${reminder.customer.customerCode} · ` : ""}استحق في {formatDateTime(reminder.reminderDate)} · <strong>متأخر {reminder.daysOverdue} يوم</strong></p><p className="mt-1 text-[11px] font-bold text-teal-700">اضغط لفتح ملف العميل وتسجيل الزيارة</p></div>
-                <ChevronLeft className="h-5 w-5 shrink-0 text-amber-600" />
-              </button>
-             )) : <EmptyRow text="لا توجد متابعة مستحقة الآن." action="عرض كل التذكيرات" onAction={() => setLocation("/reminders")} />}
-          </div>
-        </div>
+            })}
+          </div>;
+        })()}
       </section>
 
       <section className="soft-card overflow-hidden">
