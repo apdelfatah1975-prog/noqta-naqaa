@@ -67,6 +67,28 @@ describe("التخزين المحلي للمزامنة", () => {
     expect(getPendingVisits(5)).toEqual([]);
   });
 
+  it("يحافظ على بيانات الأصناف المستخدمة وبيانات التحصيل في الزيارة غير المتصلة", () => {
+    const pending = queueOfflineVisit(5, {
+      customerId: 8,
+      visitType: "maintenance",
+      visitDate: "2026-08-15T09:00:00.000Z",
+      technicianName: "أحمد",
+      visitResult: "تم تغيير الممبرين",
+      collectedAmount: 25000,
+      collectedCurrency: "SAR",
+      notes: "تم الحفظ دون اتصال",
+      items: [{ inventoryItemId: 12, quantity: 1, source: "manual" }],
+    });
+
+    expect(getPendingVisits(5)).toEqual([expect.objectContaining({
+      clientOperationId: pending.clientOperationId,
+      technicianName: "أحمد",
+      visitResult: "تم تغيير الممبرين",
+      collectedAmount: 25000,
+      items: [{ inventoryItemId: 12, quantity: 1, source: "manual" }],
+    })]);
+  });
+
   it("يحفظ حذف الزيارة في طابور مستقل ثم يزيله بعد المزامنة", () => {
     const pending = queueOfflineDelete(5, { entity: "visit", id: 17, pin: "1234" });
 

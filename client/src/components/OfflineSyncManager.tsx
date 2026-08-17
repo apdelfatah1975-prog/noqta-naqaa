@@ -84,6 +84,11 @@ export function OfflineSyncManager() {
           visitType: visit.visitType,
           visitDate: new Date(visit.visitDate),
           notes: visit.notes,
+          technicianName: visit.technicianName ?? null,
+          visitResult: visit.visitResult ?? null,
+          collectedAmount: visit.collectedAmount ?? 0,
+          collectedCurrency: visit.collectedCurrency ?? "SAR",
+          items: visit.items ?? [],
           clientOperationId: visit.clientOperationId,
         });
         removePendingVisit(user.id, visit.clientOperationId);
