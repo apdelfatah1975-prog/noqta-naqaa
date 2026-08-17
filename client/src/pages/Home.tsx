@@ -136,7 +136,7 @@ export default function Home() {
         <button type="button" onClick={saveLocalSnapshot} className={`rounded-full px-3 py-1.5 text-xs font-extrabold transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${pendingCount > 0 ? "bg-sky-100 text-sky-800 hover:bg-sky-200" : online ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" : "bg-amber-100 text-amber-800 hover:bg-amber-200"}`} aria-label="حفظ البيانات الحالية محليًا">{pendingCount > 0 ? "حفظ محلي الآن" : online ? "حفظ محلي" : "حفظ محلي الآن"}</button>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         {statStyles.filter(card => card.key !== "upcoming" || appSettings.dashboardShowUpcoming).filter(card => card.key !== "due" || appSettings.dashboardShowDue).filter(card => card.key !== "cash" || appSettings.dashboardShowCash).filter(card => card.key !== "inventory" || appSettings.dashboardShowInventory).map(({ icon: Icon, color, label, key, href }) => (
           <button
             key={key}
@@ -153,13 +153,12 @@ export default function Home() {
             <ChevronLeft className="h-5 w-5 text-teal-700 opacity-0 transition group-hover:translate-x-[-2px] group-hover:opacity-100" />
           </button>
         ))}
+        <button type="button" onClick={() => setLocation("/settings")} className="soft-card group flex min-w-0 items-center gap-3 border border-rose-100 bg-rose-50/70 p-4 text-right transition hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2" aria-label="فتح سلة المحذوفات">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-900/10"><Trash2 className="h-5 w-5" /></div>
+          <div className="min-w-0 flex-1"><p className="text-sm font-extrabold text-rose-950">سلة المحذوفات</p><p className="mt-1 line-clamp-1 text-[11px] font-semibold text-rose-800">العناصر المحذوفة</p></div>
+          <span className="rounded-full bg-white px-2.5 py-1 text-sm font-extrabold text-rose-700 shadow-sm">{trashCount.toLocaleString("ar-SA")}</span>
+        </button>
       </section>
-
-      <button type="button" onClick={() => setLocation("/settings")} className="soft-card group flex w-full items-center gap-4 border border-rose-100 bg-rose-50/70 p-4 text-right transition hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2" aria-label="فتح سلة المحذوفات">
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-900/10"><Trash2 className="h-5 w-5" /></div>
-        <div className="min-w-0 flex-1"><p className="font-extrabold text-rose-950">سلة المحذوفات</p><p className="mt-1 text-xs font-semibold text-rose-800">راجع العناصر المحذوفة واستعدها عند الحاجة</p></div>
-        <span className="rounded-full bg-white px-3 py-1.5 text-sm font-extrabold text-rose-700 shadow-sm">{trashCount.toLocaleString("ar-SA")}</span><ChevronLeft className="h-5 w-5 text-rose-600 transition group-hover:-translate-x-1" />
-      </button>
 
       <ReminderAlertBanner />
 
