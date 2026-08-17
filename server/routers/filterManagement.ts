@@ -439,7 +439,7 @@ export const filterManagementRouter = router({
         totalItems: inventory.items.length,
         lowStockCount: lowStock.length,
         lowStock,
-        items: inventory.items.map(item => ({ id: item.id, name: item.name, currentBalance: item.currentBalance })),
+        items: inventory.items.map(item => ({ id: item.id, name: item.name, currentBalance: item.currentBalance, reorderLevel: item.reorderLevel })),
       },
       cash: { incomeTotal: cash.incomeTotal, expenseTotal: cash.expenseTotal, balance: cash.balance, summaries: cash.summaries },
       chart: { days: chartDays, generatedAt: new Date() },
