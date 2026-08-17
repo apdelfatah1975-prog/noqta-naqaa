@@ -55,25 +55,23 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     cleanup();
   });
 
-  it("تعرض بطاقات المتابعة الثلاث وتفتح فلتر التواصل عند الضغط", () => {
+  it("تعرض قسم الزيارات القادمة وقسم المتابعة المستحقة في التخطيط السابق", () => {
     mocks.dashboard.mockReturnValue({
       isLoading: false,
       data: {
         todayVisits: [],
-        upcomingVisits: [],
-        upcomingFollowUps: [{ id: 21, customerId: 7, reminderDate: new Date(), customer: { name: "عميل يحتاج تواصل", customerCode: "٧" } }],
-        dueReminders: [],
+        upcomingVisits: [{ id: 21, customerId: 7, visitDate: new Date(), visitType: "maintenance", customer: { name: "عميل قادم", customerCode: "٧" } }],
+        upcomingFollowUps: [],
+        dueReminders: [{ id: 22, customerId: 8, reminderDate: new Date(), daysOverdue: 2, customer: { name: "عميل مستحق", customerCode: "٨" } }],
         customerCount: 4,
         inventory: { totalItems: 0, lowStockCount: 0, lowStock: [] },
       },
     });
     render(<Home />);
-    expect(screen.getByRole("button", { name: "عرض تواصل الآن" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "عرض متأخرون" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "عرض تمت المتابعة" })).toBeTruthy();
-    expect(screen.getByText("تواصل الآن")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "عرض تواصل الآن" }));
-    expect(mocks.setLocation).toHaveBeenCalledWith("/customers?followUpStatus=upcoming");
+    expect(screen.getByText("الزيارات القادمة")).toBeTruthy();
+    expect(screen.getByText("المتابعة المستحقة")).toBeTruthy();
+    expect(screen.queryByText("تواصل الآن")).toBeNull();
+    expect(screen.queryByText("تمت المتابعة")).toBeNull();
   });
 
   it("تفتح بطاقة تسجيل الزيارة من الإجراء السريع في الصفحة الرئيسية", () => {
