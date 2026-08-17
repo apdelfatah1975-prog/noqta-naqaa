@@ -29,6 +29,7 @@ export type PendingCustomer = Omit<OfflineCustomer, "id"> & {
   firstVisitDate?: string;
   firstTechnicianName?: string | null;
   firstVisitNotes?: string | null;
+  firstVisitResult?: string | null;
   firstCollectedAmount?: number;
   firstCollectedCurrency?: "SAR";
   localId: number;
@@ -42,6 +43,7 @@ export type OfflineVisit = {
   visitType: "installation" | "maintenance" | "cartridge_change" | "follow_up" | "other";
   visitDate: string;
   technicianName?: string | null;
+  visitResult?: string | null;
   notes?: string | null;
   collectedAmount?: number;
   collectedCurrency?: "SAR";
@@ -53,6 +55,7 @@ export type PendingVisit = {
   visitType: "installation" | "maintenance" | "cartridge_change" | "follow_up" | "other";
   visitDate: string;
   technicianName?: string | null;
+  visitResult?: string | null;
   notes: string | null;
   collectedAmount?: number;
   collectedCurrency?: "SAR";
@@ -377,7 +380,7 @@ const arabicFieldLabels: Record<string, string> = {
   id: "المعرّف", ownerId: "معرّف المستخدم", customerId: "معرّف العميل", inventoryItemId: "معرّف الصنف", manualCode: "كود العميل", customerCode: "كود العميل", localId: "المعرّف المحلي", clientOperationId: "معرّف العملية المحلية",
   name: "الاسم", phone: "الهاتف", address: "العنوان", location: "الموقع", latitude: "خط العرض", longitude: "خط الطول", notes: "الملاحظات",
   visitType: "نوع الزيارة", serviceOrderType: "نوع أمر الخدمة", visitDate: "تاريخ الزيارة", nextVisitDate: "موعد الزيارة القادمة", reminderDate: "تاريخ التذكير", reminderId: "معرّف التذكير", alertedAt: "وقت التنبيه", status: "الحالة",
-  technicianName: "اسم الفني", firstTechnicianName: "اسم فني الزيارة الأولى", recipientName: "اسم المستلم", receivedBy: "الفني المستلم",
+  technicianName: "اسم الفني", firstTechnicianName: "اسم فني الزيارة الأولى", visitResult: "نتيجة الزيارة", firstVisitResult: "نتيجة الزيارة الأولى", recipientName: "اسم المستلم", receivedBy: "الفني المستلم",
   collectedAmount: "المبلغ المحصل", firstCollectedAmount: "مبلغ الزيارة الأولى", amount: "المبلغ", currency: "العملة", category: "البند", description: "البيان", transactionType: "نوع العملية", transactionDate: "تاريخ العملية",
   date: "التاريخ", dateFrom: "من تاريخ", dateTo: "إلى تاريخ", period: "الفترة", itemId: "معرّف الصنف", itemName: "اسم الصنف", quantity: "الكمية", openingQuantity: "الرصيد الافتتاحي", currentBalance: "الرصيد الحالي", incoming: "الوارد", outgoing: "المنصرف", movementType: "نوع الحركة", movementDate: "تاريخ الحركة", unitCost: "سعر الوحدة", unitPrice: "سعر الوحدة", total: "الإجمالي",
   createdAt: "تاريخ الإنشاء", updatedAt: "آخر تحديث", pendingOperations: "العمليات المعلقة", data: "البيانات", entity: "نوع السجل", leadDays: "عدد أيام التنبيه", alertHour: "ساعة التنبيه", alertMinute: "دقيقة التنبيه", timezoneOffsetMinutes: "فرق التوقيت بالدقائق", scheduleCronTaskUid: "معرّف الجدولة", pinHash: "رمز الحماية المشفّر",

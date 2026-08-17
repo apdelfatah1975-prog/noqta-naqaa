@@ -38,7 +38,7 @@ export default function Visits() {
 
   useEffect(() => { if (customers) cacheOfflineCustomers(customers); }, [customers]);
   useEffect(() => {
-    if (visitList) cacheOfflineVisits(visitList.map(visit => ({ id: visit.id, customerId: visit.customerId, visitType: visit.visitType, visitDate: new Date(visit.visitDate).toISOString(), technicianName: visit.technicianName, notes: visit.notes, collectedAmount: visit.collectedAmount, collectedCurrency: "SAR" })));
+    if (visitList) cacheOfflineVisits(visitList.map(visit => ({ id: visit.id, customerId: visit.customerId, visitType: visit.visitType, visitDate: new Date(visit.visitDate).toISOString(), technicianName: visit.technicianName, visitResult: visit.visitResult, notes: visit.notes, collectedAmount: visit.collectedAmount, collectedCurrency: "SAR" })));
   }, [visitList]);
 
   const customerMap = useMemo(() => new Map(visibleCustomers.map(customer => [customer.id, customer])), [visibleCustomers]);

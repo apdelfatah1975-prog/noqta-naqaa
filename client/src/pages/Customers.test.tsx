@@ -102,12 +102,13 @@ describe("ترابط تعديل بيانات العميل", () => {
     render(<Customers />);
     fireEvent.click(screen.getByRole("button", { name: "زيارة" }));
     fireEvent.change(screen.getByLabelText("اسم الفني"), { target: { value: "أحمد" } });
+    fireEvent.change(screen.getByLabelText("نتيجة الزيارة"), { target: { value: "تم تغيير الشمعات" } });
     expect(screen.getByLabelText("اسم الفني")).toBeTruthy();
     expect(screen.getByLabelText("المبلغ المحصل")).toBeTruthy();
     expect(screen.queryByText(/ريال سعودي|ر\.س/)).toBeNull();
     fireEvent.change(screen.getByLabelText("المبلغ المحصل"), { target: { value: "250" } });
     fireEvent.click(screen.getByRole("button", { name: "حفظ الزيارة" }));
-    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ customerId: 12, technicianName: "أحمد", collectedAmount: 25000, collectedCurrency: "SAR" }));
+    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ customerId: 12, technicianName: "أحمد", visitResult: "تم تغيير الشمعات", collectedAmount: 25000, collectedCurrency: "SAR" }));
   });
 
   it("يرسل خيار الفرز حسب أقرب موعد إلى قائمة العملاء", () => {

@@ -58,6 +58,7 @@ const customerCreateInput = customerInput.extend({
   firstVisitDate: z.date().optional(),
   firstTechnicianName: z.string().trim().max(160).optional().nullable(),
   firstVisitNotes: z.string().trim().max(2000).optional().nullable(),
+  firstVisitResult: z.string().trim().max(2000).optional().nullable(),
   firstCollectedAmount: z.number().int().nonnegative().optional().default(0),
   firstCollectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
 });
@@ -67,6 +68,7 @@ const visitInput = z.object({
   visitType: z.enum(visitTypes),
   visitDate: z.date(),
   technicianName: z.string().trim().max(160).optional().nullable(),
+  visitResult: z.string().trim().max(2000).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
   collectedAmount: z.number().int().nonnegative().optional().default(0),
   collectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
@@ -570,7 +572,7 @@ export const filterManagementRouter = router({
         )).limit(1);
         if (existing[0]) return { id: existing[0].id, alreadySynced: true };
       }
-      const { clientOperationId, firstVisitType, firstVisitDate, firstTechnicianName, firstVisitNotes, firstCollectedAmount, firstCollectedCurrency, ...data } = input;
+      const { clientOperationId, firstVisitType, firstVisitDate, firstTechnicianName, firstVisitResult, firstVisitNotes, firstCollectedAmount, firstCollectedCurrency, ...data } = input;
       const existingNames = await db.select({ id: customers.id, name: customers.name }).from(customers).where(eq(customers.ownerId, ctx.user.id)).limit(100000);
       if (existingNames.some(customer => normalizeCustomerName(customer.name) === normalizeCustomerName(data.name))) {
         throw new TRPCError({ code: "CONFLICT", message: "اسم العميل موجود بالفعل، استخدم اسمًا مختلفًا." });
@@ -586,7 +588,7 @@ export const filterManagementRouter = router({
         return { id: customerId, alreadySynced: false, firstVisitCreated: false };
       }
       const visitDate = firstVisitDate ?? new Date();
-      const visitResult = await db.insert(visits).values({ customerId, ownerId: ctx.user.id, visitType: firstVisitType, visitDate, technicianName: firstTechnicianName ?? null, notes: firstVisitNotes ?? null });
+      const visitResult = await db.insert(visits).values({ customerId, ownerId: ctx.user.id, visitType: firstVisitType, visitDate, technicianName: firstTechnicianName ?? null, visitResult: firstVisitResult ?? null, notes: firstVisitNotes ?? null });
       const visitId = Number(visitResult[0].insertId);
       if (needsAutomaticReminder(firstVisitType)) {
         await db.insert(reminders).values({ customerId, visitId, ownerId: ctx.user.id, reminderDate: followUpDate(visitDate) });

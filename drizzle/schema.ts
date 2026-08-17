@@ -68,6 +68,7 @@ export const visits = mysqlTable(
     visitDate: timestamp("visitDate").notNull(),
     technicianName: varchar("technicianName", { length: 160 }),
     notes: text("notes"),
+    visitResult: text("visitResult"),
     clientOperationId: varchar("clientOperationId", { length: 64 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
