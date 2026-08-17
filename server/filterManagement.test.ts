@@ -164,15 +164,23 @@ describe("واجهات إدارة فلاتر المياه", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-01T09:00:00.000Z"));
     const customersRows = [
-      { id: 7, ownerId: 1, name: "عميل بموعد", phone: "01000000000", address: null, latitude: null, longitude: null, notes: null },
-      { id: 8, ownerId: 1, name: "عميل بلا موعد", phone: "01111111111", address: null, latitude: null, longitude: null, notes: null },
+      { id: 7, ownerId: 1, name: "عميل موعد اليوم", phone: "01000000000", address: null, latitude: null, longitude: null, notes: null, createdAt: new Date("2026-01-01T09:00:00.000Z"), updatedAt: new Date("2026-01-01T09:00:00.000Z") },
+      { id: 8, ownerId: 1, name: "عميل بلا موعد", phone: "01111111111", address: null, latitude: null, longitude: null, notes: null, createdAt: new Date("2026-01-02T09:00:00.000Z"), updatedAt: new Date("2026-01-02T09:00:00.000Z") },
+      { id: 9, ownerId: 1, name: "عميل خلال خمسة أيام", phone: "01222222222", address: null, latitude: null, longitude: null, notes: null, createdAt: new Date("2026-01-03T09:00:00.000Z"), updatedAt: new Date("2026-01-03T09:00:00.000Z") },
+      { id: 10, ownerId: 1, name: "عميل بعد خمسة أيام", phone: "01333333333", address: null, latitude: null, longitude: null, notes: null, createdAt: new Date("2026-01-04T09:00:00.000Z"), updatedAt: new Date("2026-01-04T09:00:00.000Z") },
+      { id: 11, ownerId: 1, name: "عميل متأخر", phone: "01444444444", address: null, latitude: null, longitude: null, notes: null, createdAt: new Date("2026-01-05T09:00:00.000Z"), updatedAt: new Date("2026-01-05T09:00:00.000Z") },
     ];
     const db = {
       select: () => ({
         from: (table: unknown) => ({
           where: () => {
             if (table === customers) return { orderBy: async () => customersRows };
-            if (table === visits) return { orderBy: async () => [{ id: 55, ownerId: 1, customerId: 7, visitType: "installation" as const, visitDate: new Date("2026-01-01T09:00:00.000Z") }] };
+            if (table === visits) return { orderBy: async () => [
+              { id: 55, ownerId: 1, customerId: 7, visitType: "installation" as const, visitDate: new Date("2026-01-01T09:00:00.000Z") },
+              { id: 56, ownerId: 1, customerId: 9, visitType: "installation" as const, visitDate: new Date("2026-01-06T09:00:00.000Z") },
+              { id: 57, ownerId: 1, customerId: 10, visitType: "installation" as const, visitDate: new Date("2026-01-07T09:00:00.000Z") },
+              { id: 58, ownerId: 1, customerId: 11, visitType: "installation" as const, visitDate: new Date("2025-12-31T09:00:00.000Z") },
+            ] };
             return [];
           },
         }),
@@ -182,6 +190,9 @@ describe("واجهات إدارة فلاتر المياه", () => {
     const caller = appRouter.createCaller(createContext());
     try {
       await expect(caller.filters.customers.list({ followUpStatus: "today" })).resolves.toHaveLength(1);
+      await expect(caller.filters.customers.list({ followUpStatus: "upcoming" })).resolves.toMatchObject([{ id: 7 }, { id: 9 }, { id: 11 }]);
+      await expect(caller.filters.customers.list({ followUpStatus: "upcoming" })).resolves.not.toContainEqual(expect.objectContaining({ id: 10 }));
+      await expect(caller.filters.customers.list({ followUpStatus: "upcoming" })).resolves.toContainEqual(expect.objectContaining({ id: 11 }));
       await expect(caller.filters.customers.list({ followUpStatus: "none" })).resolves.toMatchObject([{ id: 8 }]);
       await expect(caller.filters.customers.list({ followUpDate: "2026-05-01" })).resolves.toMatchObject([{ id: 7 }]);
     } finally {

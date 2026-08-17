@@ -525,7 +525,7 @@ export const filterManagementRouter = router({
             || (input.followUpStatus === "none" && !followUp)
             || (input.followUpStatus === "overdue" && Boolean(followUp && followUp.daysRemaining < 0))
             || (input.followUpStatus === "today" && Boolean(followUp && followUp.daysRemaining === 0))
-            || (input.followUpStatus === "upcoming" && Boolean(followUp && followUp.daysRemaining > 0));
+            || (input.followUpStatus === "upcoming" && Boolean(followUp && followUp.daysRemaining <= 5));
           const lastVisitDate = customer.lastVisitDate?.toISOString().slice(0, 10);
           const matchesDate = !input.followUpDate || Boolean(followUp && followUp.nextVisitDate.toISOString().slice(0, 10) === input.followUpDate);
           const matchesVisitDateFrom = !input.visitDateFrom || Boolean(lastVisitDate && lastVisitDate >= input.visitDateFrom);
