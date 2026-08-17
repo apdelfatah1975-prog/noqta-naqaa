@@ -153,7 +153,7 @@ export default function Home() {
             <ChevronLeft className="h-5 w-5 text-teal-700 opacity-0 transition group-hover:translate-x-[-2px] group-hover:opacity-100" />
           </button>
         ))}
-        <button type="button" onClick={() => setLocation("/settings")} className="soft-card group flex min-w-0 items-center gap-3 border border-rose-100 bg-rose-50/70 p-4 text-right transition hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2" aria-label="فتح سلة المحذوفات">
+        <button type="button" onClick={() => setLocation("/settings?section=trash")} className="soft-card group flex min-w-0 items-center gap-3 border border-rose-100 bg-rose-50/70 p-4 text-right transition hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2" aria-label="فتح سلة المحذوفات">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-900/10"><Trash2 className="h-5 w-5" /></div>
           <div className="min-w-0 flex-1"><p className="text-sm font-extrabold text-rose-950">سلة المحذوفات</p><p className="mt-1 line-clamp-1 text-[11px] font-semibold text-rose-800">العناصر المحذوفة</p></div>
           <span className="rounded-full bg-white px-2.5 py-1 text-sm font-extrabold text-rose-700 shadow-sm">{trashCount.toLocaleString("ar-SA")}</span>

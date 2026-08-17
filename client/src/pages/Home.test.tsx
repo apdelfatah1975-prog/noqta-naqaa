@@ -101,6 +101,6 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     expect(trashButton.textContent).toContain("سلة المحذوفات");
     expect(trashButton.textContent).toContain("٢");
     fireEvent.click(trashButton);
-    expect(mocks.setLocation).toHaveBeenCalledWith("/settings");
+    expect(mocks.setLocation).toHaveBeenCalledWith("/settings?section=trash");
   });
 });
