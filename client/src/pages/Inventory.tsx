@@ -121,13 +121,13 @@ export default function Inventory() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.05fr_1fr_1.35fr]">
-        <InventoryDecisionCard tone="teal" icon={<Boxes className="h-5 w-5" />} label="الرصيد الجاهز" value={inventoryStats.currentBalance.toLocaleString("ar-SA")} detail={`متاح من ${inventoryStats.totalItems.toLocaleString("ar-SA")} أصناف`} />
-        <InventoryDecisionCard tone={inventoryStats.lowStock ? "amber" : "green"} icon={<AlertTriangle className="h-5 w-5" />} label="يحتاج شراء" value={inventoryStats.lowStock.toLocaleString("ar-SA")} detail={inventoryStats.lowStock ? lowStockItems.map(item => item.name).join("، ") : "كل الأصناف فوق حد التنبيه"} />
-        <article className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold text-sky-900/70">حركة المخزن</p><p className="mt-1 text-sm font-extrabold text-sky-950">الوارد والمنصرف</p></div><span className="rounded-xl bg-white p-2 text-sky-700"><ArrowDownLeft className="h-5 w-5" /></span></div>
-          <div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-xl bg-white/80 p-3"><p className="text-[11px] font-bold text-teal-700">وارد</p><p className="mt-1 text-xl font-black text-teal-900">{inventoryStats.incoming.toLocaleString("ar-SA")}</p></div><div className="rounded-xl bg-white/80 p-3"><p className="text-[11px] font-bold text-amber-700">منصرف</p><p className="mt-1 text-xl font-black text-amber-900">{inventoryStats.outgoing.toLocaleString("ar-SA")}</p></div></div>
-        </article>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-teal-100 bg-white px-4 py-3 text-sm shadow-sm">
+        <span className="font-bold text-teal-950">ملخص المخزن</span>
+        <span className="text-slate-600">الأصناف: <strong className="text-teal-800">{inventoryStats.totalItems.toLocaleString("ar-SA")}</strong></span>
+        <span className="text-slate-600">الرصيد: <strong className="text-teal-800">{inventoryStats.currentBalance.toLocaleString("ar-SA")}</strong></span>
+        <span className={inventoryStats.lowStock ? "text-amber-700" : "text-emerald-700"}>يحتاج شراء: <strong>{inventoryStats.lowStock.toLocaleString("ar-SA")}</strong></span>
+        <span className="text-slate-600">الوارد: <strong className="text-teal-800">{inventoryStats.incoming.toLocaleString("ar-SA")}</strong></span>
+        <span className="text-slate-600">المنصرف: <strong className="text-amber-800">{inventoryStats.outgoing.toLocaleString("ar-SA")}</strong></span>
       </div>
 
       <section className="soft-card overflow-hidden">
