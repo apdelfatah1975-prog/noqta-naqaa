@@ -203,13 +203,13 @@ describe("ترابط تعديل بيانات العميل", () => {
       isError: false,
     });
     render(<Customers />);
-    fireEvent.click(screen.getByRole("button", { name: "متأخر" }));
+    fireEvent.click(screen.getByRole("button", { name: "عرض متأخر" }));
     expect(screen.getByText("العملاء المتأخرون: 2")).toBeTruthy();
   });
 
   it("يرسل حالة المتابعة من الفلتر السريع إلى قائمة العملاء", () => {
     render(<Customers />);
-    fireEvent.click(screen.getByRole("button", { name: "متأخر" }));
+    fireEvent.click(screen.getByRole("button", { name: "عرض متأخر" }));
     const latestInput = mocks.list.mock.calls.at(-1)?.[0];
     expect(latestInput.followUpStatus).toBe("overdue");
     expect(latestInput.visitDateFrom).toBeUndefined();
