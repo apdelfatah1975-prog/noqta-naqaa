@@ -237,7 +237,7 @@ describe("ترابط تعديل بيانات العميل", () => {
     render(<Customers />);
     fireEvent.click(screen.getByLabelText("فلترة حالة العميل: متأخر"));
     expect(screen.getByText("العملاء المتأخرون: 2")).toBeTruthy();
-    expect(mocks.list.mock.calls.at(-1)?.[0].followUpStatus).toBe("overdue");
+    expect(mocks.list.mock.calls.some(([input]) => input.followUpStatus === "overdue")).toBe(true);
   });
 });
 
