@@ -936,12 +936,53 @@ export const filterManagementRouter = router({
     createItem: adminProcedure.input(inventoryItemInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       if (input.clientOperationId) {
-        const existing = await db.select({ id: inventoryItems.id }).from(inventoryItems).where(and(eq(inventoryItems.ownerId, ctx.user.id), eq(inventoryItems.clientOperationId, input.clientOperationId))).limit(1);
-        if (existing[0]) return { id: existing[0].id };
+        const existingOperation = await db.select({ id: inventoryItems.id }).from(inventoryItems).where(and(eq(inventoryItems.ownerId, ctx.user.id), eq(inventoryItems.clientOperationId, input.clientOperationId))).limit(1);
+        if (existingOperation[0]) return { id: existingOperation[0].id, merged: false, duplicate: false };
+        const existingMovement = await db.select({ id: inventoryMovements.id, inventoryItemId: inventoryMovements.inventoryItemId }).from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ctx.user.id), eq(inventoryMovements.clientOperationId, input.clientOperationId))).limit(1);
+        if (existingMovement[0]) return { id: existingMovement[0].inventoryItemId, movementId: existingMovement[0].id, merged: true, duplicate: true };
       }
-      const result = await db.insert(inventoryItems).values({ ...input, ownerId: ctx.user.id });
+
+      const normalizedName = input.name.trim();
+      const duplicate = await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ctx.user.id), eq(inventoryItems.name, normalizedName))).limit(1);
+      if (duplicate[0]) {
+        if (input.openingQuantity <= 0) {
+          await refreshOwnerBackup(ctx.user.id);
+          return { id: duplicate[0].id, merged: true, duplicate: true, movementId: null };
+        }
+        const movementDate = new Date();
+        const movementResult = await db.insert(inventoryMovements).values({
+          ownerId: ctx.user.id,
+          inventoryItemId: duplicate[0].id,
+          movementType: "incoming",
+          quantity: input.openingQuantity,
+          unitCost: input.defaultUnitCost,
+          currency: "SAR",
+          movementDate,
+          notes: input.notes || `إضافة وارد للصنف الموجود: ${normalizedName}`,
+          clientOperationId: input.clientOperationId,
+        });
+        const movementId = Number(movementResult[0].insertId);
+        if (input.defaultUnitCost > 0) {
+          await db.insert(cashTransactions).values({
+            ownerId: ctx.user.id,
+            transactionType: "expense",
+            currency: "SAR",
+            amount: input.openingQuantity * input.defaultUnitCost,
+            category: `شراء مخزون - ${duplicate[0].name}`,
+            transactionDate: movementDate,
+            sourceInventoryMovementId: movementId,
+            recipientName: "مشتريات",
+            notes: input.notes || `شراء ${input.openingQuantity} من ${duplicate[0].name}`,
+          });
+        }
+        await refreshOwnerBackup(ctx.user.id);
+        return { id: duplicate[0].id, movementId, merged: true, duplicate: true };
+      }
+
+      const result = await db.insert(inventoryItems).values({ ...input, name: normalizedName, ownerId: ctx.user.id });
+      const itemId = Number(result[0].insertId);
       await refreshOwnerBackup(ctx.user.id);
-      return { id: Number(result[0].insertId) };
+      return { id: itemId, merged: false, duplicate: false };
     }),
     updateAppearance: adminProcedure.input(inventoryAppearanceInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
