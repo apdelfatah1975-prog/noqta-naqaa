@@ -45,11 +45,9 @@ export default function Visits() {
   const selectedVisit: VisitRow | null = deleteId === null ? null : (rows.find(visit => visit.id === deleteId) ?? null);
 
   return <div className="-mx-4 -mt-2 w-[calc(100%+2rem)] max-w-none space-y-4 px-0 sm:-mx-6 sm:w-[calc(100%+3rem)] lg:-mx-8 lg:w-[calc(100%+4rem)]">
-    <header className="overflow-hidden rounded-3xl bg-gradient-to-l from-teal-950 via-teal-900 to-cyan-800 p-5 text-white shadow-lg shadow-teal-950/10 sm:p-7">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div><span className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-bold">متابعة العمل اليومية</span><h1 className="mt-3 text-3xl font-black tracking-tight">سجل الزيارات</h1><p className="mt-2 max-w-2xl text-sm leading-7 text-teal-50/85">كل زيارة في جدول واضح، بتفاصيل سهلة للمراجعة والرجوع إلى ملف العميل.</p></div>
-        <div className="grid grid-cols-2 gap-2 text-center text-xs font-bold sm:min-w-64"><div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3"><p className="text-2xl font-black">{rows.length.toLocaleString("ar-SA")}</p><p className="mt-1 text-teal-50/75">زيارة ظاهرة</p></div><div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3"><p className="text-2xl font-black">{online ? "متصل" : "دون نت"}</p><p className="mt-1 text-teal-50/75">حالة البيانات</p></div></div>
-      </div>
+    <header className="soft-card flex flex-col gap-3 border-teal-100 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div><div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-teal-100 text-teal-800"><ClipboardList className="h-5 w-5" /></span><div><p className="text-xs font-bold text-teal-700">متابعة العمل اليومية</p><h1 className="text-2xl font-black tracking-tight text-teal-950">سجل الزيارات</h1></div></div><p className="mt-2 text-sm text-muted-foreground">راجع الزيارات وابحث فيها بسرعة من جدول واحد.</p></div>
+      <div className="flex items-center gap-2 self-start sm:self-center"><span className="rounded-xl bg-teal-50 px-3 py-2 text-sm font-black text-teal-800">{rows.length.toLocaleString("ar-SA")} زيارة</span><span className={`rounded-xl px-3 py-2 text-sm font-bold ${online ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{online ? "متصل" : "دون نت"}</span></div>
     </header>
 
     <div className="grid gap-3 sm:grid-cols-3">
