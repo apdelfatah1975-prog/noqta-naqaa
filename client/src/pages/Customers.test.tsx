@@ -279,6 +279,11 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(addOrIncrementVisitItem(selected, item, 1)).toEqual(selected);
   });
 
+  it("لا يضيف صنفًا عندما يكون رصيده صفرًا", () => {
+    const item = { id: 42, name: "فلتر جامبو", currentBalance: 0 };
+    expect(addOrIncrementVisitItem([], item, 1)).toEqual([]);
+  });
+
   it("يبحث عن العميل بالاسم أو الهاتف أو الكود قبل فتح بطاقة الزيارة", () => {
     mocks.list.mockReturnValue({
       data: [
