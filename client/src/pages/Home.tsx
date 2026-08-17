@@ -5,10 +5,20 @@ import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { AppSettings, getAppSettings } from "@/lib/appSettings";
 import { getTrashItems } from "@/lib/trashBin";
 import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
-import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, CloudOff, CloudUpload, Download, Info, PackageSearch, Plus, RefreshCw, Trash2, Upload, UsersRound } from "lucide-react";
+import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, CloudOff, CloudUpload, Download, Droplets, Filter, Info, PackageSearch, Plus, Refrigerator, RefreshCw, Snowflake, Trash2, Upload, UsersRound } from "lucide-react";
 import React from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+
+function inventoryItemCode(id: number) { return `#${String(id).padStart(4, "0")}`; }
+function inventoryVisual(category?: string | null, name?: string) {
+  const value = `${category ?? ""} ${name ?? ""}`;
+  if (value.includes("مبرد") || value.includes("ثلاج")) return { icon: Refrigerator, tone: "bg-sky-100 text-sky-700", label: "مبردة" };
+  if (value.includes("قارور") || value.includes("زجاج") || value.includes("عبو")) return { icon: Droplets, tone: "bg-cyan-100 text-cyan-700", label: "قارورة" };
+  if (value.includes("فلتر") || value.includes("شمع") || value.includes("ممبرين")) return { icon: Filter, tone: "bg-teal-100 text-teal-700", label: category || "فلتر" };
+  if (value.includes("ثلج") || value.includes("تبريد")) return { icon: Snowflake, tone: "bg-indigo-100 text-indigo-700", label: category || "تبريد" };
+  return { icon: PackageSearch, tone: "bg-violet-100 text-violet-700", label: category || "صنف" };
+}
 
 const statStyles = [
   { icon: BellRing, color: "bg-amber-500", label: "مستحقون للمتابعة", key: "due", href: "/reminders" },
@@ -200,7 +210,7 @@ export default function Home() {
           <div><h2 className="font-extrabold">حالة المخزن</h2><p className="mt-1 text-xs text-muted-foreground">{data?.inventory.lowStockCount ? `${data.inventory.lowStockCount} أصناف تحتاج مراجعة الرصيد` : "الأرصدة المتاحة قيد المتابعة"}</p></div>
           <Button variant="outline" onClick={() => setLocation("/inventory")} className="rounded-xl border-teal-700/20 text-teal-800 hover:bg-teal-50"><PackageSearch className="ml-2 h-4 w-4" />إدارة المخزن</Button>
         </div>
-        {isLoading ? <EmptyRow text="جارٍ تحميل أسماء الأصناف…" /> : data?.inventory.items?.length ? <div className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between gap-3"><p className="text-xs font-bold text-muted-foreground">الأصناف الموجودة داخل المخزن</p><span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-extrabold text-violet-700">{data.inventory.totalItems} صنف</span></div><div className="flex flex-wrap gap-2">{data.inventory.items.slice(0, 8).map(item => <span key={item.id} className="rounded-lg bg-teal-50 px-2.5 py-1.5 text-xs font-bold text-teal-800">{item.name}</span>)}{data.inventory.items.length > 8 ? <span className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-600">+{data.inventory.items.length - 8} أصناف أخرى</span> : null}</div></div> : <EmptyRow text="لا توجد أصناف مسجلة في المخزن." />}
+        {isLoading ? <EmptyRow text="جارٍ تحميل أسماء الأصناف…" /> : data?.inventory.items?.length ? <div className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between gap-3"><p className="text-xs font-bold text-muted-foreground">الأصناف الموجودة داخل المخزن</p><span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-extrabold text-violet-700">{data.inventory.totalItems} صنف</span></div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{data.inventory.items.slice(0, 8).map(item => { const visual = inventoryVisual(undefined, item.name); const Icon = visual.icon; return <div key={item.id} className="flex min-w-0 items-center gap-2 rounded-xl border border-teal-100 bg-white/80 px-2.5 py-2 shadow-sm"><div className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${visual.tone}`}><Icon className="h-4 w-4" /></div><div className="min-w-0"><p className="truncate text-xs font-extrabold text-teal-950" title={item.name}>{item.name}</p><p className="mt-0.5 text-[10px] font-bold text-teal-700">{inventoryItemCode(item.id)} · الرصيد {item.currentBalance}</p></div></div>; })}{data.inventory.items.length > 8 ? <div className="flex items-center justify-center rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">+{data.inventory.items.length - 8} أصناف أخرى</div> : null}</div></div> : <EmptyRow text="لا توجد أصناف مسجلة في المخزن." />}
       </section>
 
       <section className="soft-card overflow-hidden border border-sky-200/70 bg-gradient-to-l from-sky-50/80 to-white">
