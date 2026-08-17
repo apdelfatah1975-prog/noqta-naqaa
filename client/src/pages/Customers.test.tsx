@@ -79,10 +79,9 @@ describe("ترابط تعديل بيانات العميل", () => {
       isError: false,
     });
     render(<Customers />);
-    expect(screen.getByLabelText("موعد متابعة العميل قريب وهو اليوم")).toBeTruthy();
-    expect(screen.getByLabelText("العميل متأخر عن موعد المتابعة")).toBeTruthy();
-    expect(screen.getByLabelText("موعد متابعة العميل قريب")).toBeTruthy();
-    expect(screen.getByLabelText("تمت متابعة العميل ولا توجد متابعة مستحقة حاليًا")).toBeTruthy();
+    expect(screen.getAllByLabelText("فلترة حالة العميل: قريب")).toHaveLength(2);
+    expect(screen.getByLabelText("فلترة حالة العميل: متأخر")).toBeTruthy();
+    expect(screen.getByLabelText("فلترة حالة العميل: منتظم")).toBeTruthy();
   });
 
   it("يفتح بطاقة تسجيل الزيارة مباشرة من بطاقة العميل ويُبقي السجل مستقلًا", () => {
@@ -214,6 +213,21 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(latestInput.followUpStatus).toBe("overdue");
     expect(latestInput.visitDateFrom).toBeUndefined();
     expect(latestInput.collectedAmountMin).toBeUndefined();
+  });
+
+  it("يفعّل فلتر الحالة عند النقر على أيقونة العميل", () => {
+    mocks.list.mockReturnValue({
+      data: [
+        { id: 12, name: "عميل متأخر", phone: "01000000000", address: "العنوان", customerCode: "C-000012", followUp: { nextVisitDate: new Date("2026-08-10T09:00:00Z"), daysRemaining: -2 } },
+        { id: 13, name: "عميل منتظم", phone: "01000000001", address: "العنوان", customerCode: "C-000013", followUp: { nextVisitDate: new Date("2026-09-10T09:00:00Z"), daysRemaining: 26 } },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+    render(<Customers />);
+    fireEvent.click(screen.getByLabelText("فلترة حالة العميل: متأخر"));
+    expect(screen.getByText("العملاء المتأخرون: 2")).toBeTruthy();
+    expect(mocks.list.mock.calls.at(-1)?.[0].followUpStatus).toBe("overdue");
   });
 });
 

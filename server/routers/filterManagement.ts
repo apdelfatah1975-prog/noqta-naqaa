@@ -475,7 +475,7 @@ export const filterManagementRouter = router({
   customers: router({
     list: protectedProcedure.input(z.object({
       search: z.string().trim().max(160).optional(),
-      followUpStatus: z.enum(["all", "overdue", "today", "upcoming", "none"]).default("all"),
+      followUpStatus: z.enum(["all", "overdue", "today", "upcoming", "regular", "none"]).default("all"),
       followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       visitDateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       visitDateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -525,7 +525,8 @@ export const filterManagementRouter = router({
             || (input.followUpStatus === "none" && !followUp)
             || (input.followUpStatus === "overdue" && Boolean(followUp && followUp.daysRemaining < 0))
             || (input.followUpStatus === "today" && Boolean(followUp && followUp.daysRemaining === 0))
-            || (input.followUpStatus === "upcoming" && Boolean(followUp && followUp.daysRemaining <= 5));
+            || (input.followUpStatus === "upcoming" && Boolean(followUp && followUp.daysRemaining <= 5))
+            || (input.followUpStatus === "regular" && Boolean(followUp && followUp.daysRemaining > 5));
           const lastVisitDate = customer.lastVisitDate?.toISOString().slice(0, 10);
           const matchesDate = !input.followUpDate || Boolean(followUp && followUp.nextVisitDate.toISOString().slice(0, 10) === input.followUpDate);
           const matchesVisitDateFrom = !input.visitDateFrom || Boolean(lastVisitDate && lastVisitDate >= input.visitDateFrom);
