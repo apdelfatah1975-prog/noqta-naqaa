@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import Customers, { buildPartsConfirmation } from "./Customers";
+import Customers, { addOrIncrementVisitItem, buildPartsConfirmation } from "./Customers";
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -97,6 +97,26 @@ describe("ترابط تعديل بيانات العميل", () => {
     fireEvent.click(screen.getByRole("button", { name: "إضافة عميل" }));
     expect(screen.getByText("قطع الغيار والأصناف المستخدمة")).toBeTruthy();
     expect(screen.getByRole("button", { name: "إضافة صنف" })).toBeTruthy();
+  });
+
+  it("يجمع عدة أصناف مختلفة داخل زيارة واحدة دون استبدال الصنف السابق", () => {
+    const catalog = [
+      { id: 1, name: "فلتر جامبو" },
+      { id: 2, name: "قارورة" },
+      { id: 3, name: "مبردة" },
+    ];
+    let items: Array<{ inventoryItemId: number; quantity: number; source: "default" | "manual" }> = [];
+    for (const item of catalog) items = addOrIncrementVisitItem(items, item);
+    expect(items).toEqual([
+      { inventoryItemId: 1, quantity: 1, source: "manual" },
+      { inventoryItemId: 2, quantity: 1, source: "manual" },
+      { inventoryItemId: 3, quantity: 1, source: "manual" },
+    ]);
+    expect(addOrIncrementVisitItem(items, catalog[1], 2)).toEqual([
+      { inventoryItemId: 1, quantity: 1, source: "manual" },
+      { inventoryItemId: 2, quantity: 3, source: "manual" },
+      { inventoryItemId: 3, quantity: 1, source: "manual" },
+    ]);
   });
 
   it("يعرض اسم الصنف والكمية في رسالة تأكيد الخصم", () => {
