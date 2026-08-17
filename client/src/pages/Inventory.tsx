@@ -129,7 +129,7 @@ export default function Inventory() {
   function submitMovement(event: FormEvent) {
     event.preventDefault();
     if (!movementItem) return;
-    const input = { inventoryItemId: movementItem.id, movementType, quantity: Number(quantity), unitCost: movementType === "incoming" ? Number(unitCost || 0) : 0, currency: movementCurrency, movementDate: new Date(movementDate), technicianName: technicianName || null, notes: movementNotes || null };
+    const input = { inventoryItemId: movementItem.id, movementType, quantity: Number(quantity), unitCost: movementType === "incoming" ? Math.round(Number(unitCost || 0) * 100) : 0, currency: movementCurrency, movementDate: new Date(movementDate), technicianName: technicianName || null, notes: movementNotes || null };
     if (!navigator.onLine && owner) {
       queueOfflineInventoryMovement(owner.id, { ...input, movementDate: input.movementDate.toISOString() });
       const current = data as any;

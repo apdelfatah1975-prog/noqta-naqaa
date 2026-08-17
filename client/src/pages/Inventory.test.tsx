@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   summary: vi.fn(),
   createItem: vi.fn(),
   createMovement: vi.fn(),
+  movementMutate: vi.fn(),
   deleteItem: vi.fn(),
   deleteMovement: vi.fn(),
   invalidate: vi.fn(),
@@ -37,7 +38,8 @@ vi.mock("@/lib/trpc", () => ({
 describe("تفاصيل المنصرف في المخزون", () => {
   beforeEach(() => {
     mocks.createItem.mockReturnValue({ mutate: vi.fn(), isPending: false });
-    mocks.createMovement.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    mocks.movementMutate.mockReset();
+    mocks.createMovement.mockReturnValue({ mutate: mocks.movementMutate, isPending: false });
     mocks.deleteItem.mockReturnValue({ mutate: vi.fn(), isPending: false });
     mocks.deleteMovement.mockReturnValue({ mutate: vi.fn(), isPending: false });
     mocks.summary.mockReturnValue({
@@ -85,6 +87,18 @@ describe("تفاصيل المنصرف في المخزون", () => {
   it("يعرض مسار إضافة الوارد للصنف الموجود لتحديث رصيده", () => {
     render(<Inventory />);
     expect(screen.getAllByRole("button", { name: "إضافة وارد" }).length).toBeGreaterThan(0);
+  });
+
+  it("يحوّل سعر قطعة الوارد إلى إجمالي صحيح قبل إرساله للخادم", () => {
+    render(<Inventory />);
+    fireEvent.click(screen.getAllByRole("button", { name: "إضافة وارد" })[0]);
+    const dialog = within(screen.getByRole("dialog"));
+    const numberInputs = dialog.getAllByRole("spinbutton");
+    fireEvent.change(numberInputs[0], { target: { value: "10" } });
+    fireEvent.change(numberInputs[1], { target: { value: "50" } });
+    expect(dialog.getByText("إجمالي الخصم المتوقع: 500.00")).toBeTruthy();
+    fireEvent.click(dialog.getByRole("button", { name: "حفظ الحركة" }));
+    expect(mocks.movementMutate).toHaveBeenCalledWith(expect.objectContaining({ quantity: 10, unitCost: 5000 }));
   });
 
   it("ينقل بطاقة الصنف إلى صفها ويظلله بالبرتقالي", async () => {
