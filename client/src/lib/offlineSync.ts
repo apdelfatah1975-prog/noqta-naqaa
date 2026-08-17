@@ -193,7 +193,18 @@ export function getPendingCustomers(ownerId: number) {
   return readJson<PendingCustomer[]>(queueKey(CUSTOMER_QUEUE_PREFIX, ownerId), []);
 }
 
+function normalizeCustomerName(name: string) {
+  return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("ar");
+}
+
+export function hasOfflineCustomerName(name: string, excludeId?: number) {
+  const normalizedName = normalizeCustomerName(name);
+  return getOfflineCustomers().some(customer => customer.id !== excludeId && normalizeCustomerName(customer.name) === normalizedName)
+    || getPendingCustomers(getOfflineSession()?.id ?? 0).some(customer => customer.localId !== excludeId && normalizeCustomerName(customer.name) === normalizedName);
+}
+
 export function queueOfflineCustomer(ownerId: number, customer: Omit<OfflineCustomer, "id"> & Partial<Omit<PendingCustomer, "localId" | "clientOperationId" | "createdAt">>) {
+  if (hasOfflineCustomerName(customer.name)) throw new Error("اسم العميل موجود بالفعل، استخدم اسمًا مختلفًا.");
   const pending: PendingCustomer = {
     ...customer,
     localId: -Date.now(),

@@ -192,6 +192,20 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(mocks.remindersInvalidate).toHaveBeenCalled();
   });
 
+  it("يعرض عدد العملاء المطابقين بعد اختيار حالة المتابعة", () => {
+    mocks.list.mockReturnValue({
+      data: [
+        { id: 12, name: "عميل متأخر", phone: "01000000000", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000012", followUp: { nextVisitDate: new Date("2026-08-10T09:00:00Z"), daysRemaining: -5 } },
+        { id: 13, name: "عميل متأخر آخر", phone: "01000000001", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000013", followUp: { nextVisitDate: new Date("2026-08-11T09:00:00Z"), daysRemaining: -4 } },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+    render(<Customers />);
+    fireEvent.click(screen.getByRole("button", { name: "متأخر" }));
+    expect(screen.getByText("العملاء المتأخرون: 2")).toBeTruthy();
+  });
+
   it("يرسل حالة المتابعة من الفلتر السريع إلى قائمة العملاء", () => {
     render(<Customers />);
     fireEvent.click(screen.getByRole("button", { name: "متأخر" }));

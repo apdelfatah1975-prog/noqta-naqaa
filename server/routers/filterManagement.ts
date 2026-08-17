@@ -49,6 +49,10 @@ const customerInput = z.object({
   collectedAmount: z.number().int().nonnegative().optional().nullable(),
 });
 
+function normalizeCustomerName(name: string) {
+  return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("ar");
+}
+
 const customerCreateInput = customerInput.extend({
   firstVisitType: z.enum(visitTypes).optional(),
   firstVisitDate: z.date().optional(),
@@ -567,6 +571,10 @@ export const filterManagementRouter = router({
         if (existing[0]) return { id: existing[0].id, alreadySynced: true };
       }
       const { clientOperationId, firstVisitType, firstVisitDate, firstTechnicianName, firstVisitNotes, firstCollectedAmount, firstCollectedCurrency, ...data } = input;
+      const existingNames = await db.select({ id: customers.id, name: customers.name }).from(customers).where(eq(customers.ownerId, ctx.user.id)).limit(100000);
+      if (existingNames.some(customer => normalizeCustomerName(customer.name) === normalizeCustomerName(data.name))) {
+        throw new TRPCError({ code: "CONFLICT", message: "اسم العميل موجود بالفعل، استخدم اسمًا مختلفًا." });
+      }
       if (data.manualCode) {
         const duplicate = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.ownerId, ctx.user.id), eq(customers.manualCode, data.manualCode))).limit(1);
         if (duplicate[0]) throw new TRPCError({ code: "CONFLICT", message: "كود العميل مستخدم بالفعل، اختر كودًا مختلفًا." });
@@ -595,6 +603,10 @@ export const filterManagementRouter = router({
       const db = await databaseOrThrow();
       const customer = await getOwnedCustomer(ctx.user.id, input.id);
       const { id, serviceDate, collectedAmount, pin: _pin, ...data } = input;
+      const existingNames = await db.select({ id: customers.id, name: customers.name }).from(customers).where(and(eq(customers.ownerId, ctx.user.id), ne(customers.id, id))).limit(100000);
+      if (existingNames.some(customer => normalizeCustomerName(customer.name) === normalizeCustomerName(data.name))) {
+        throw new TRPCError({ code: "CONFLICT", message: "اسم العميل موجود بالفعل، استخدم اسمًا مختلفًا." });
+      }
       if (data.manualCode) {
         const duplicate = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.ownerId, ctx.user.id), eq(customers.manualCode, data.manualCode), ne(customers.id, id))).limit(1);
         if (duplicate[0]) throw new TRPCError({ code: "CONFLICT", message: "كود العميل مستخدم بالفعل، اختر كودًا مختلفًا." });

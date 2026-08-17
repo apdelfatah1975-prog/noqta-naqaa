@@ -13,6 +13,7 @@ import {
   getPendingVisits,
   getPendingVisitDeletes,
   queueOfflineCustomer,
+  hasOfflineCustomerName,
   queueOfflineVisit,
   rememberOfflineSession,
   removePendingVisit,
@@ -42,6 +43,14 @@ describe("التخزين المحلي للمزامنة", () => {
 
     expect(getPendingCustomers(5)).toEqual([expect.objectContaining({ clientOperationId: pending.clientOperationId, name: "عميل دون اتصال" })]);
     expect(getOfflineCustomers()).toEqual([expect.objectContaining({ id: pending.localId, name: "عميل دون اتصال" })]);
+  });
+
+  it("يرفض اسم العميل المكرر محليًا حتى مع اختلاف المسافات والحروف", () => {
+    rememberOfflineSession({ id: 5, name: "مدير", email: "manager@example.com", openId: "owner-5", role: "admin" });
+    cacheOfflineCustomers([{ id: 8, name: "أحمد محمد", phone: "01000000000" }]);
+
+    expect(hasOfflineCustomerName(" أحمد   محمد ")).toBe(true);
+    expect(() => queueOfflineCustomer(5, { name: "أحمد محمد", phone: "01011111111", address: null, latitude: null, longitude: null, notes: null })).toThrow("اسم العميل موجود بالفعل");
   });
 
   it("يضع الزيارة في طابور الحساب ثم يزيلها بعد تأكيد المزامنة", () => {
