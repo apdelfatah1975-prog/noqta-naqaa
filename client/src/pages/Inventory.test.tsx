@@ -89,7 +89,7 @@ describe("تفاصيل المنصرف في المخزون", () => {
     const dialog = within(screen.getByRole("dialog"));
     expect(dialog.getByText("نوع الصنف")).toBeTruthy();
     expect(dialog.getByText("وحدة القياس")).toBeTruthy();
-    expect(dialog.getByText("حد التنبيه")).toBeTruthy();
+    expect(dialog.getByText("الحد الأدنى للرصيد")).toBeTruthy();
     expect(dialog.queryByText("سعر الشراء الافتراضي")).toBeNull();
     expect(dialog.queryByText("سعر شراء الوحدة")).toBeNull();
   });

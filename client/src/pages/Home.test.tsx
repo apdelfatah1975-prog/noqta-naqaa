@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   backupStatus: vi.fn(),
   backupCreateNow: vi.fn(),
   setLocation: vi.fn(),
+  toastWarning: vi.fn(),
 }));
 
 vi.mock("@/lib/trpc", () => ({
@@ -29,6 +30,10 @@ vi.mock("@/components/ReminderAlertBanner", () => ({
   ReminderAlertBanner: () => null,
 }));
 
+vi.mock("sonner", () => ({
+  toast: { warning: mocks.toastWarning },
+}));
+
 vi.mock("wouter", () => ({
   useLocation: () => ["/", mocks.setLocation],
 }));
@@ -36,6 +41,8 @@ vi.mock("wouter", () => ({
 describe("بطاقة رصيد الخزينة في لوحة التحكم", () => {
   beforeEach(() => {
     mocks.setLocation.mockReset();
+    mocks.toastWarning.mockReset();
+    localStorage.removeItem("purepoint-low-stock-alert");
     mocks.dashboard.mockReturnValue({
       isLoading: false,
       data: {
@@ -78,6 +85,26 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     render(<Home />);
     fireEvent.click(screen.getByRole("button", { name: "تسجيل زيارة جديدة" }));
     expect(mocks.setLocation).toHaveBeenCalledWith("/customers?visit=1");
+  });
+
+  it("تنبه المستخدم تلقائيًا عند وصول صنف إلى الحد الأدنى", () => {
+    mocks.dashboard.mockReturnValue({
+      isLoading: false,
+      data: {
+        todayVisits: [],
+        upcomingVisits: [],
+        upcomingFollowUps: [],
+        dueReminders: [],
+        inventory: {
+          totalItems: 1,
+          lowStockCount: 1,
+          lowStock: [{ id: 27, name: "فلتر جامبو", currentBalance: 2, reorderLevel: 2 }],
+          items: [{ id: 27, name: "فلتر جامبو", currentBalance: 2, reorderLevel: 2 }],
+        },
+      },
+    });
+    render(<Home />);
+    expect(mocks.toastWarning).toHaveBeenCalledWith(expect.stringContaining("فلتر جامبو"), expect.objectContaining({ description: expect.stringContaining("الحد الأدنى") }));
   });
 
   it("تنتقل بطاقة صنف المخزن إلى تفاصيل الصنف المحدد", () => {

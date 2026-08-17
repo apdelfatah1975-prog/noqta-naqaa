@@ -48,6 +48,16 @@ export default function Home() {
   const [trashCount, setTrashCount] = React.useState(() => getTrashItems().length);
   const restoreInputRef = React.useRef<HTMLInputElement>(null);
   React.useEffect(() => {
+    const lowStockItems = data?.inventory?.items?.filter(item => item.currentBalance <= (item.reorderLevel ?? 2)) ?? [];
+    if (!lowStockItems.length || typeof window === "undefined") return;
+    const signature = lowStockItems.slice(0, 8).map(item => `${item.id}:${item.currentBalance}:${item.reorderLevel ?? 2}`).join("|");
+    const storageKey = "purepoint-low-stock-alert";
+    if (window.localStorage.getItem(storageKey) === signature) return;
+    const names = lowStockItems.slice(0, 3).map(item => `${item.name} (${item.currentBalance})`).join("، ");
+    toast.warning(`تنبيه المخزن: ${names}`, { description: `يوجد ${lowStockItems.length.toLocaleString("ar-SA")} أصناف عند الحد الأدنى أو أقل. يُرجى مراجعة المخزن.` });
+    window.localStorage.setItem(storageKey, signature);
+  }, [data?.inventory?.items]);
+  React.useEffect(() => {
     const onSettingsChange = (event: Event) => setAppSettings((event as CustomEvent<AppSettings>).detail);
     window.addEventListener("purepoint-settings-changed", onSettingsChange);
     return () => window.removeEventListener("purepoint-settings-changed", onSettingsChange);
