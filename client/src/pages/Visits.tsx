@@ -4,7 +4,7 @@ import { cacheOfflineCustomers, cacheOfflineVisits, getOfflineCustomers, getOffl
 import { moveToTrash } from "@/lib/trashBin";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { trpc } from "@/lib/trpc";
-import { CalendarCheck2, ClipboardList, Search, WalletCards, X } from "lucide-react";
+import { ClipboardList, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -50,12 +50,6 @@ export default function Visits() {
       <div className="flex items-center gap-2 self-start sm:self-center"><span className="rounded-xl bg-teal-50 px-3 py-2 text-sm font-black text-teal-800">{rows.length.toLocaleString("ar-SA")} زيارة</span><span className={`rounded-xl px-3 py-2 text-sm font-bold ${online ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{online ? "متصل" : "دون نت"}</span></div>
     </header>
 
-    <div className="grid gap-3 sm:grid-cols-3">
-      <SummaryCard icon={<ClipboardList className="h-5 w-5" />} label="الزيارات الظاهرة" value={rows.length.toLocaleString("ar-SA")} tone="teal" />
-      <SummaryCard icon={<CalendarCheck2 className="h-5 w-5" />} label="بانتظار المزامنة" value={pendingVisits.length.toLocaleString("ar-SA")} tone="amber" />
-      <SummaryCard icon={<WalletCards className="h-5 w-5" />} label="إجمالي التحصيل" value={(totalCollected / 100).toLocaleString("ar-SA")} tone="sky" />
-    </div>
-
     <VisitHistory rows={rows} search={search} onSearchChange={setSearch} typeFilter={typeFilter} onTypeFilterChange={setTypeFilter} dateFrom={dateFrom} onDateFromChange={setDateFrom} dateTo={dateTo} onDateToChange={setDateTo} onClearFilters={clearFilters} onOpenCustomer={customer => setLocation(`/customers/${customer.id}`)} onDelete={visit => setDeleteId(visit.id)} />
     <PinVerificationDialog open={deleteId !== null} onOpenChange={open => { if (!open) setDeleteId(null); }} busy={deleteVisit.isPending} title="تأكيد حذف الزيارة" description="ستُنقل نسخة الزيارة إلى سلة المحذوفات قبل حذفها من السجل." onConfirm={pin => { if (!selectedVisit || !deleteId) return; moveToTrash({ entityType: "visit", entityLabel: `زيارة: ${selectedVisit.customer?.name ?? "عميل"}`, payload: selectedVisit }); if (!navigator.onLine && offlineUser) { queueOfflineDelete(offlineUser.id, { entity: "visit", id: deleteId, pin }); cacheOfflineVisits(getOfflineVisits().filter(visit => visit.id !== deleteId)); setDeleteId(null); toast.success("تم حذف الزيارة محليًا ونقل نسختها إلى السلة"); } else { deleteVisit.mutate({ id: deleteId, pin }); } }} />
   </div>;
@@ -69,11 +63,6 @@ export function filterVisitRows(rows: VisitRow[], filters: { search?: string; ty
     const date = new Date(visit.visitDate).toISOString().slice(0, 10);
     return (!search || text.includes(search)) && (!filters.type || filters.type === "all" || visit.visitType === filters.type) && (!filters.dateFrom || date >= filters.dateFrom) && (!filters.dateTo || date <= filters.dateTo);
   });
-}
-
-function SummaryCard({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone: "teal" | "amber" | "sky" }) {
-  const tones = { teal: "bg-teal-50 text-teal-800 border-teal-100", amber: "bg-amber-50 text-amber-800 border-amber-100", sky: "bg-sky-50 text-sky-800 border-sky-100" };
-  return <div className={`soft-card flex items-center gap-3 border p-4 ${tones[tone]}`}><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/80">{icon}</div><div className="min-w-0"><p className="text-xs font-bold opacity-75">{label}</p><p className="mt-1 truncate text-xl font-black">{value}</p></div></div>;
 }
 
 function VisitHistory({ rows, search, onSearchChange, typeFilter, onTypeFilterChange, dateFrom, onDateFromChange, dateTo, onDateToChange, onClearFilters, onOpenCustomer, onDelete }: { rows: VisitRow[]; search: string; onSearchChange: (value: string) => void; typeFilter: string; onTypeFilterChange: (value: string) => void; dateFrom: string; onDateFromChange: (value: string) => void; dateTo: string; onDateToChange: (value: string) => void; onClearFilters: () => void; onOpenCustomer: (customer: any) => void; onDelete: (visit: VisitRow) => void }) {
