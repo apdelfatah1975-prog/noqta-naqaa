@@ -88,7 +88,7 @@ describe("تفاصيل المنصرف في المخزون", () => {
 
   it("يعرض حقول بيانات الصنف المفيدة داخل بطاقة الإضافة", () => {
     render(<Inventory />);
-    fireEvent.click(screen.getByRole("button", { name: "إضافة صنف" }));
+    fireEvent.click(screen.getByRole("button", { name: "إضافة صنف جديد" }));
     const dialog = within(screen.getByRole("dialog"));
     expect(dialog.getByText("نوع الصنف")).toBeTruthy();
     expect(dialog.getByText("وحدة القياس")).toBeTruthy();
