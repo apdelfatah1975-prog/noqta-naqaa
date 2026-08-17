@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import React from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
+import { trpc } from "@/lib/trpc";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   BellRing,
@@ -35,7 +37,9 @@ import {
   PackageSearch,
   Settings,
   UsersRound,
+  RefreshCw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { AutomaticReminderNotifications } from "./AutomaticReminderNotifications";
@@ -91,6 +95,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const utils = trpc.useUtils();
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const visibleMenuItems = user?.role === "admin" ? menuItems : menuItems.filter(item => item.path !== "/inventory" && item.path !== "/cash" && item.path !== "/reports" && item.path !== "/technician-payroll");
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
@@ -100,6 +106,27 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     ?? menuItems[0];
   const initials = user?.name?.trim().slice(0, 1) || "م";
 
+  const refreshData = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        utils.filters.dashboard.invalidate(),
+        utils.filters.customers.list.invalidate(),
+        utils.filters.customers.get.invalidate(),
+        utils.filters.reminders.due.invalidate(),
+        utils.filters.reminders.alerts.invalidate(),
+        utils.filters.inventory.summary.invalidate(),
+        utils.filters.cash.summary.invalidate(),
+        utils.filters.notifications.nextAlert.invalidate(),
+      ]);
+      toast.success("تم تحديث البيانات المحفوظة");
+    } catch {
+      toast.error("تعذر تحديث البيانات. ستظل البيانات المحفوظة كما هي.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   return (
     <>
@@ -173,6 +200,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={refreshData}
+              disabled={isRefreshing}
+              aria-label="تحديث البيانات المحفوظة"
+              title="تحديث البيانات المحفوظة"
+              className="grid h-10 w-10 place-items-center rounded-xl border border-teal-950/8 bg-white text-teal-800 transition hover:bg-teal-50 disabled:cursor-wait disabled:opacity-60"
+            >
+              <RefreshCw className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`} />
+            </button>
             <InstallAppButton compact={isMobile} />
             {!isMobile ? (
               <button onClick={toggleSidebar} className="grid h-10 w-10 place-items-center rounded-xl border border-teal-950/8 bg-white text-teal-800 transition hover:bg-teal-50" aria-label="طي القائمة الجانبية">
