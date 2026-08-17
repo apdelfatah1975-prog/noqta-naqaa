@@ -193,51 +193,36 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(mocks.remindersInvalidate).toHaveBeenCalled();
   });
 
-  it("يعرض عدد العملاء المطابقين بعد اختيار حالة المتابعة", () => {
-    mocks.list.mockReturnValue({
-      data: [
-        { id: 12, name: "عميل متأخر", phone: "01000000000", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000012", followUp: { nextVisitDate: new Date("2026-08-10T09:00:00Z"), daysRemaining: -5 } },
-        { id: 13, name: "عميل متأخر آخر", phone: "01000000001", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000013", followUp: { nextVisitDate: new Date("2026-08-11T09:00:00Z"), daysRemaining: -4 } },
-      ],
-      isLoading: false,
-      isError: false,
-    });
+  it("لا يعرض بطاقات أو فلاتر حالات بجانب البحث", () => {
     render(<Customers />);
-    fireEvent.click(screen.getByRole("button", { name: "عرض متأخر" }));
-    expect(screen.getByText("العملاء المتأخرون: 2")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "عرض متأخر" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "عرض اليوم" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "عرض خلال ٥ أيام" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "عرض بدون موعد" })).toBeNull();
   });
 
-  it("يرسل حالة المتابعة من الفلتر السريع إلى قائمة العملاء", () => {
+  it("يستخدم كل العملاء كحالة افتراضية بعد إزالة الفلتر السريع", () => {
     render(<Customers />);
-    fireEvent.click(screen.getByRole("button", { name: "عرض متأخر" }));
     const latestInput = mocks.list.mock.calls.at(-1)?.[0];
-    expect(latestInput.followUpStatus).toBe("overdue");
-    expect(latestInput.visitDateFrom).toBeUndefined();
-    expect(latestInput.collectedAmountMin).toBeUndefined();
+    expect(latestInput.followUpStatus).toBe("all");
   });
 
-  it("يعرض بطاقات الحالات الخمس ويربط بطاقة المتأخر بفلتر العملاء", () => {
+  it("لا يعرض بطاقات الحالات بعد تبسيط صفحة العملاء", () => {
     mocks.list.mockReturnValue({
       data: [
         { id: 12, name: "عميل متأخر", phone: "01000000000", address: "العنوان", customerCode: "C-000012", followUp: { nextVisitDate: new Date("2026-08-10T09:00:00Z"), daysRemaining: -2 } },
         { id: 13, name: "عميل اليوم", phone: "01000000001", address: "العنوان", customerCode: "C-000013", followUp: { nextVisitDate: new Date("2026-08-17T09:00:00Z"), daysRemaining: 0 } },
         { id: 14, name: "عميل قريب", phone: "01000000002", address: "العنوان", customerCode: "C-000014", followUp: { nextVisitDate: new Date("2026-08-20T09:00:00Z"), daysRemaining: 3 } },
         { id: 15, name: "عميل منتظم", phone: "01000000003", address: "العنوان", customerCode: "C-000015", followUp: { nextVisitDate: new Date("2026-09-10T09:00:00Z"), daysRemaining: 26 } },
-        { id: 16, name: "عميل بدون موعد", phone: "01000000004", address: "العنوان", customerCode: "C-000016", followUp: null },
       ],
       isLoading: false,
       isError: false,
     });
     render(<Customers />);
-    expect(screen.getByRole("button", { name: "عرض متأخر" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "عرض اليوم" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "عرض خلال ٥ أيام" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "عرض متأخر" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "عرض اليوم" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "عرض خلال ٥ أيام" })).toBeNull();
     expect(screen.queryByRole("button", { name: "عرض منتظم" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "عرض بدون موعد" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "عرض اليوم" }));
-    expect(mocks.list.mock.calls.at(-1)?.[0].followUpStatus).toBe("today");
-    fireEvent.click(screen.getByRole("button", { name: "عرض متأخر" }));
-    expect(mocks.list.mock.calls.at(-1)?.[0].followUpStatus).toBe("overdue");
   });
 
   it("يفعّل فلتر الحالة عند النقر على أيقونة العميل", () => {
