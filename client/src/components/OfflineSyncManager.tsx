@@ -63,6 +63,7 @@ export function OfflineSyncManager() {
           firstVisitNotes: customer.firstVisitNotes ?? null,
           firstCollectedAmount: customer.firstCollectedAmount ?? 0,
           firstCollectedCurrency: "SAR",
+          items: customer.firstVisitItems ?? [],
           clientOperationId: customer.clientOperationId,
         });
         customerIdMap.set(customer.localId, result.id);
@@ -114,7 +115,7 @@ export function OfflineSyncManager() {
     for (const operation of getPendingInventory(user.id)) {
       try {
         if (operation.entity === "item") {
-          const result = await syncInventoryItem({ name: operation.name, openingQuantity: operation.openingQuantity, notes: operation.notes ?? null, clientOperationId: operation.clientOperationId });
+          const result = await syncInventoryItem({ name: operation.name, category: operation.category ?? "عام", unit: operation.unit ?? "قطعة", reorderLevel: operation.reorderLevel ?? 2, defaultUnitCost: operation.defaultUnitCost ?? 0, openingQuantity: operation.openingQuantity, notes: operation.notes ?? null, clientOperationId: operation.clientOperationId });
           inventoryIdMap.set(operation.localId ?? -Date.now(), result.id);
         } else if (operation.entity === "movement") {
           const inventoryItemId = inventoryIdMap.get(operation.inventoryItemId) ?? operation.inventoryItemId;

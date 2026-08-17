@@ -64,6 +64,11 @@ const customerCreateInput = customerInput.extend({
   firstVisitResult: z.string().trim().max(2000).optional().nullable(),
   firstCollectedAmount: z.number().int().nonnegative().optional().default(0),
   firstCollectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
+  items: z.array(z.object({
+    inventoryItemId: z.number().int().positive(),
+    quantity: z.number().int().positive("أدخل كمية أكبر من صفر"),
+    source: z.enum(["default", "manual"]).default("default"),
+  })).max(50).optional().default([]),
 });
 
 const visitItemInput = z.object({
@@ -584,7 +589,7 @@ export const filterManagementRouter = router({
         )).limit(1);
         if (existing[0]) return { id: existing[0].id, alreadySynced: true };
       }
-      const { clientOperationId, firstVisitType, firstVisitDate, firstTechnicianName, firstVisitResult, firstVisitNotes, firstCollectedAmount, firstCollectedCurrency, ...data } = input;
+      const { clientOperationId, firstVisitType, firstVisitDate, firstTechnicianName, firstVisitResult, firstVisitNotes, firstCollectedAmount, firstCollectedCurrency, items, ...data } = input;
       const existingNames = await db.select({ id: customers.id, name: customers.name }).from(customers).where(eq(customers.ownerId, ctx.user.id)).limit(100000);
       if (existingNames.some(customer => normalizeCustomerName(customer.name) === normalizeCustomerName(data.name))) {
         throw new TRPCError({ code: "CONFLICT", message: "اسم العميل موجود بالفعل، استخدم اسمًا مختلفًا." });
@@ -602,6 +607,21 @@ export const filterManagementRouter = router({
       const visitDate = firstVisitDate ?? new Date();
       const visitResult = await db.insert(visits).values({ customerId, ownerId: ctx.user.id, visitType: firstVisitType, visitDate, technicianName: firstTechnicianName ?? null, visitResult: firstVisitResult ?? null, notes: firstVisitNotes ?? null });
       const visitId = Number(visitResult[0].insertId);
+      const inventoryRows = items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ctx.user.id), inArray(inventoryItems.id, items.map(item => item.inventoryItemId)))) : [];
+      const inventoryById = new Map(inventoryRows.map(item => [item.id, item]));
+      for (const requested of items) {
+        const inventoryItem = inventoryById.get(requested.inventoryItemId);
+        if (!inventoryItem) throw new TRPCError({ code: "NOT_FOUND", message: "لم يتم العثور على أحد الأصناف المستخدمة." });
+        const movements = await db.select().from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ctx.user.id), eq(inventoryMovements.inventoryItemId, requested.inventoryItemId)));
+        const balance = calculateStockBalance(inventoryItem.openingQuantity, movements);
+        if (requested.quantity > balance) throw new TRPCError({ code: "BAD_REQUEST", message: `الرصيد غير كافٍ من صنف ${inventoryItem.name}؛ المتاح ${balance} والمطلوب ${requested.quantity}.` });
+      }
+      for (const requested of items) {
+        const inventoryItem = inventoryById.get(requested.inventoryItemId)!;
+        const operationId = clientOperationId ? `${clientOperationId}:${requested.inventoryItemId}`.slice(0, 64) : undefined;
+        await db.insert(visitItems).values({ ownerId: ctx.user.id, visitId, inventoryItemId: inventoryItem.id, itemNameSnapshot: inventoryItem.name, unitSnapshot: inventoryItem.unit, quantity: requested.quantity, source: requested.source, clientOperationId: operationId });
+        await db.insert(inventoryMovements).values({ ownerId: ctx.user.id, inventoryItemId: inventoryItem.id, movementType: "outgoing", quantity: requested.quantity, unitCost: inventoryItem.defaultUnitCost, currency: "SAR", movementDate: visitDate, technicianName: firstTechnicianName ?? null, notes: `منصرف تلقائي من أول زيارة للعميل ${input.name}`, clientOperationId: operationId });
+      }
       if (needsAutomaticReminder(firstVisitType)) {
         await db.insert(reminders).values({ customerId, visitId, ownerId: ctx.user.id, reminderDate: followUpDate(visitDate) });
       }

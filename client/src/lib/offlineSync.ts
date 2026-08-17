@@ -33,6 +33,7 @@ export type PendingCustomer = Omit<OfflineCustomer, "id"> & {
   firstVisitResult?: string | null;
   firstCollectedAmount?: number;
   firstCollectedCurrency?: "SAR";
+  firstVisitItems?: OfflineVisitItem[];
   localId: number;
   clientOperationId: string;
   createdAt: string;
@@ -97,6 +98,10 @@ export type PendingInventoryItem = {
   localId: number;
   clientOperationId: string;
   name: string;
+  category?: string;
+  unit?: string;
+  reorderLevel?: number;
+  defaultUnitCost?: number;
   openingQuantity: number;
   notes?: string | null;
   createdAt: string;

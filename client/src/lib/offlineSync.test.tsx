@@ -15,6 +15,8 @@ import {
   queueOfflineCustomer,
   hasOfflineCustomerName,
   queueOfflineVisit,
+  queueOfflineInventoryItem,
+  getPendingInventory,
   rememberOfflineSession,
   removePendingVisit,
   queueOfflineDelete,
@@ -43,6 +45,20 @@ describe("التخزين المحلي للمزامنة", () => {
 
     expect(getPendingCustomers(5)).toEqual([expect.objectContaining({ clientOperationId: pending.clientOperationId, name: "عميل دون اتصال" })]);
     expect(getOfflineCustomers()).toEqual([expect.objectContaining({ id: pending.localId, name: "عميل دون اتصال" })]);
+  });
+
+  it("يحافظ على أصناف الزيارة الأولى داخل طابور العميل الجديد", () => {
+    const pending = queueOfflineCustomer(5, { name: "عميل تركيب", phone: "01022222222", address: null, latitude: null, longitude: null, notes: null, firstVisitType: "installation", firstVisitItems: [{ inventoryItemId: 21, quantity: 2, source: "default" }] });
+
+    expect(getPendingCustomers(5)).toEqual([expect.objectContaining({ firstVisitType: "installation", firstVisitItems: [{ inventoryItemId: 21, quantity: 2, source: "default" }] })]);
+    expect(pending.localId).toBeLessThan(0);
+  });
+
+  it("يحفظ نوع الصنف وبياناته عند إنشاء صنف المخزن دون اتصال", () => {
+    const pending = queueOfflineInventoryItem(5, { name: "فلتر ٧ مراحل كلاسيك", category: "فلتر ٧ مراحل كلاسيك", unit: "قطعة", reorderLevel: 2, defaultUnitCost: 0, openingQuantity: 10, notes: "مقاس قياسي" });
+
+    expect(getPendingInventory(5)).toEqual([expect.objectContaining({ entity: "item", name: "فلتر ٧ مراحل كلاسيك", category: "فلتر ٧ مراحل كلاسيك", unit: "قطعة", openingQuantity: 10 })]);
+    expect(pending.clientOperationId).toBeTruthy();
   });
 
   it("يرفض اسم العميل المكرر محليًا حتى مع اختلاف المسافات والحروف", () => {

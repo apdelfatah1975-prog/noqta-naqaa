@@ -92,6 +92,13 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(screen.getByLabelText("فلترة حالة العميل: متأخر")).toBeTruthy();
   });
 
+  it("يعرض قسم قطع الغيار المستخدمة داخل حوار تسجيل عميل جديد", () => {
+    render(<Customers />);
+    fireEvent.click(screen.getByRole("button", { name: "إضافة عميل" }));
+    expect(screen.getByText("قطع الغيار والأصناف المستخدمة")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "إضافة صنف" })).toBeTruthy();
+  });
+
   it("يعرض اسم الصنف والكمية في رسالة تأكيد الخصم", () => {
     const confirmation = buildPartsConfirmation([{ inventoryItemId: 7, quantity: 2 }], [{ id: 7, name: "ممبرين" }]);
     expect(confirmation).toContain("ممبرين: 2");
@@ -243,6 +250,26 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(screen.getByRole("button", { name: /فلترة حالة العميل: متأخر/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /فلترة حالة العميل: اليوم/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /فلترة حالة العميل: خلال ٥ أيام/ })).toBeTruthy();
+  });
+
+  it("يبحث عن العميل بالاسم أو الهاتف أو الكود قبل فتح بطاقة الزيارة", () => {
+    mocks.list.mockReturnValue({
+      data: [
+        { id: 12, name: "عميل قديم", phone: "01000000000", address: "العنوان", customerCode: "C-000012", followUp: null },
+        { id: 13, name: "عميل آخر", phone: "0501234567", address: "عنوان آخر", customerCode: "C-000013", followUp: null },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+    render(<Customers />);
+    fireEvent.click(screen.getByRole("button", { name: "تسجيل زيارة" }));
+    const searchInput = screen.getByPlaceholderText("اكتب الاسم أو الهاتف أو كود العميل");
+    fireEvent.change(searchInput, { target: { value: "0501234567" } });
+    const customerSelect = screen.getByRole("combobox", { name: "العميل" });
+    expect(customerSelect.textContent).toContain("عميل آخر");
+    fireEvent.change(customerSelect, { target: { value: "13" } });
+    fireEvent.click(screen.getByRole("button", { name: "فتح بطاقة التسجيل" }));
+    expect(screen.getByText(/للعميل: عميل آخر/)).toBeTruthy();
   });
 
   it("يفعّل فلتر الحالة عند النقر على أيقونة العميل", () => {
