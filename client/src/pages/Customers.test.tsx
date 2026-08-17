@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import Customers from "./Customers";
+import Customers, { buildPartsConfirmation } from "./Customers";
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -90,6 +90,12 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(screen.getByLabelText("فلترة حالة العميل: اليوم")).toBeTruthy();
     expect(screen.getByLabelText("فلترة حالة العميل: خلال ٥ أيام")).toBeTruthy();
     expect(screen.getByLabelText("فلترة حالة العميل: متأخر")).toBeTruthy();
+  });
+
+  it("يعرض اسم الصنف والكمية في رسالة تأكيد الخصم", () => {
+    const confirmation = buildPartsConfirmation([{ inventoryItemId: 7, quantity: 2 }], [{ id: 7, name: "ممبرين" }]);
+    expect(confirmation).toContain("ممبرين: 2");
+    expect(confirmation).toContain("هل تريد حفظ الزيارة وخصم هذه الكميات من المخزن؟");
   });
 
   it("يفتح بطاقة تسجيل الزيارة مباشرة من بطاقة العميل ويُبقي السجل مستقلًا", () => {

@@ -22,6 +22,14 @@ function parseLocation(value: string) { const trimmed = value.trim(); const matc
 function followUpBadge(daysRemaining: number) { if (daysRemaining < 0) return { label: "متأخر", className: "border-rose-200 bg-rose-100 text-rose-800 hover:bg-rose-100", ariaLabel: "العميل متأخر عن موعد المتابعة" }; if (daysRemaining <= 5) return { label: daysRemaining === 0 ? "قريب · اليوم" : "قريب", className: "border-amber-200 bg-amber-100 text-amber-900 hover:bg-amber-100", ariaLabel: daysRemaining === 0 ? "موعد متابعة العميل قريب وهو اليوم" : "موعد متابعة العميل قريب" }; return { label: "منتظم", className: "border-emerald-200 bg-emerald-100 text-emerald-800 hover:bg-emerald-100", ariaLabel: "تمت متابعة العميل ولا توجد متابعة مستحقة حاليًا" }; }
 const emptyCustomer: CustomerForm = { manualCode: "", name: "", phone: "", address: "", location: "", notes: "", firstVisitType: "installation", firstVisitDate: toDateTimeLocal(), firstTechnicianName: "", firstVisitResult: "", firstVisitNotes: "", firstCollectedAmount: "" };
 
+export function buildPartsConfirmation(items: Array<{ inventoryItemId: number; quantity: number }>, catalogItems: Array<{ id: number; name: string }>) {
+  const summary = items.map(item => {
+    const catalogItem = catalogItems.find(entry => entry.id === item.inventoryItemId);
+    return `• ${catalogItem?.name ?? `صنف رقم ${item.inventoryItemId}`}: ${item.quantity}`;
+  }).join("\\n");
+  return `قطع الغيار التي سيتم صرفها:\\n${summary}\\n\\nهل تريد حفظ الزيارة وخصم هذه الكميات من المخزن؟`;
+}
+
 export default function Customers() {
   const [search, setSearch] = useState("");
   const [followUpStatus, setFollowUpStatus] = useState<"all" | "overdue" | "today" | "upcoming" | "regular">("all");
@@ -172,6 +180,10 @@ export default function Customers() {
     if (!visitCustomer) return;
     const collectedAmount = Math.round((Number.parseFloat(visitCollectedAmount) || 0) * 100);
     const payload = { customerId: visitCustomer.id, visitType, visitDate: new Date(visitDate), technicianName: visitTechnicianName || null, visitResult: visitResult || null, collectedAmount, collectedCurrency: "SAR" as const, notes: visitNotes || null, items: visitItems.filter(item => item.quantity > 0) };
+    if (payload.items.length > 0) {
+      const confirmed = window.confirm(buildPartsConfirmation(payload.items, effectiveServiceCatalog?.items ?? []));
+      if (!confirmed) return;
+    }
     if (isOffline) {
       const offlineUser = getOfflineSession();
       if (!offlineUser) return toast.error("افتح التطبيق مرة واحدة مع الإنترنت أولًا لتفعيل العمل دون اتصال.");
