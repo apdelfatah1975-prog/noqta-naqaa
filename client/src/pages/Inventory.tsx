@@ -15,7 +15,8 @@ import { moveToTrash } from "@/lib/trashBin";
 
 export default function Inventory() {
   const [location, navigate] = useLocation();
-  const selectedItemId = Number(new URLSearchParams(location.includes("?") ? location.split("?")[1] : window.location.search).get("item") ?? 0);
+  const [focusedItemId, setFocusedItemId] = useState(() => Number(new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("item") ?? 0));
+  const selectedItemId = focusedItemId || Number(new URLSearchParams(location.includes("?") ? location.split("?")[1] : typeof window !== "undefined" ? window.location.search : "").get("item") ?? 0);
   const owner = getOfflineSession();
   const inventoryQuery = trpc.filters.inventory.summary.useQuery(undefined, { retry: false, staleTime: 60_000 });
   const cachedInventory = getOfflineInventory<typeof inventoryQuery.data>(owner?.id ?? 0);
@@ -40,7 +41,11 @@ export default function Inventory() {
     if (!selectedItemId) return;
     const targets = Array.from(document.querySelectorAll<HTMLElement>(`[data-inventory-item-id="${selectedItemId}"]`));
     const target = targets.find(element => element.offsetParent !== null) ?? targets[0];
-    if (target && typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (!target) return;
+    window.requestAnimationFrame(() => {
+      const rect = target.getBoundingClientRect();
+      window.scrollTo({ top: Math.max(0, window.scrollY + rect.top - window.innerHeight * 0.28), behavior: "smooth" });
+    });
   }, [selectedItemId, data.items.length]);
   const utils = trpc.useUtils();
   const [itemDialog, setItemDialog] = useState(false);
@@ -54,8 +59,8 @@ export default function Inventory() {
   const [itemNotes, setItemNotes] = useState("");
   const [movementType, setMovementType] = useState<"incoming" | "outgoing">("incoming");
   function focusInventoryItem(itemId: number) {
+    setFocusedItemId(itemId);
     navigate(`/inventory?item=${itemId}`);
-    window.requestAnimationFrame(() => { const targets = Array.from(document.querySelectorAll<HTMLElement>(`[data-inventory-item-id="${itemId}"]`)); const target = targets.find(element => element.offsetParent !== null) ?? targets[0]; if (target && typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "smooth", block: "center" }); });
   }
   function openMovement(item: { id: number; name: string; defaultUnitCost?: number | null }, type: "incoming" | "outgoing") {
     setMovementType(type);
@@ -170,7 +175,6 @@ export default function Inventory() {
           </table>
         </div>
         <div className="divide-y divide-teal-950/6 md:hidden">
-        <div className="divide-y divide-teal-950/6 md:hidden">
           {data?.items.length ? data.items.map(item => (
             <div data-inventory-item-id={item.id} key={item.id} className={`inventory-item-row space-y-4 p-5 transition-[background-color,box-shadow] duration-500 ease-out ${item.id === selectedItemId ? "inventory-item-row-selected bg-orange-100 ring-2 ring-inset ring-orange-500 shadow-[inset_0_0_0_1px_rgba(249,115,22,.45)]" : "hover:bg-teal-50/40"}`}>
               <div className="flex items-start justify-between gap-3">
@@ -198,7 +202,6 @@ export default function Inventory() {
               </div>
             </div>
           )) : <EmptyInventoryCard isLoading={isLoading} />}
-        </div>
         </div>
       </section>
 
