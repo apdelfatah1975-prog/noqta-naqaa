@@ -81,6 +81,11 @@ describe("تفاصيل المنصرف في المخزون", () => {
     expect(dialog.getByDisplayValue("منصرف")).toBeTruthy();
   });
 
+  it("يعرض مسار إضافة الوارد للصنف الموجود لتحديث رصيده", () => {
+    render(<Inventory />);
+    expect(screen.getAllByRole("button", { name: "إضافة وارد" }).length).toBeGreaterThan(0);
+  });
+
   it("يعرض حقول بيانات الصنف المفيدة داخل بطاقة الإضافة", () => {
     render(<Inventory />);
     fireEvent.click(screen.getByRole("button", { name: "إضافة صنف" }));
