@@ -132,6 +132,45 @@ export default function Inventory() {
         <span className="font-bold">كل صنف محدد برقم مخزون ورمز بصري، والرصيد ملوّن حسب حالته.</span>
       </div>
 
+      <section aria-labelledby="inventory-items-cards" className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 id="inventory-items-cards" className="text-lg font-extrabold text-teal-950">أصناف المخزن</h2>
+            <p className="mt-1 text-xs text-muted-foreground">اضغط على بطاقة الصنف للانتقال إلى تفاصيله وصرفه.</p>
+          </div>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-teal-700 shadow-sm ring-1 ring-teal-100">{data.items.length} صنف</span>
+        </div>
+        {data.items.length ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {data.items.map(item => {
+              const visual = inventoryVisual(item.category, item.name);
+              const Icon = visual.icon;
+              const selected = item.id === selectedItemId;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => document.getElementById(`inventory-item-${item.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                  onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); document.getElementById(`inventory-item-${item.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); } }}
+                  className={`group min-w-0 rounded-2xl border bg-white p-3 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/20 ${selected ? "border-teal-500 ring-2 ring-teal-200" : "border-teal-100/80"}`}
+                  aria-label={`الصنف ${item.name}، رقم المخزون ${item.id}، الرصيد ${item.currentBalance}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${visual.tone}`}><Icon className="h-5 w-5" /></span>
+                    <span className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-extrabold text-slate-600">رقم {item.id}</span>
+                  </div>
+                  <p className="mt-3 min-h-10 text-sm font-extrabold leading-5 text-teal-950">{item.name}</p>
+                  <div className="mt-3 flex items-end justify-between gap-2 border-t border-slate-100 pt-2">
+                    <span className="text-[10px] font-bold text-muted-foreground">الرصيد الحالي</span>
+                    <span className={`text-xl font-black ${balanceTextClass(item.currentBalance, item.reorderLevel)}`}>{item.currentBalance}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : <div className="rounded-2xl border border-dashed border-teal-200 bg-white/70 p-8 text-center text-sm text-muted-foreground">ستظهر بطاقات الأصناف هنا بعد إضافة أول صنف.</div>}
+      </section>
+
       <section className="soft-card overflow-hidden">
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[760px] text-right">
