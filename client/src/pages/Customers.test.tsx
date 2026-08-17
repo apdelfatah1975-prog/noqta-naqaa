@@ -79,7 +79,8 @@ describe("ترابط تعديل بيانات العميل", () => {
       isError: false,
     });
     render(<Customers />);
-    expect(screen.getAllByLabelText("فلترة حالة العميل: قريب")).toHaveLength(2);
+    expect(screen.getByLabelText("فلترة حالة العميل: اليوم")).toBeTruthy();
+    expect(screen.getByLabelText("فلترة حالة العميل: خلال ٥ أيام")).toBeTruthy();
     expect(screen.getByLabelText("فلترة حالة العميل: متأخر")).toBeTruthy();
     expect(screen.getByLabelText("فلترة حالة العميل: منتظم")).toBeTruthy();
   });
@@ -215,21 +216,27 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(latestInput.collectedAmountMin).toBeUndefined();
   });
 
-  it("يعرض بطاقات الحالات الثلاث ويربط بطاقة المتأخرين بفلتر العملاء", () => {
+  it("يعرض بطاقات الحالات الخمس ويربط بطاقة المتأخر بفلتر العملاء", () => {
     mocks.list.mockReturnValue({
       data: [
         { id: 12, name: "عميل متأخر", phone: "01000000000", address: "العنوان", customerCode: "C-000012", followUp: { nextVisitDate: new Date("2026-08-10T09:00:00Z"), daysRemaining: -2 } },
-        { id: 13, name: "عميل قريب", phone: "01000000001", address: "العنوان", customerCode: "C-000013", followUp: { nextVisitDate: new Date("2026-08-18T09:00:00Z"), daysRemaining: 3 } },
-        { id: 14, name: "عميل منتظم", phone: "01000000002", address: "العنوان", customerCode: "C-000014", followUp: { nextVisitDate: new Date("2026-09-10T09:00:00Z"), daysRemaining: 26 } },
+        { id: 13, name: "عميل اليوم", phone: "01000000001", address: "العنوان", customerCode: "C-000013", followUp: { nextVisitDate: new Date("2026-08-17T09:00:00Z"), daysRemaining: 0 } },
+        { id: 14, name: "عميل قريب", phone: "01000000002", address: "العنوان", customerCode: "C-000014", followUp: { nextVisitDate: new Date("2026-08-20T09:00:00Z"), daysRemaining: 3 } },
+        { id: 15, name: "عميل منتظم", phone: "01000000003", address: "العنوان", customerCode: "C-000015", followUp: { nextVisitDate: new Date("2026-09-10T09:00:00Z"), daysRemaining: 26 } },
+        { id: 16, name: "عميل بدون موعد", phone: "01000000004", address: "العنوان", customerCode: "C-000016", followUp: null },
       ],
       isLoading: false,
       isError: false,
     });
     render(<Customers />);
-    expect(screen.getByRole("button", { name: "عرض تواصل الآن" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "عرض متأخرون" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "عرض تمت المتابعة" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "عرض متأخرون" }));
+    expect(screen.getByRole("button", { name: "عرض متأخر" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "عرض اليوم" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "عرض خلال ٥ أيام" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "عرض منتظم" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "عرض بدون موعد" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "عرض اليوم" }));
+    expect(mocks.list.mock.calls.at(-1)?.[0].followUpStatus).toBe("today");
+    fireEvent.click(screen.getByRole("button", { name: "عرض متأخر" }));
     expect(mocks.list.mock.calls.at(-1)?.[0].followUpStatus).toBe("overdue");
   });
 
