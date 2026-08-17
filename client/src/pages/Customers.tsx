@@ -62,6 +62,7 @@ export default function Customers() {
       utils.filters.customers.list.invalidate();
       utils.filters.dashboard.invalidate();
       utils.filters.reminders.due.invalidate();
+      utils.filters.inventory.summary.invalidate();
       setVisitCustomer(null);
       setVisitNotes("");
       setVisitResult("");

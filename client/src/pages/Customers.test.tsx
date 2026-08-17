@@ -13,8 +13,10 @@ const mocks = vi.hoisted(() => ({
   getInvalidate: vi.fn(),
   dashboardInvalidate: vi.fn(),
   remindersInvalidate: vi.fn(),
+  inventoryInvalidate: vi.fn(),
   location: vi.fn(),
   updateOptions: null as null | { onSuccess?: () => void },
+  visitOptions: null as null | { onSuccess?: (result: { reminderCreated?: boolean }) => void },
 }));
 
 vi.mock("@/lib/trpc", () => ({
@@ -29,6 +31,7 @@ vi.mock("@/lib/trpc", () => ({
       visits: { create: { useMutation: mocks.visitUseMutation } },
       dashboard: { invalidate: mocks.dashboardInvalidate },
       reminders: { due: { invalidate: mocks.remindersInvalidate } },
+      inventory: { summary: { invalidate: mocks.inventoryInvalidate } },
     },
     useUtils: () => ({
       filters: {
@@ -38,6 +41,7 @@ vi.mock("@/lib/trpc", () => ({
         },
         dashboard: { invalidate: mocks.dashboardInvalidate },
         reminders: { due: { invalidate: mocks.remindersInvalidate } },
+        inventory: { summary: { invalidate: mocks.inventoryInvalidate } },
       },
     }),
   },
@@ -53,7 +57,10 @@ describe("ترابط تعديل بيانات العميل", () => {
       isError: false,
     });
     mocks.createUseMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
-    mocks.visitUseMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    mocks.visitUseMutation.mockImplementation((options: { onSuccess?: (result: { reminderCreated?: boolean }) => void }) => {
+      mocks.visitOptions = options;
+      return { mutate: vi.fn(), isPending: false };
+    });
     mocks.deleteUseMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
     mocks.updateUseMutation.mockImplementation((options: { onSuccess?: () => void }) => {
       mocks.updateOptions = options;
@@ -65,6 +72,7 @@ describe("ترابط تعديل بيانات العميل", () => {
     cleanup();
     vi.clearAllMocks();
     mocks.updateOptions = null;
+    mocks.visitOptions = null;
   });
 
   it("يعرض شارة موعد اليوم وشارة التأخر بوضوح", () => {
@@ -108,6 +116,13 @@ describe("ترابط تعديل بيانات العميل", () => {
     fireEvent.change(screen.getByLabelText("المبلغ المحصل"), { target: { value: "250" } });
     fireEvent.click(screen.getByRole("button", { name: "حفظ الزيارة" }));
     expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ customerId: 12, technicianName: "أحمد", visitResult: "تم تغيير الشمعات", collectedAmount: 25000, collectedCurrency: "SAR" }));
+  });
+
+  it("يحدّث ملخص المخزن بعد نجاح تسجيل الزيارة", () => {
+    render(<Customers />);
+    expect(mocks.visitOptions?.onSuccess).toBeTruthy();
+    mocks.visitOptions?.onSuccess?.({ reminderCreated: false });
+    expect(mocks.inventoryInvalidate).toHaveBeenCalled();
   });
 
   it("يرسل خيار الفرز حسب أقرب موعد إلى قائمة العملاء", () => {
