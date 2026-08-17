@@ -3,6 +3,7 @@ import { PinVerificationDialog } from "@/components/PinVerificationDialog";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { reminderExcelHeaders, reminderRowsForExcel, downloadRowsAsExcel, withArabicHeaders } from "@/lib/excelExport";
+import { printArabicPdf } from "@/lib/pdfExport";
 import {
   buildWhatsAppReminderMessage,
   buildWhatsAppUrl,
@@ -61,6 +62,7 @@ export default function Reminders() {
   const isLoading = dueLoading || alertsLoading;
   const isError = dueError || alertsError;
   const exportReminders = () => { if (!reminders.length) { toast.info("لا توجد تذكيرات مطابقة للتصدير"); return; } downloadRowsAsExcel(`تذكيرات-نقطة-نقاء-${new Date().toISOString().slice(0, 10)}.xlsx`, "التذكيرات", withArabicHeaders(reminderRowsForExcel(reminders), reminderExcelHeaders)); toast.success("تم تجهيز ملف التذكيرات للتنزيل"); };
+  const exportRemindersPdf = () => { if (!reminders.length) { toast.info("لا توجد تذكيرات مطابقة للتصدير"); return; } const rows = withArabicHeaders(reminderRowsForExcel(reminders), reminderExcelHeaders); const opened = printArabicPdf("التذكيرات والمتابعة", rows, Object.entries(reminderExcelHeaders).map(([key, label]) => ({ key: label, label }))); if (opened) toast.success("تم تجهيز PDF للتذكيرات"); else toast.error("تعذر فتح نافذة PDF؛ اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى"); };
 
   const markCustomerConfirmed = (reminder: (typeof reminders)[number]) => {
     const key = `${reminder.id}:confirmed`;
@@ -90,7 +92,7 @@ export default function Reminders() {
   return (
     <>
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><h1 className="page-heading">التذكيرات والمتابعة</h1><p className="page-subheading">رسالة واتساب جاهزة قبل الموعد بيوم، ورسالة متابعة يوم الموعد إذا لم يصل رد.</p><p className="mt-2 text-xs font-bold text-emerald-800">رقم واتساب الشركة: <span dir="ltr">{COMPANY_WHATSAPP_DISPLAY_PHONE}</span> — اضغط زر واتساب لفتح الرسالة الجاهزة ثم اضغط إرسال.</p></div><Button onClick={exportReminders} variant="outline" className="h-11 shrink-0 rounded-xl"><Download className="ml-2 h-4 w-4" />تصدير Excel</Button></div>
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><h1 className="page-heading">التذكيرات والمتابعة</h1><p className="page-subheading">رسالة واتساب جاهزة قبل الموعد بيوم، ورسالة متابعة يوم الموعد إذا لم يصل رد.</p><p className="mt-2 text-xs font-bold text-emerald-800">رقم واتساب الشركة: <span dir="ltr">{COMPANY_WHATSAPP_DISPLAY_PHONE}</span> — اضغط زر واتساب لفتح الرسالة الجاهزة ثم اضغط إرسال.</p></div><div className="flex flex-wrap gap-2"><Button onClick={exportReminders} variant="outline" className="h-11 shrink-0 rounded-xl"><Download className="ml-2 h-4 w-4" />Excel</Button><Button onClick={exportRemindersPdf} variant="outline" className="h-11 shrink-0 rounded-xl"><Download className="ml-2 h-4 w-4" />PDF</Button></div></div>
       <NotificationSettingsCard />
       <section className="soft-card overflow-hidden">
         <div className="flex items-center justify-between border-b border-teal-950/6 p-5"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-100 text-amber-700"><BellRing className="h-5 w-5" /></div><div><h2 className="font-extrabold">قائمة المتابعة</h2><p className="mt-1 text-xs text-muted-foreground">{isLoading ? "جارٍ التحميل…" : `${reminders.length} تذكير ظاهر`}</p></div></div></div>
