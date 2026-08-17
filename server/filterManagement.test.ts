@@ -486,7 +486,24 @@ describe("واجهات إدارة فلاتر المياه", () => {
 		})]);
 	});
 
-	it("يعيد حساب وقت الإشعار القادم فور حفظ وقت تنبيه جديد", async () => {
+  it("يحمي حذف عملية الخزينة بالرقم السري", async () => {
+    let deleted = false;
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => ({ limit: async () => table === notificationSettings ? [{ ownerId: 1, pinHash: TEST_PIN_HASH }] : [] }),
+        }),
+      }),
+      delete: () => ({ where: async () => { deleted = true; } }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+    await expect(caller.filters.cash.delete({ id: 91, pin: "9999" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(deleted).toBe(false);
+    await expect(caller.filters.cash.delete({ id: 91, pin: TEST_PIN })).resolves.toEqual({ success: true });
+    expect(deleted).toBe(true);
+  });
+  it("يعيد حساب وقت الإشعار القادم فور حفظ وقت تنبيه جديد", async () => {
 		let savedSettings = {
 			ownerId: 1,
 			leadDays: 1,
