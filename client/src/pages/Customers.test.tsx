@@ -232,8 +232,8 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(screen.getByRole("button", { name: "عرض متأخر" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "عرض اليوم" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "عرض خلال ٥ أيام" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "عرض منتظم" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "عرض بدون موعد" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "عرض منتظم" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "عرض بدون موعد" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "عرض اليوم" }));
     expect(mocks.list.mock.calls.at(-1)?.[0].followUpStatus).toBe("today");
     fireEvent.click(screen.getByRole("button", { name: "عرض متأخر" }));
