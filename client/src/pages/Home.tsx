@@ -2,10 +2,11 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { cacheOfflineCash, cacheOfflineDashboard, downloadOfflineBackup, getOfflineBackupKeyCount, getOfflineDashboard, getOfflineSession, getPendingOperationCount, restoreOfflineBackupFromExcel } from "@/lib/offlineSync";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
+import { printArabicPdf } from "@/lib/pdfExport";
 import { AppSettings, getAppSettings } from "@/lib/appSettings";
 import { getTrashItems } from "@/lib/trashBin";
 import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
-import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, CloudOff, CloudUpload, Download, Droplets, Filter, Info, PackageSearch, Plus, Refrigerator, RefreshCw, Snowflake, Trash2, Upload, UsersRound } from "lucide-react";
+import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, CloudOff, CloudUpload, Download, Droplets, Filter, Info, PackageSearch, Plus, Printer, Refrigerator, RefreshCw, Snowflake, Trash2, Upload, UsersRound } from "lucide-react";
 import React from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -121,6 +122,22 @@ export default function Home() {
     setOfflineDashboard(displayData ?? null);
     toast.success("تم حفظ البيانات الحالية على الجهاز بنجاح");
   }
+  function downloadDashboardPdf() {
+    const rows: Array<Record<string, unknown>> = [];
+    displayData?.todayVisits?.forEach(visit => rows.push({ القسم: "زيارات اليوم", العميل: visit.customer?.name || "—", التاريخ: formatDateTime(visit.visitDate), التفاصيل: visitTypeLabels[visit.visitType as keyof typeof visitTypeLabels] || visit.visitType || "—" }));
+    displayData?.upcomingVisits?.forEach(visit => rows.push({ القسم: "زيارات قادمة", العميل: visit.customer?.name || "—", التاريخ: formatDateTime(visit.visitDate), التفاصيل: visitTypeLabels[visit.visitType as keyof typeof visitTypeLabels] || visit.visitType || "—" }));
+    displayData?.dueReminders?.forEach(reminder => rows.push({ القسم: "متابعات مستحقة", العميل: reminder.customer?.name || "—", التاريخ: formatDateTime(reminder.reminderDate), التفاصيل: `متأخر ${reminder.daysOverdue ?? 0} يوم` }));
+    displayData?.inventory?.items?.forEach(item => rows.push({ القسم: "المخزن", العميل: item.name, التاريخ: `رقم ${item.id}`, التفاصيل: `الرصيد ${item.currentBalance} — الحد الأدنى ${item.reorderLevel ?? 2}` }));
+    rows.push({ القسم: "الخزينة", العميل: "الرصيد الحالي", التاريخ: "—", التفاصيل: `${Math.round((cash?.balance ?? 0) / 100)}` });
+    const opened = printArabicPdf("تقرير ملخص التطبيق", rows, [
+      { key: "القسم", label: "القسم" },
+      { key: "العميل", label: "العميل / الصنف" },
+      { key: "التاريخ", label: "التاريخ / الرقم" },
+      { key: "التفاصيل", label: "التفاصيل" },
+    ]);
+    if (!opened) toast.error("تعذر فتح نافذة PDF؛ يرجى السماح بالنوافذ المنبثقة ثم المحاولة مرة أخرى.");
+  }
+
   const cardDetails = {
     today: "الزيارات المسجلة لهذا اليوم",
     upcoming: nextVisit ? `${nextVisit.customer?.name || "عميل"} · ${formatDateTime(nextVisit.visitDate)}` : "لا توجد زيارات مسجلة",
@@ -241,6 +258,7 @@ export default function Home() {
           <div className="flex flex-col gap-2 sm:min-w-52 sm:flex-row">
             <input ref={restoreInputRef} type="file" accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx" className="hidden" onChange={async event => { const file = event.target.files?.[0]; event.target.value = ""; if (!file) return; if (!window.confirm("تحذير: ستستبدل الاستعادة البيانات المحلية الحالية. يفضل تنزيل نسخة حالية أولًا. هل تريد المتابعة؟")) return; try { const result = restoreOfflineBackupFromExcel(await file.arrayBuffer()); toast.success(`تمت استعادة ${result.restoredKeys} عناصر محلية. سيعاد تحميل التطبيق الآن.`); window.setTimeout(() => window.location.reload(), 700); } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر استعادة ملف Excel."); } }} aria-label="اختيار ملف Excel للاستعادة" />
             <button type="button" onClick={() => { const downloaded = downloadOfflineBackup(); toast(downloaded ? `تم تنزيل ملف Excel العربي الشامل (${getOfflineBackupKeyCount()} عناصر محلية).` : "تعذر إنشاء ملف النسخة الاحتياطية."); }} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-sky-700 px-4 text-sm font-extrabold text-white transition hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"><Download className="h-4 w-4" />تنزيل Excel</button>
+            <button type="button" onClick={downloadDashboardPdf} disabled={!displayData} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 text-sm font-extrabold text-teal-800 transition hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"><Printer className="h-4 w-4" />تنزيل PDF</button>
             <button type="button" onClick={() => restoreInputRef.current?.click()} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sky-200 bg-white px-4 text-sm font-extrabold text-sky-800 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"><Upload className="h-4 w-4" />استعادة Excel</button>
           </div>
         </div>
