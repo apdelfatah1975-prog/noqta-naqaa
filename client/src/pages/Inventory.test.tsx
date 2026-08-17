@@ -65,13 +65,12 @@ describe("تفاصيل المنصرف في المخزون", () => {
 
     expect(screen.getAllByText("شمعة كربون 10 بوصة").length).toBeGreaterThan(0);
     expect(screen.getAllByText("#0004").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("رقم الصنف").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("نوع الصنف").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("الصنف ورقم المخزون").length).toBeGreaterThan(0);
     expect(screen.getAllByText("منصرف").length).toBeGreaterThan(0);
     expect(screen.getAllByText("محمد الفني").length).toBeGreaterThan(0);
     expect(screen.getAllByText("صرف لتركيب جديد").length).toBeGreaterThan(0);
     expect(screen.getAllByText("الفني / المستلم").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("(7)").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("7").length).toBeGreaterThan(0);
     expect(screen.getAllByText("متوفر").length).toBeGreaterThan(0);
   });
 
