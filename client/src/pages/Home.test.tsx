@@ -80,6 +80,28 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     expect(mocks.setLocation).toHaveBeenCalledWith("/customers?visit=1");
   });
 
+  it("تنتقل بطاقة صنف المخزن إلى تفاصيل الصنف المحدد", () => {
+    mocks.dashboard.mockReturnValue({
+      isLoading: false,
+      data: {
+        todayVisits: [],
+        upcomingVisits: [],
+        upcomingFollowUps: [],
+        dueReminders: [],
+        inventory: {
+          totalItems: 1,
+          lowStockCount: 0,
+          lowStock: [],
+          items: [{ id: 27, name: "فلتر جامبو", currentBalance: 4, reorderLevel: 2 }],
+        },
+      },
+    });
+    render(<Home />);
+    const itemCard = screen.getByRole("button", { name: "فتح تفاصيل فلتر جامبو" });
+    fireEvent.click(itemCard);
+    expect(mocks.setLocation).toHaveBeenCalledWith("/inventory?item=27");
+  });
+
   it("تظهر كبطاقة تفاعلية وتنتقل إلى صفحة الخزينة عند الضغط", () => {
     render(<Home />);
 
