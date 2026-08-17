@@ -106,16 +106,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     ?? menuItems[0];
   const initials = user?.name?.trim().slice(0, 1) || "م";
   const pageAccent = location === "/customers"
-    ? { bar: "from-sky-500 via-cyan-500 to-teal-500", label: "text-sky-700", glow: "shadow-[0_8px_28px_rgba(14,165,233,.12)]" }
+    ? { bar: "from-sky-500 via-cyan-500 to-teal-500", label: "text-sky-800", surface: "bg-sky-50/95", glow: "shadow-[0_8px_28px_rgba(14,165,233,.18)]" }
     : location === "/inventory"
-      ? { bar: "from-emerald-500 via-teal-500 to-cyan-500", label: "text-emerald-700", glow: "shadow-[0_8px_28px_rgba(16,185,129,.12)]" }
+      ? { bar: "from-amber-400 via-orange-500 to-rose-500", label: "text-orange-800", surface: "bg-amber-50/95", glow: "shadow-[0_8px_28px_rgba(245,158,11,.20)]" }
       : location === "/cash"
-        ? { bar: "from-amber-500 via-orange-500 to-rose-500", label: "text-amber-700", glow: "shadow-[0_8px_28px_rgba(245,158,11,.12)]" }
+        ? { bar: "from-emerald-400 via-teal-500 to-cyan-500", label: "text-emerald-800", surface: "bg-emerald-50/95", glow: "shadow-[0_8px_28px_rgba(16,185,129,.20)]" }
         : location === "/reports"
-          ? { bar: "from-violet-500 via-fuchsia-500 to-pink-500", label: "text-violet-700", glow: "shadow-[0_8px_28px_rgba(139,92,246,.12)]" }
+          ? { bar: "from-violet-500 via-fuchsia-500 to-pink-500", label: "text-violet-800", surface: "bg-violet-50/95", glow: "shadow-[0_8px_28px_rgba(139,92,246,.20)]" }
           : location === "/technician-payroll"
-            ? { bar: "from-indigo-500 via-blue-500 to-cyan-500", label: "text-indigo-700", glow: "shadow-[0_8px_28px_rgba(99,102,241,.12)]" }
-            : { bar: "from-teal-500 via-cyan-500 to-sky-500", label: "text-teal-700", glow: "shadow-[0_8px_28px_rgba(20,184,166,.10)]" };
+            ? { bar: "from-indigo-500 via-blue-500 to-cyan-500", label: "text-indigo-800", surface: "bg-indigo-50/95", glow: "shadow-[0_8px_28px_rgba(99,102,241,.20)]" }
+            : { bar: "from-teal-500 via-cyan-500 to-sky-500", label: "text-teal-800", surface: "bg-teal-50/95", glow: "shadow-[0_8px_28px_rgba(20,184,166,.16)]" };
 
   const refreshData = async () => {
     if (isRefreshing) return;
@@ -202,7 +202,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       </Sidebar>
 
       <SidebarInset className="min-w-0 max-w-full bg-[#f6fbfa]">
-        <header className={`relative sticky top-0 z-20 flex h-16 items-center justify-between border-b border-teal-950/5 bg-[#f6fbfa]/90 px-4 backdrop-blur-lg lg:px-8 ${pageAccent.glow}`}>
+        <header className={`relative sticky top-0 z-20 flex h-16 items-center justify-between border-b border-teal-950/5 px-4 backdrop-blur-lg lg:px-8 ${pageAccent.surface} ${pageAccent.glow}`}>
           <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-l ${pageAccent.bar}`} aria-hidden="true" />
           <div className="flex items-center gap-3">
             {isMobile ? <SidebarTrigger className="h-10 w-10 rounded-xl border border-teal-950/10 bg-white text-teal-800"><Menu className="h-5 w-5" /></SidebarTrigger> : null}

@@ -37,7 +37,7 @@ import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
 import { COOKIE_NAME } from "../../shared/const";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 import { createOwnerBackup, refreshOwnerBackup } from "../backup";
-import { storageGet } from "../storage";
+import { storageGet, storagePut } from "../storage";
 
 const customerInput = z.object({
   name: z.string().trim().min(2, "أدخل اسم العميل").max(160),
@@ -98,7 +98,15 @@ const inventoryItemInput = z.object({
   defaultUnitCost: z.number().int().nonnegative().max(999999999).default(0),
   openingQuantity: z.number().int().min(0).default(0),
   notes: z.string().trim().max(2000).optional().nullable(),
+  customEmoji: z.string().trim().max(8).optional().nullable(),
   clientOperationId: z.string().uuid().optional(),
+});
+
+const inventoryAppearanceInput = z.object({
+  inventoryItemId: z.number().int().positive(),
+  customEmoji: z.string().trim().max(8).optional().nullable(),
+  imageDataUrl: z.string().max(1_500_000).optional().nullable(),
+  clearImage: z.boolean().optional().default(false),
 });
 
 const inventoryMovementInput = z.object({
@@ -934,6 +942,32 @@ export const filterManagementRouter = router({
       const result = await db.insert(inventoryItems).values({ ...input, ownerId: ctx.user.id });
       await refreshOwnerBackup(ctx.user.id);
       return { id: Number(result[0].insertId) };
+    }),
+    updateAppearance: adminProcedure.input(inventoryAppearanceInput).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const item = await db.select({ id: inventoryItems.id, name: inventoryItems.name }).from(inventoryItems).where(and(eq(inventoryItems.id, input.inventoryItemId), eq(inventoryItems.ownerId, ctx.user.id))).limit(1);
+      if (!item[0]) throw new TRPCError({ code: "NOT_FOUND", message: "الصنف غير موجود." });
+
+      let imageKey: string | null | undefined;
+      let imageUrl: string | null | undefined;
+      if (input.clearImage) {
+        imageKey = null;
+        imageUrl = null;
+      } else if (input.imageDataUrl) {
+        const match = input.imageDataUrl.match(/^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
+        if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "اختر صورة بصيغة PNG أو JPG أو WEBP أو GIF." });
+        const contentType = match[1];
+        const buffer = Buffer.from(match[2], "base64");
+        if (buffer.length > 1_000_000) throw new TRPCError({ code: "BAD_REQUEST", message: "حجم الصورة بعد الضغط يجب ألا يتجاوز 1 ميجابايت." });
+        const extension = contentType === "image/jpeg" ? "jpg" : contentType.split("/")[1];
+        const uploaded = await storagePut(`water-filter-items/${ctx.user.id}/${input.inventoryItemId}.${extension}`, buffer, contentType);
+        imageKey = uploaded.key;
+        imageUrl = uploaded.url;
+      }
+
+      await db.update(inventoryItems).set({ customEmoji: input.customEmoji?.trim() || null, ...(imageKey !== undefined ? { imageKey } : {}), ...(imageUrl !== undefined ? { imageUrl } : {}) }).where(and(eq(inventoryItems.id, input.inventoryItemId), eq(inventoryItems.ownerId, ctx.user.id)));
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true };
     }),
     createMovement: adminProcedure.input(inventoryMovementInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();

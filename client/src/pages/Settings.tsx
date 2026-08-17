@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { AppSettings, defaultAppSettings, getAppSettings, resetAppSettings, saveAppSettings } from "@/lib/appSettings";
-import { Eye, EyeOff, KeyRound, RotateCcw, Save, ShieldCheck, SlidersHorizontal, Trash2, Undo2 } from "lucide-react";
+import { Eye, EyeOff, Image as ImageIcon, KeyRound, RotateCcw, Save, ShieldCheck, SlidersHorizontal, Smile, Trash2, Undo2 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { appendActivityLog, clearActivityLog, getActivityLog, type ActivityLogEntry } from "@/lib/activityLog";
@@ -14,6 +14,33 @@ const visitTypes = [
   ["follow_up", "متابعة"],
   ["other", "أخرى"],
 ] as const;
+
+const inventoryEmojiOptions = ["💧", "🧊", "🧴", "🔧", "🧽", "🧪", "📦", "⚙️", "🛠️", "✨"];
+type ItemAppearanceDraft = { emoji: string; imageDataUrl?: string; previewUrl?: string; clearImage?: boolean };
+
+function resizeInventoryImage(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) return Promise.reject(new Error("اختر ملف صورة صالحًا."));
+  if (file.size > 8 * 1024 * 1024) return Promise.reject(new Error("حجم الصورة الأصلي كبير جدًا؛ اختر صورة أقل من 8 ميجابايت."));
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("تعذر قراءة الصورة."));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error("تعذر فتح الصورة."));
+      image.onload = () => {
+        const maxSide = 640;
+        const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      image.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (value: boolean) => void; label: string }) {
   return <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold"><span>{label}</span><input type="checkbox" className="h-5 w-5 accent-teal-700" checked={checked} onChange={event => onChange(event.target.checked)} /></label>;
@@ -35,10 +62,27 @@ export default function Settings() {
   const restoreCash = trpc.filters.cash.create.useMutation();
   const restoreInventoryItem = trpc.filters.inventory.createItem.useMutation();
   const restoreInventoryMovement = trpc.filters.inventory.createMovement.useMutation();
+  const inventoryQuery = trpc.filters.inventory.summary.useQuery(undefined, { retry: false, staleTime: 60_000 });
+  const [appearanceDrafts, setAppearanceDrafts] = useState<Record<number, ItemAppearanceDraft>>({});
+  const updateAppearance = trpc.filters.inventory.updateAppearance.useMutation({
+    onSuccess: () => { inventoryQuery.refetch(); toast.success("تم حفظ مظهر الصنف"); },
+    onError: error => toast.error(error.message || "تعذر حفظ مظهر الصنف."),
+  });
   const setPin = trpc.filters.notifications.setPin.useMutation({
     onSuccess: () => { setCurrentPin(""); setNewPin(""); setConfirmPin(""); toast.success("تم تغيير الرقم السري بنجاح"); },
     onError: error => toast.error(error.message || "تعذر تغيير الرقم السري."),
   });
+
+  useEffect(() => {
+    if (!inventoryQuery.data?.items) return;
+    setAppearanceDrafts(current => {
+      const next = { ...current };
+      for (const item of inventoryQuery.data.items) {
+        if (!next[item.id]) next[item.id] = { emoji: item.customEmoji ?? "" };
+      }
+      return next;
+    });
+  }, [inventoryQuery.data?.items]);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("section") === "trash") {
@@ -52,6 +96,25 @@ export default function Settings() {
     window.addEventListener("purepoint-settings-changed", onChange);
     return () => { window.removeEventListener("purepoint-settings-changed", onChange); window.removeEventListener("purepoint-activity-log-changed", onLogChange); window.removeEventListener("purepoint-trash-bin-changed", onTrashChange); };
   }, []);
+
+  function updateAppearanceDraft(itemId: number, patch: Partial<ItemAppearanceDraft>) {
+    setAppearanceDrafts(current => ({ ...current, [itemId]: { ...(current[itemId] ?? { emoji: "" }), ...patch } }));
+  }
+
+  async function chooseItemImage(itemId: number, file: File | undefined) {
+    if (!file) return;
+    try {
+      const imageDataUrl = await resizeInventoryImage(file);
+      updateAppearanceDraft(itemId, { imageDataUrl, previewUrl: imageDataUrl, clearImage: false });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر تجهيز الصورة.");
+    }
+  }
+
+  function saveItemAppearance(item: { id: number; customEmoji?: string | null }) {
+    const draft = appearanceDrafts[item.id] ?? { emoji: item.customEmoji ?? "" };
+    updateAppearance.mutate({ inventoryItemId: item.id, customEmoji: draft.emoji.trim() || null, imageDataUrl: draft.imageDataUrl ?? null, clearImage: Boolean(draft.clearImage) });
+  }
 
   function update<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     setSettings(current => ({ ...current, [key]: value }));
@@ -154,6 +217,8 @@ export default function Settings() {
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h1 className="page-heading">الإعدادات</h1><p className="page-subheading">اضبط كل ما يخص نقطة نقاء من مكان واحد. الإعدادات تحفظ على هذا الجهاز وتعمل دون إنترنت.</p></div><div className="flex items-center gap-2"><span className="rounded-full bg-teal-50 px-3 py-2 text-xs font-bold text-teal-800">{savedAt ? `آخر حفظ ${savedAt}` : "إعدادات محلية"}</span><Button onClick={saveAll} className="rounded-xl bg-teal-700 hover:bg-teal-800"><Save className="ml-1 h-4 w-4" />حفظ كل الإعدادات</Button></div></div>
 
     <section className="soft-card overflow-hidden"><div className="flex items-start gap-3 border-b border-teal-950/6 p-5"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-sky-100 text-sky-700"><SlidersHorizontal className="h-5 w-5" /></div><div><h2 className="font-extrabold">بيانات الشركة وطريقة العرض</h2><p className="mt-1 text-xs leading-6 text-muted-foreground">هذه البيانات تستخدم كإعدادات عامة للتطبيق والتقارير والتصدير والبيانات الجديدة.</p></div></div><div className="grid gap-4 p-5 sm:grid-cols-2"><label><span className="field-label">اسم الشركة</span><input className="field-input" value={settings.companyName} onChange={event => update("companyName", event.target.value)} /></label><label><span className="field-label">رقم هاتف الشركة</span><input className="field-input" value={settings.companyPhone} onChange={event => update("companyPhone", event.target.value)} placeholder="مثال: 01000000000" /></label><label><span className="field-label">عنوان الشركة</span><input className="field-input" value={settings.companyAddress} onChange={event => update("companyAddress", event.target.value)} /></label><label><span className="field-label">اسم الفني الافتراضي</span><input className="field-input" value={settings.defaultTechnician} onChange={event => update("defaultTechnician", event.target.value)} placeholder="يظهر تلقائيًا في الزيارات الجديدة" /></label><label><span className="field-label">تنسيق التاريخ</span><select className="field-input" value={settings.dateFormat} onChange={event => update("dateFormat", event.target.value as AppSettings["dateFormat"])}><option value="arabic">عربي</option><option value="gregorian">إنجليزي/ميلادي</option></select></label><div className="sm:col-span-2"><Toggle checked={settings.useArabicDigits} onChange={value => update("useArabicDigits", value)} label="استخدام الأرقام العربية في العرض والتقارير" /></div></div></section>
+
+    <section className="soft-card overflow-hidden"><div className="border-b border-teal-950/6 p-5"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-2xl bg-violet-100 text-violet-700"><ImageIcon className="h-5 w-5" /></div><div><h2 className="font-extrabold">مظهر أصناف المخزن</h2><p className="mt-1 text-xs leading-6 text-muted-foreground">اختر رمزًا تعبيريًا أو ارفع صورة حقيقية لكل صنف. الصورة تُضغط على الجهاز قبل رفعها وتظهر في بطاقات المخزن وبطاقات الاختيار.</p></div></div></div><div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">{inventoryQuery.isLoading ? <div className="rounded-xl bg-slate-50 p-4 text-sm text-muted-foreground">جارٍ تحميل أصناف المخزن…</div> : (inventoryQuery.data?.items ?? []).length ? (inventoryQuery.data?.items ?? []).map(item => { const draft = appearanceDrafts[item.id] ?? { emoji: item.customEmoji ?? "" }; const imageSrc = draft.previewUrl ?? item.imageUrl ?? undefined; return <article key={item.id} className="rounded-2xl border border-violet-100 bg-white p-4 shadow-sm"><div className="flex items-center gap-3"><div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-violet-50 text-3xl text-violet-700">{imageSrc ? <img src={imageSrc} alt="" className="h-full w-full object-cover" /> : draft.emoji ? <span>{draft.emoji}</span> : <Smile className="h-7 w-7" />}</div><div className="min-w-0"><h3 className="truncate font-extrabold text-teal-950">{item.name}</h3><p className="mt-1 text-xs font-bold text-muted-foreground">رقم المخزون: {item.id}</p><p className="mt-1 text-xs text-muted-foreground">الرصيد الحالي: {item.currentBalance}</p></div></div><div className="mt-4 flex flex-wrap gap-1.5">{inventoryEmojiOptions.map(emoji => <button key={emoji} type="button" aria-label={`اختيار الرمز ${emoji}`} onClick={() => updateAppearanceDraft(item.id, { emoji, clearImage: false })} className={`grid h-8 w-8 place-items-center rounded-lg text-lg transition ${draft.emoji === emoji ? "bg-violet-100 ring-2 ring-violet-400" : "bg-slate-50 hover:bg-violet-50"}`}>{emoji}</button>)}</div><div className="mt-3 flex items-center gap-2"><label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-violet-200 bg-violet-50/50 px-3 py-2 text-xs font-bold text-violet-800"><ImageIcon className="h-4 w-4 shrink-0" /><span className="truncate">رفع صورة حقيقية</span><input type="file" accept="image/*" className="sr-only" onChange={event => chooseItemImage(item.id, event.target.files?.[0])} /></label>{imageSrc ? <Button type="button" variant="outline" size="sm" onClick={() => updateAppearanceDraft(item.id, { imageDataUrl: undefined, previewUrl: undefined, clearImage: true })} className="rounded-xl border-rose-200 px-2 text-xs text-rose-700">إزالة</Button> : null}</div><div className="mt-3 flex gap-2"><input className="field-input min-w-0 flex-1" value={draft.emoji} onChange={event => updateAppearanceDraft(item.id, { emoji: event.target.value.slice(0, 4), clearImage: false })} placeholder="أو اكتب رمزًا" /><Button type="button" onClick={() => saveItemAppearance(item)} disabled={updateAppearance.isPending} className="rounded-xl bg-violet-700 px-4 hover:bg-violet-800">حفظ</Button></div></article>; }) : <div className="rounded-xl bg-slate-50 p-4 text-sm text-muted-foreground sm:col-span-2 lg:col-span-3">لا توجد أصناف في المخزن بعد. أضف صنفًا أولًا من صفحة المخزن.</div>}</div></section>
 
     <section className="soft-card overflow-hidden"><div className="border-b border-teal-950/6 p-5"><h2 className="font-extrabold">العملاء والزيارات والمتابعة</h2><p className="mt-1 text-xs leading-6 text-muted-foreground">تحكم في القيم الافتراضية التي تظهر أثناء تسجيل العميل والزيارة وحساب موعد المتابعة.</p></div><div className="grid gap-4 p-5 sm:grid-cols-2"><label><span className="field-label">مدة المتابعة التلقائية بالأيام</span><input type="number" min={1} max={730} className="field-input" value={settings.followUpDays} onChange={event => update("followUpDays", Math.max(1, Number(event.target.value) || 120))} /></label><label><span className="field-label">طريقة كود العميل</span><select className="field-input" value={settings.customerCodeMode} onChange={event => update("customerCodeMode", event.target.value as AppSettings["customerCodeMode"])}><option value="automatic">تلقائي بالترتيب</option><option value="manual">إدخال يدوي</option></select></label><label><span className="field-label">نوع الزيارة الافتراضي</span><select className="field-input" value={settings.defaultVisitType} onChange={event => update("defaultVisitType", event.target.value as AppSettings["defaultVisitType"])}>{visitTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label><span className="field-label">عدد أيام التذكير قبل الموعد</span><input type="number" min={0} max={30} className="field-input" value={settings.reminderLeadDays} onChange={event => update("reminderLeadDays", Math.max(0, Number(event.target.value) || 0))} /></label></div></section>
 

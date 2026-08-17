@@ -14,7 +14,7 @@ import { cacheOfflineInventory, getOfflineInventory, getOfflineSession, queueOff
 import { moveToTrash } from "@/lib/trashBin";
 
 export default function Inventory() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const selectedItemId = Number(new URLSearchParams(location.split("?")[1] ?? "").get("item") ?? 0);
   const owner = getOfflineSession();
   const inventoryQuery = trpc.filters.inventory.summary.useQuery(undefined, { retry: false, staleTime: 60_000 });
@@ -52,6 +52,10 @@ export default function Inventory() {
   const [openingQuantity, setOpeningQuantity] = useState("0");
   const [itemNotes, setItemNotes] = useState("");
   const [movementType, setMovementType] = useState<"incoming" | "outgoing">("incoming");
+  function focusInventoryItem(itemId: number) {
+    navigate(`/inventory?item=${itemId}`);
+    window.requestAnimationFrame(() => document.getElementById(`inventory-item-${itemId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }
   function openMovement(item: { id: number; name: string; defaultUnitCost?: number | null }, type: "incoming" | "outgoing") {
     setMovementType(type);
     setMovementItem(item);
@@ -128,47 +132,17 @@ export default function Inventory() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-teal-100 bg-teal-50/60 px-4 py-3 text-sm text-teal-900 shadow-sm">
-        <span className="font-bold">كل صنف محدد برقم مخزون ورمز بصري، والرصيد ملوّن حسب حالته.</span>
-      </div>
-
-      <section aria-labelledby="inventory-items-cards" className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 id="inventory-items-cards" className="text-lg font-extrabold text-teal-950">أصناف المخزن</h2>
-            <p className="mt-1 text-xs text-muted-foreground">اضغط على بطاقة الصنف للانتقال إلى تفاصيله وصرفه.</p>
-          </div>
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-teal-700 shadow-sm ring-1 ring-teal-100">{data.items.length} صنف</span>
+      <section aria-labelledby="inventory-items-cards" className="rounded-2xl border border-teal-100 bg-teal-50/60 p-2.5 shadow-sm">
+        <div className="mb-2 flex items-center justify-between gap-2 px-1">
+          <h2 id="inventory-items-cards" className="text-sm font-extrabold text-teal-950">أصناف المخزن</h2>
+          <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-teal-700 ring-1 ring-teal-100">اختيار سريع</span>
         </div>
-        {data.items.length ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {data.items.map(item => {
-              const visual = inventoryVisual(item.category, item.name);
-              const Icon = visual.icon;
-              const selected = item.id === selectedItemId;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => document.getElementById(`inventory-item-${item.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}
-                  onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); document.getElementById(`inventory-item-${item.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); } }}
-                  className={`group min-w-0 rounded-2xl border bg-white p-3 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/20 ${selected ? "border-teal-500 ring-2 ring-teal-200" : "border-teal-100/80"}`}
-                  aria-label={`الصنف ${item.name}، رقم المخزون ${item.id}، الرصيد ${item.currentBalance}`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${visual.tone}`}><Icon className="h-5 w-5" /></span>
-                    <span className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-extrabold text-slate-600">رقم {item.id}</span>
-                  </div>
-                  <p className="mt-3 min-h-10 text-sm font-extrabold leading-5 text-teal-950">{item.name}</p>
-                  <div className="mt-3 flex items-end justify-between gap-2 border-t border-slate-100 pt-2">
-                    <span className="text-[10px] font-bold text-muted-foreground">الرصيد الحالي</span>
-                    <span className={`text-xl font-black ${balanceTextClass(item.currentBalance, item.reorderLevel)}`}>{item.currentBalance}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        ) : <div className="rounded-2xl border border-dashed border-teal-200 bg-white/70 p-8 text-center text-sm text-muted-foreground">ستظهر بطاقات الأصناف هنا بعد إضافة أول صنف.</div>}
+        {data.items.length ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+          {data.items.map(item => <button key={item.id} type="button" onClick={() => focusInventoryItem(item.id)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); focusInventoryItem(item.id); } }} className="flex min-w-0 items-center gap-2 rounded-xl border border-white bg-white px-2 py-2 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500" aria-label={`الصنف ${item.name}، رقم المخزون ${item.id}، الرصيد ${item.currentBalance}`}>
+            <InventoryVisual compact category={item.category} name={item.name} customEmoji={item.customEmoji} imageUrl={item.imageUrl} />
+            <span className="min-w-0"><span className="block truncate text-[11px] font-extrabold text-teal-950">{item.name}</span><span className="mt-0.5 block text-[10px] font-bold text-slate-500">الرصيد: <b className={balanceTextClass(item.currentBalance, item.reorderLevel)}>{item.currentBalance}</b></span></span>
+          </button>)}
+        </div> : <p className="px-2 py-3 text-center text-xs text-muted-foreground">ستظهر بطاقات الأصناف هنا بعد إضافة أول صنف.</p>}
       </section>
 
       <section className="soft-card overflow-hidden">
@@ -186,7 +160,7 @@ export default function Inventory() {
             <div id={`inventory-item-${item.id}`} key={item.id} className={`space-y-4 p-5 ${item.id === selectedItemId ? "bg-teal-50 ring-2 ring-inset ring-teal-300" : ""}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-3">
-                  <InventoryVisual category={item.category} name={item.name} />
+                  <InventoryVisual category={item.category} name={item.name} customEmoji={item.customEmoji} imageUrl={item.imageUrl} />
                   <div className="min-w-0">
                     <p className="mt-1 text-lg font-extrabold leading-7 text-teal-950">{item.name}</p>
                     <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-bold">
@@ -248,10 +222,10 @@ function inventoryVisual(category?: string | null, name?: string) {
   if (value.includes("ثلج") || value.includes("تبريد")) return { icon: Snowflake, tone: "bg-indigo-100 text-indigo-700" };
   return { icon: PackageSearch, tone: "bg-violet-100 text-violet-700" };
 }
-function InventoryVisual({ category, name }: { category?: string | null; name?: string }) { const visual = inventoryVisual(category, name); const Icon = visual.icon; return <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${visual.tone}`}><Icon className="h-5 w-5" /></span>; }
-function InventoryTableRow({ item, onMovement, onDelete, selected }: { item: { id: number; name: string; category?: string | null; notes: string | null; openingQuantity: number; currentBalance: number; reorderLevel?: number | null; defaultUnitCost?: number | null; createdAt?: Date | string | null }; onMovement: () => void; onDelete: () => void; selected?: boolean }) {
+function InventoryVisual({ category, name, customEmoji, imageUrl, compact = false }: { category?: string | null; name?: string; customEmoji?: string | null; imageUrl?: string | null; compact?: boolean }) { const visual = inventoryVisual(category, name); const Icon = visual.icon; return <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden ${compact ? "h-8 w-8 rounded-xl" : "h-11 w-11 rounded-2xl"} ${visual.tone}`}>{imageUrl ? <img src={imageUrl} alt="" className="h-full w-full object-cover" /> : customEmoji ? <span className={`${compact ? "text-lg" : "text-2xl"} leading-none`}>{customEmoji}</span> : <Icon className={compact ? "h-4 w-4" : "h-5 w-5"} />}</span>; }
+function InventoryTableRow({ item, onMovement, onDelete, selected }: { item: { id: number; name: string; category?: string | null; customEmoji?: string | null; imageUrl?: string | null; notes: string | null; openingQuantity: number; currentBalance: number; reorderLevel?: number | null; defaultUnitCost?: number | null; createdAt?: Date | string | null }; onMovement: () => void; onDelete: () => void; selected?: boolean }) {
   return <tr id={`inventory-item-${item.id}`} className={selected ? "bg-teal-50 ring-2 ring-inset ring-teal-300" : "hover:bg-teal-50/45"}>
-    <td className="px-5 py-4"><div className="flex items-center gap-3"><InventoryVisual category={item.category} name={item.name} /><div><p className="mt-1 text-base font-extrabold text-teal-950">{item.name}</p><p className="mt-1 text-xs font-bold text-teal-700">{item.category || "عام"}</p><p className="mt-1 text-xs text-muted-foreground">أضيف في: {formatDate(item.createdAt)}</p>{item.notes ? <p className="mt-1 max-w-64 truncate text-xs text-muted-foreground">{item.notes}</p> : null}</div></div></td>
+    <td className="px-5 py-4"><div className="flex items-center gap-3"><InventoryVisual category={item.category} name={item.name} customEmoji={item.customEmoji} imageUrl={item.imageUrl} /><div><p className="mt-1 text-base font-extrabold text-teal-950">{item.name}</p><p className="mt-1 text-xs font-bold text-teal-700">{item.category || "عام"}</p><p className="mt-1 text-xs text-muted-foreground">أضيف في: {formatDate(item.createdAt)}</p>{item.notes ? <p className="mt-1 max-w-64 truncate text-xs text-muted-foreground">{item.notes}</p> : null}</div></div></td>
     <td className="px-5 py-4">{item.openingQuantity}</td><td className={`px-5 py-4 text-lg font-extrabold ${balanceTextClass(item.currentBalance, item.reorderLevel)}`}>{item.currentBalance}</td><td className="px-5 py-4"><StockBadge balance={item.currentBalance} reorderLevel={item.reorderLevel} /></td><td className="px-5 py-4"><Button size="sm" variant="outline" onClick={onMovement} className="rounded-lg border-teal-700/20 text-teal-800 hover:bg-teal-50"><PackagePlus className="ml-1 h-4 w-4" />صرف صنف</Button><Button size="sm" variant="outline" onClick={onDelete} className="mr-2 rounded-lg border-rose-200 text-rose-700 hover:bg-rose-50">حذف</Button></td>
   </tr>;
 }

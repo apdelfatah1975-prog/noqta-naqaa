@@ -21,6 +21,8 @@ vi.mock("@/lib/trpc", () => ({
       inventory: {
         createItem: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
         createMovement: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
+        summary: { useQuery: () => ({ data: { items: [] }, isLoading: false, refetch: vi.fn() }) },
+        updateAppearance: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
       },
     },
   },
