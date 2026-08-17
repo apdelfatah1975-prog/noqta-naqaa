@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Inventory from "./Inventory";
@@ -28,6 +28,7 @@ vi.mock("@/lib/trpc", () => ({
       filters: {
         inventory: { summary: { invalidate: mocks.invalidate } },
         dashboard: { invalidate: mocks.invalidate },
+        cash: { summary: { invalidate: mocks.invalidate } },
       },
     }),
   },
@@ -84,6 +85,16 @@ describe("تفاصيل المنصرف في المخزون", () => {
   it("يعرض مسار إضافة الوارد للصنف الموجود لتحديث رصيده", () => {
     render(<Inventory />);
     expect(screen.getAllByRole("button", { name: "إضافة وارد" }).length).toBeGreaterThan(0);
+  });
+
+  it("ينقل بطاقة الصنف إلى صفها ويظلله بالبرتقالي", async () => {
+    window.history.pushState({}, "", "/inventory?item=4");
+    render(<Inventory />);
+    await waitFor(() => {
+      const rows = document.querySelectorAll('[data-inventory-item-id="4"]');
+      expect(rows.length).toBeGreaterThan(0);
+      expect(Array.from(rows).some(row => row.className.includes("bg-orange-100"))).toBe(true);
+    });
   });
 
   it("يعرض حقول بيانات الصنف المفيدة داخل بطاقة الإضافة", () => {

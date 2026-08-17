@@ -617,6 +617,23 @@ describe("واجهات إدارة فلاتر المياه", () => {
 });
 
 
+describe("المخزن ومنع تكرار الأصناف", () => {
+  it("يحوّل إضافة صنف موجود إلى حركة وارد ومصروف خزينة دون إنشاء بطاقة ثانية", async () => {
+    const insertCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
+    const db = {
+      select: () => ({ from: () => ({ where: () => ({ limit: async () => [{ id: 41, ownerId: 1, name: "فلتر جامبو" }] }) }) }),
+      insert: (table: unknown) => ({ values: async (values: Record<string, unknown>) => { insertCalls.push({ table, values }); return [{ insertId: table === inventoryMovements ? 91 : 0 }]; } }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+    const result = await caller.filters.inventory.createItem({ name: "فلتر جامبو", category: "فلاتر", unit: "قطعة", reorderLevel: 2, defaultUnitCost: 1250, openingQuantity: 4, notes: "وارد جديد" });
+    expect(result).toMatchObject({ id: 41, merged: true, duplicate: true, movementId: 91 });
+    expect(insertCalls.filter(call => call.table === inventoryItems)).toHaveLength(0);
+    expect(insertCalls.find(call => call.table === inventoryMovements)?.values).toMatchObject({ inventoryItemId: 41, movementType: "incoming", quantity: 4, unitCost: 1250 });
+    expect(insertCalls.find(call => call.table === cashTransactions)?.values).toMatchObject({ amount: 5000, sourceInventoryMovementId: 91, transactionType: "expense" });
+  });
+});
+
 describe("صلاحيات الفني والإدارة", () => {
   function createTechnicianContext(): TrpcContext {
     return {

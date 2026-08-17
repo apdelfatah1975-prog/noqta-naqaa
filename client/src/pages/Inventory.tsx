@@ -15,7 +15,7 @@ import { moveToTrash } from "@/lib/trashBin";
 
 export default function Inventory() {
   const [location, navigate] = useLocation();
-  const selectedItemId = Number(new URLSearchParams(location.split("?")[1] ?? "").get("item") ?? 0);
+  const selectedItemId = Number(new URLSearchParams(location.includes("?") ? location.split("?")[1] : window.location.search).get("item") ?? 0);
   const owner = getOfflineSession();
   const inventoryQuery = trpc.filters.inventory.summary.useQuery(undefined, { retry: false, staleTime: 60_000 });
   const cachedInventory = getOfflineInventory<typeof inventoryQuery.data>(owner?.id ?? 0);
@@ -40,7 +40,7 @@ export default function Inventory() {
     if (!selectedItemId) return;
     const targets = Array.from(document.querySelectorAll<HTMLElement>(`[data-inventory-item-id="${selectedItemId}"]`));
     const target = targets.find(element => element.offsetParent !== null) ?? targets[0];
-    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (target && typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedItemId, data.items.length]);
   const utils = trpc.useUtils();
   const [itemDialog, setItemDialog] = useState(false);
@@ -55,7 +55,7 @@ export default function Inventory() {
   const [movementType, setMovementType] = useState<"incoming" | "outgoing">("incoming");
   function focusInventoryItem(itemId: number) {
     navigate(`/inventory?item=${itemId}`);
-    window.requestAnimationFrame(() => { const targets = Array.from(document.querySelectorAll<HTMLElement>(`[data-inventory-item-id="${itemId}"]`)); const target = targets.find(element => element.offsetParent !== null) ?? targets[0]; target?.scrollIntoView({ behavior: "smooth", block: "center" }); });
+    window.requestAnimationFrame(() => { const targets = Array.from(document.querySelectorAll<HTMLElement>(`[data-inventory-item-id="${itemId}"]`)); const target = targets.find(element => element.offsetParent !== null) ?? targets[0]; if (target && typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "smooth", block: "center" }); });
   }
   function openMovement(item: { id: number; name: string; defaultUnitCost?: number | null }, type: "incoming" | "outgoing") {
     setMovementType(type);
