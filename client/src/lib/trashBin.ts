@@ -1,3 +1,5 @@
+import { getOfflineSession } from "@/lib/offlineSync";
+
 export const TRASH_BIN_KEY = "purepoint-trash-bin";
 
 export type TrashItem = {
@@ -6,6 +8,7 @@ export type TrashItem = {
   entityLabel: string;
   payload: unknown;
   deletedAt: string;
+  deletedBy: string;
 };
 
 function canUseStorage() {
@@ -21,7 +24,11 @@ export function getTrashItems(): TrashItem[] {
   try {
     const raw = localStorage.getItem(TRASH_BIN_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is TrashItem => Boolean(item && typeof item === "object" && typeof item.id === "string" && typeof item.entityType === "string" && typeof item.entityLabel === "string" && typeof item.deletedAt === "string")).map(item => ({
+      ...item,
+      deletedBy: typeof item.deletedBy === "string" && item.deletedBy.trim() ? item.deletedBy : "مستخدم سابق",
+    }));
   } catch {
     return [];
   }
@@ -32,8 +39,15 @@ function saveTrashItems(items: TrashItem[]) {
   notify();
 }
 
-export function moveToTrash(item: Omit<TrashItem, "id" | "deletedAt">) {
-  const entry: TrashItem = { ...item, id: `${item.entityType}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, deletedAt: new Date().toISOString() };
+export function moveToTrash(item: Omit<TrashItem, "id" | "deletedAt" | "deletedBy">) {
+  const session = getOfflineSession();
+  const deletedBy = session?.name?.trim() || session?.email?.trim() || "المستخدم الحالي";
+  const entry: TrashItem = {
+    ...item,
+    id: `${item.entityType}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    deletedAt: new Date().toISOString(),
+    deletedBy,
+  };
   saveTrashItems([entry, ...getTrashItems()]);
   return entry;
 }
