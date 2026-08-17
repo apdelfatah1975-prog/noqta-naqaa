@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { formatDate, toDateTimeLocal } from "@/lib/filterUi";
-import { ArrowDownLeft, ArrowUpRight, Boxes, PackagePlus, Plus } from "lucide-react";
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Boxes, PackagePlus, Plus } from "lucide-react";
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { cacheOfflineInventory, getOfflineInventory, getOfflineSession, queueOfflineDelete, queueOfflineInventoryItem, queueOfflineInventoryMovement } from "@/lib/offlineSync";
@@ -28,6 +28,7 @@ export default function Inventory() {
       outgoing: movements.filter(movement => movement.movementType === "outgoing").reduce((sum, movement) => sum + movement.quantity, 0),
     };
   }, [data]);
+  const lowStockItems = useMemo(() => data.items.filter(item => item.currentBalance <= (item.reorderLevel ?? 2)).slice(0, 3), [data]);
   useEffect(() => {
     if (inventoryQuery.data && owner) cacheOfflineInventory(owner.id, inventoryQuery.data);
   }, [inventoryQuery.data, owner]);
@@ -118,15 +119,13 @@ export default function Inventory() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <InventorySummaryCard label="عدد الأصناف" value={inventoryStats.totalItems.toLocaleString("ar-SA")} hint="أصناف مسجلة في المخزن" tone="teal" />
-        <InventorySummaryCard label="الرصيد الحالي" value={inventoryStats.currentBalance.toLocaleString("ar-SA")} hint="إجمالي القطع المتاحة" tone="sky" />
-        <InventorySummaryCard label="إجمالي الوارد" value={inventoryStats.incoming.toLocaleString("ar-SA")} hint="قطع أُضيفت للمخزن" tone="violet" />
-        <InventorySummaryCard label="إجمالي المنصرف" value={inventoryStats.outgoing.toLocaleString("ar-SA")} hint="قطع صُرفت من المخزن" tone="amber" />
-      </div>
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm">
-        <div><p className="text-sm font-extrabold">تنبيه المخزون</p><p className="mt-1 text-xs text-amber-800/80">{inventoryStats.lowStock ? `${inventoryStats.lowStock.toLocaleString("ar-SA")} أصناف تحتاج مراجعة الرصيد` : "كل الأرصدة ضمن الحد المطمئن"}</p></div>
-        <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-amber-800">{inventoryStats.lowStock.toLocaleString("ar-SA")}</span>
+      <div className="grid gap-4 lg:grid-cols-[1.05fr_1fr_1.35fr]">
+        <InventoryDecisionCard tone="teal" icon={<Boxes className="h-5 w-5" />} label="الرصيد الجاهز" value={inventoryStats.currentBalance.toLocaleString("ar-SA")} detail={`متاح من ${inventoryStats.totalItems.toLocaleString("ar-SA")} أصناف`} />
+        <InventoryDecisionCard tone={inventoryStats.lowStock ? "amber" : "green"} icon={<AlertTriangle className="h-5 w-5" />} label="يحتاج شراء" value={inventoryStats.lowStock.toLocaleString("ar-SA")} detail={inventoryStats.lowStock ? lowStockItems.map(item => item.name).join("، ") : "كل الأصناف فوق حد التنبيه"} />
+        <article className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold text-sky-900/70">حركة المخزن</p><p className="mt-1 text-sm font-extrabold text-sky-950">الوارد والمنصرف</p></div><span className="rounded-xl bg-white p-2 text-sky-700"><ArrowDownLeft className="h-5 w-5" /></span></div>
+          <div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-xl bg-white/80 p-3"><p className="text-[11px] font-bold text-teal-700">وارد</p><p className="mt-1 text-xl font-black text-teal-900">{inventoryStats.incoming.toLocaleString("ar-SA")}</p></div><div className="rounded-xl bg-white/80 p-3"><p className="text-[11px] font-bold text-amber-700">منصرف</p><p className="mt-1 text-xl font-black text-amber-900">{inventoryStats.outgoing.toLocaleString("ar-SA")}</p></div></div>
+        </article>
       </div>
 
       <section className="soft-card overflow-hidden">
@@ -167,6 +166,7 @@ export default function Inventory() {
 function formatMoney(minorAmount: number) { return (minorAmount / 100).toLocaleString("ar-SA", { maximumFractionDigits: 2 }); }
 function latestPurchaseUnitCost(itemId: number, movements: Array<{ inventoryItemId: number; movementType: string; unitCost?: number | null }>) { return movements.find(movement => movement.inventoryItemId === itemId && movement.movementType === "incoming" && (movement.unitCost ?? 0) > 0)?.unitCost ?? 0; }
 function InventorySummaryCard({ label, value, hint, tone }: { label: string; value: string; hint: string; tone: "teal" | "amber" | "sky" | "violet" }) { const tones = { teal: "border-teal-200 bg-teal-50 text-teal-950", amber: "border-amber-200 bg-amber-50 text-amber-950", sky: "border-sky-200 bg-sky-50 text-sky-950", violet: "border-violet-200 bg-violet-50 text-violet-950" }; return <article className={`min-h-28 rounded-2xl border p-4 shadow-sm ${tones[tone]}`}><p className="text-xs font-bold opacity-75">{label}</p><p className="mt-2 text-xl font-black">{value}</p><p className="mt-1 text-[11px] opacity-70">{hint}</p></article>; }
+function InventoryDecisionCard({ icon, label, value, detail, tone }: { icon: React.ReactNode; label: string; value: string; detail: string; tone: "teal" | "amber" | "green" }) { const tones = { teal: "border-teal-200 bg-teal-50 text-teal-950", amber: "border-amber-200 bg-amber-50 text-amber-950", green: "border-emerald-200 bg-emerald-50 text-emerald-950" }; return <article className={`min-h-36 rounded-2xl border p-4 shadow-sm ${tones[tone]}`}><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold opacity-70">{label}</p><p className="mt-2 text-3xl font-black">{value}</p></div><span className="rounded-xl bg-white/80 p-2.5 shadow-sm">{icon}</span></div><p className="mt-3 truncate text-xs font-bold opacity-70" title={detail}>{detail}</p></article>; }
 function StockBadge({ balance }: { balance: number }) { return <Badge className={balance <= 2 ? "bg-amber-100 text-amber-800 hover:bg-amber-100" : "bg-teal-100 text-teal-800 hover:bg-teal-100"}>{balance <= 2 ? "رصيد منخفض" : "متوفر"}</Badge>; }
 function inventoryItemCode(id: number) { return `#${String(id).padStart(4, "0")}`; }
 function InventoryTableRow({ item, onMovement, onDelete }: { item: { id: number; name: string; notes: string | null; openingQuantity: number; currentBalance: number }; onMovement: () => void; onDelete: () => void }) { return <tr className="hover:bg-teal-50/45"><td className="px-5 py-4 text-sm font-bold text-teal-700">{inventoryItemCode(item.id)}</td><td className="px-5 py-4"><p className="text-base font-extrabold text-teal-950">{item.name}</p>{item.notes ? <p className="mt-1 max-w-64 truncate text-xs text-muted-foreground">{item.notes}</p> : null}</td><td className="px-5 py-4">{item.openingQuantity}</td><td className="px-5 py-4 text-lg font-extrabold text-teal-800">{item.currentBalance}</td><td className="px-5 py-4"><StockBadge balance={item.currentBalance} /></td><td className="px-5 py-4"><Button size="sm" variant="outline" onClick={onMovement} className="rounded-lg border-teal-700/20 text-teal-800 hover:bg-teal-50"><PackagePlus className="ml-1 h-4 w-4" />صرف صنف</Button><Button size="sm" variant="outline" onClick={onDelete} className="mr-2 rounded-lg border-rose-200 text-rose-700 hover:bg-rose-50">حذف</Button></td></tr>; }
