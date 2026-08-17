@@ -1,4 +1,4 @@
-import { index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { boolean, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 import { cashCurrencies, cashTransactionTypes } from "../shared/cashBusiness";
 
 /**
@@ -183,3 +183,52 @@ export const cashTransactions = mysqlTable(
   table => [index("cash_transactions_owner_date_idx").on(table.ownerId, table.transactionDate),
     uniqueIndex("cash_transactions_owner_operation_unique").on(table.ownerId, table.clientOperationId), index("cash_transactions_source_visit_idx").on(table.ownerId, table.sourceVisitId), index("cash_transactions_source_inventory_idx").on(table.ownerId, table.sourceInventoryMovementId)],
 );
+
+export const serviceTypes = mysqlTable(
+  "serviceTypes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    code: varchar("code", { length: 64 }).notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    isActive: boolean("isActive").default(true).notNull(),
+    version: int("version").default(1).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [uniqueIndex("service_types_owner_code_unique").on(table.ownerId, table.code)],
+);
+
+export const serviceTypeItems = mysqlTable(
+  "serviceTypeItems",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    serviceTypeId: int("serviceTypeId").notNull().references(() => serviceTypes.id, { onDelete: "cascade" }),
+    inventoryItemId: int("inventoryItemId").notNull().references(() => inventoryItems.id, { onDelete: "cascade" }),
+    defaultQuantity: int("defaultQuantity").default(1).notNull(),
+    isRequired: boolean("isRequired").default(false).notNull(),
+    allowEditQuantity: boolean("allowEditQuantity").default(true).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [uniqueIndex("service_type_items_owner_service_item_unique").on(table.ownerId, table.serviceTypeId, table.inventoryItemId), index("service_type_items_service_idx").on(table.serviceTypeId)],
+);
+
+export const visitItems = mysqlTable(
+  "visitItems",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    visitId: int("visitId").notNull().references(() => visits.id, { onDelete: "cascade" }),
+    inventoryItemId: int("inventoryItemId").notNull().references(() => inventoryItems.id, { onDelete: "cascade" }),
+    itemNameSnapshot: varchar("itemNameSnapshot", { length: 160 }).notNull(),
+    unitSnapshot: varchar("unitSnapshot", { length: 40 }).notNull(),
+    quantity: int("quantity").notNull(),
+    source: mysqlEnum("source", ["default", "manual"]).default("default").notNull(),
+    clientOperationId: varchar("clientOperationId", { length: 64 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [index("visit_items_visit_idx").on(table.visitId), uniqueIndex("visit_items_owner_operation_unique").on(table.ownerId, table.clientOperationId)],
+);
+

@@ -82,7 +82,6 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(screen.getByLabelText("فلترة حالة العميل: اليوم")).toBeTruthy();
     expect(screen.getByLabelText("فلترة حالة العميل: خلال ٥ أيام")).toBeTruthy();
     expect(screen.getByLabelText("فلترة حالة العميل: متأخر")).toBeTruthy();
-    expect(screen.getByLabelText("فلترة حالة العميل: منتظم")).toBeTruthy();
   });
 
   it("يفتح بطاقة تسجيل الزيارة مباشرة من بطاقة العميل ويُبقي السجل مستقلًا", () => {
@@ -193,12 +192,12 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(mocks.remindersInvalidate).toHaveBeenCalled();
   });
 
-  it("لا يعرض بطاقات أو فلاتر حالات بجانب البحث", () => {
+  it("يبرز بطاقة الكل النشطة بإطار واضح عند فتح صفحة العملاء", () => {
     render(<Customers />);
-    expect(screen.queryByRole("button", { name: "عرض متأخر" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "عرض اليوم" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "عرض خلال ٥ أيام" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "عرض بدون موعد" })).toBeNull();
+    const allFilter = screen.getByRole("button", { name: /فلترة حالة العميل: الكل/ });
+    expect(allFilter.getAttribute("aria-pressed")).toBe("true");
+    expect(allFilter.className).toContain("ring-2");
+    expect(allFilter.className).toContain("shadow-sm");
   });
 
   it("يستخدم كل العملاء كحالة افتراضية بعد إزالة الفلتر السريع", () => {
@@ -207,7 +206,7 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(latestInput.followUpStatus).toBe("all");
   });
 
-  it("لا يعرض بطاقات الحالات بعد تبسيط صفحة العملاء", () => {
+  it("يعرض بطاقات الحالات الأربع بجوار البحث", () => {
     mocks.list.mockReturnValue({
       data: [
         { id: 12, name: "عميل متأخر", phone: "01000000000", address: "العنوان", customerCode: "C-000012", followUp: { nextVisitDate: new Date("2026-08-10T09:00:00Z"), daysRemaining: -2 } },
@@ -219,10 +218,10 @@ describe("ترابط تعديل بيانات العميل", () => {
       isError: false,
     });
     render(<Customers />);
-    expect(screen.queryByRole("button", { name: "عرض متأخر" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "عرض اليوم" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "عرض خلال ٥ أيام" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "عرض منتظم" })).toBeNull();
+    expect(screen.getByRole("button", { name: /فلترة حالة العميل: الكل/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /فلترة حالة العميل: متأخر/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /فلترة حالة العميل: اليوم/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /فلترة حالة العميل: خلال ٥ أيام/ })).toBeTruthy();
   });
 
   it("يفعّل فلتر الحالة عند النقر على أيقونة العميل", () => {

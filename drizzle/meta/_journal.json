@@ -127,6 +127,13 @@
       "when": 1786989355298,
       "tag": "0017_slippery_starjammers",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1786996500427,
+      "tag": "0018_vengeful_cammi",
+      "breakpoints": true
     }
   ]
 }

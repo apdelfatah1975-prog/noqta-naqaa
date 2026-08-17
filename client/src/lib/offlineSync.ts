@@ -12,6 +12,7 @@ const INVENTORY_KEY_PREFIX = "purepoint-offline-inventory";
 const CASH_QUEUE_PREFIX = "purepoint-pending-cash";
 const INVENTORY_QUEUE_PREFIX = "purepoint-pending-inventory";
 const REPORT_KEY_PREFIX = "purepoint-offline-report";
+const SERVICE_CATALOG_KEY = "purepoint-offline-service-catalog";
 
 export type OfflineCustomer = {
   id: number;
@@ -37,6 +38,18 @@ export type PendingCustomer = Omit<OfflineCustomer, "id"> & {
   createdAt: string;
 };
 
+export type OfflineServiceCatalog = {
+  types: Array<{ id: number; code: string; name: string }>;
+  mappings: Array<{ serviceTypeId: number; inventoryItemId: number; defaultQuantity: number; isRequired: boolean; allowEditQuantity: boolean }>;
+  items: Array<{ id: number; name: string; unit: string; currentBalance: number }>;
+};
+
+export type OfflineVisitItem = {
+  inventoryItemId: number;
+  quantity: number;
+  source: "default" | "manual";
+};
+
 export type OfflineVisit = {
   id: number;
   customerId: number;
@@ -47,6 +60,7 @@ export type OfflineVisit = {
   notes?: string | null;
   collectedAmount?: number;
   collectedCurrency?: "SAR";
+  items?: OfflineVisitItem[];
 };
 
 export type PendingVisit = {
@@ -59,6 +73,7 @@ export type PendingVisit = {
   notes: string | null;
   collectedAmount?: number;
   collectedCurrency?: "SAR";
+  items?: OfflineVisitItem[];
   createdAt: string;
 };
 
@@ -174,6 +189,14 @@ export function cacheOfflineCustomers(customers: OfflineCustomer[]) {
 
 export function getOfflineCustomers() {
   return readJson<OfflineCustomer[]>(CUSTOMERS_KEY, []);
+}
+
+export function cacheOfflineServiceCatalog(catalog: OfflineServiceCatalog) {
+  writeJson(SERVICE_CATALOG_KEY, catalog);
+}
+
+export function getOfflineServiceCatalog() {
+  return readJson<OfflineServiceCatalog | null>(SERVICE_CATALOG_KEY, null);
 }
 
 export function cacheOfflineVisits(visits: OfflineVisit[]) {

@@ -10,7 +10,7 @@ import "./index.css";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js?version=11").then(registration => {
+    void navigator.serviceWorker.register("/sw.js?version=12").then(registration => {
       const update = () => void registration.update();
       if ("requestIdleCallback" in window) {
         window.requestIdleCallback(update, { timeout: 3000 });

@@ -47,7 +47,7 @@ const menuItems = [
   { icon: UsersRound, label: "العملاء", path: "/customers" },
   { icon: CalendarPlus, label: "سجل الزيارات", path: "/visits" },
   { icon: BellRing, label: "التذكيرات", path: "/reminders" },
-  { icon: PackageSearch, label: "المخزنة", path: "/inventory" },
+  { icon: PackageSearch, label: "المخزن", path: "/inventory" },
   { icon: CircleDollarSign, label: "الخزينة والمصروفات", path: "/cash" },
   { icon: FileBarChart, label: "التقارير", path: "/reports" },
   { icon: WalletCards, label: "كشف رواتب الفنيين", path: "/technician-payroll" },
@@ -70,7 +70,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <p className="text-sm font-bold text-teal-700">نقطة نقاء</p>
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight">أهلًا بك في نظام الفلاتر</h1>
-          <p className="mt-3 text-sm leading-7 text-muted-foreground">سجّل الدخول للوصول إلى بيانات العملاء والزيارات والمخزنة بصورة آمنة.</p>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">سجّل الدخول للوصول إلى بيانات العملاء والزيارات والمخزن بصورة آمنة.</p>
           <Button onClick={() => startLogin()} size="lg" className="mt-8 h-12 w-full rounded-xl bg-teal-700 text-base hover:bg-teal-800">
             تسجيل الدخول
           </Button>

@@ -10,6 +10,9 @@ import {
   inventoryItems,
   inventoryMovements,
   notificationSettings,
+  serviceTypeItems,
+  serviceTypes,
+  visitItems,
   reminders,
   visits,
 } from "../../drizzle/schema";
@@ -63,6 +66,12 @@ const customerCreateInput = customerInput.extend({
   firstCollectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
 });
 
+const visitItemInput = z.object({
+  inventoryItemId: z.number().int().positive(),
+  quantity: z.number().int().positive("أدخل كمية أكبر من صفر"),
+  source: z.enum(["default", "manual"]).default("default"),
+});
+
 const visitInput = z.object({
   customerId: z.number().int().positive(),
   visitType: z.enum(visitTypes),
@@ -73,6 +82,7 @@ const visitInput = z.object({
   collectedAmount: z.number().int().nonnegative().optional().default(0),
   collectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
   clientOperationId: z.string().uuid().optional(),
+  items: z.array(visitItemInput).max(50).optional().default([]),
 });
 
 const inventoryItemInput = z.object({
@@ -651,6 +661,30 @@ export const filterManagementRouter = router({
     }),
   }),
 
+  serviceTypes: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const db = await databaseOrThrow();
+      const existing = await db.select().from(serviceTypes).where(eq(serviceTypes.ownerId, ctx.user.id));
+      if (!existing.length) {
+        await db.insert(serviceTypes).values(visitTypes.map(code => ({ ownerId: ctx.user.id, code, name: code === "installation" ? "تركيب فلتر" : code === "maintenance" ? "صيانة" : code === "cartridge_change" ? "تغيير شمعات" : code === "follow_up" ? "متابعة" : "أخرى" })));
+      }
+      const types = existing.length ? existing : await db.select().from(serviceTypes).where(eq(serviceTypes.ownerId, ctx.user.id));
+      const mappings = types.length ? await db.select().from(serviceTypeItems).where(and(eq(serviceTypeItems.ownerId, ctx.user.id), inArray(serviceTypeItems.serviceTypeId, types.map(type => type.id)))) : [];
+      const items = await db.select({ id: inventoryItems.id, name: inventoryItems.name, unit: inventoryItems.unit, currentBalance: inventoryItems.openingQuantity }).from(inventoryItems).where(eq(inventoryItems.ownerId, ctx.user.id));
+      return { types, mappings, items };
+    }),
+    saveMapping: adminProcedure.input(z.object({ serviceTypeId: z.number().int().positive(), inventoryItemId: z.number().int().positive(), defaultQuantity: z.number().int().positive(), isRequired: z.boolean().default(false), allowEditQuantity: z.boolean().default(true) })).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const service = await db.select({ id: serviceTypes.id }).from(serviceTypes).where(and(eq(serviceTypes.id, input.serviceTypeId), eq(serviceTypes.ownerId, ctx.user.id))).limit(1);
+      const item = await db.select({ id: inventoryItems.id }).from(inventoryItems).where(and(eq(inventoryItems.id, input.inventoryItemId), eq(inventoryItems.ownerId, ctx.user.id))).limit(1);
+      if (!service[0] || !item[0]) throw new TRPCError({ code: "NOT_FOUND", message: "الخدمة أو الصنف غير موجود." });
+      await db.insert(serviceTypeItems).values({ ownerId: ctx.user.id, ...input }).onDuplicateKeyUpdate({ set: { defaultQuantity: input.defaultQuantity, isRequired: input.isRequired, allowEditQuantity: input.allowEditQuantity } });
+      await db.update(serviceTypes).set({ version: 1 }).where(eq(serviceTypes.id, input.serviceTypeId));
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true };
+    }),
+  }),
+
   visits: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       const db = await databaseOrThrow();
@@ -688,9 +722,24 @@ export const filterManagementRouter = router({
         }
       }
       const customer = await getOwnedCustomer(ctx.user.id, input.customerId);
-      const { clientOperationId, collectedAmount, collectedCurrency, ...visitData } = input;
+      const { clientOperationId, collectedAmount, collectedCurrency, items, ...visitData } = input;
+      const inventoryRows = items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ctx.user.id), inArray(inventoryItems.id, items.map(item => item.inventoryItemId)))) : [];
+      const inventoryById = new Map(inventoryRows.map(item => [item.id, item]));
+      for (const requested of items) {
+        const inventoryItem = inventoryById.get(requested.inventoryItemId);
+        if (!inventoryItem) throw new TRPCError({ code: "NOT_FOUND", message: "لم يتم العثور على أحد الأصناف المستخدمة." });
+        const movements = await db.select().from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ctx.user.id), eq(inventoryMovements.inventoryItemId, requested.inventoryItemId)));
+        const balance = calculateStockBalance(inventoryItem.openingQuantity, movements);
+        if (requested.quantity > balance) throw new TRPCError({ code: "BAD_REQUEST", message: `الرصيد غير كافٍ من صنف ${inventoryItem.name}؛ المتاح ${balance} والمطلوب ${requested.quantity}.` });
+      }
       const visitResult = await db.insert(visits).values({ ...visitData, ownerId: ctx.user.id, clientOperationId });
       const visitId = Number(visitResult[0].insertId);
+      for (const requested of items) {
+        const inventoryItem = inventoryById.get(requested.inventoryItemId)!;
+        const operationId = clientOperationId ? `${clientOperationId}:${requested.inventoryItemId}`.slice(0, 64) : undefined;
+        await db.insert(visitItems).values({ ownerId: ctx.user.id, visitId, inventoryItemId: inventoryItem.id, itemNameSnapshot: inventoryItem.name, unitSnapshot: inventoryItem.unit, quantity: requested.quantity, source: requested.source, clientOperationId: operationId });
+        await db.insert(inventoryMovements).values({ ownerId: ctx.user.id, inventoryItemId: inventoryItem.id, movementType: "outgoing", quantity: requested.quantity, unitCost: inventoryItem.defaultUnitCost, currency: "SAR", movementDate: input.visitDate, technicianName: input.technicianName ?? null, notes: `منصرف تلقائي من زيارة العميل ${customer.name}`, clientOperationId: operationId });
+      }
       // تسجيل الزيارة يعني أن متابعة العميل تمت؛ لا نُبقي أي تذكير سابق معلقًا.
       await db.update(reminders)
         .set({ status: "completed" })

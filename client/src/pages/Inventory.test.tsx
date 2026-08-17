@@ -73,6 +73,14 @@ describe("تفاصيل المنصرف في المخزون", () => {
     expect(screen.getAllByText("الفني / المستلم").length).toBeGreaterThan(0);
   });
 
+  it("يفتح زر صرف الصنف نموذج المنصرف مباشرة", () => {
+    render(<Inventory />);
+    fireEvent.click(screen.getAllByRole("button", { name: "صرف صنف" })[0]);
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByText(/صرف صنف من المخزن/)).toBeTruthy();
+    expect(dialog.getByDisplayValue("منصرف")).toBeTruthy();
+  });
+
   it("يعرض حقول بيانات الصنف المفيدة داخل بطاقة الإضافة", () => {
     render(<Inventory />);
     fireEvent.click(screen.getByRole("button", { name: "إضافة صنف" }));
@@ -87,8 +95,8 @@ describe("تفاصيل المنصرف في المخزون", () => {
   it("يعرض واجهة المخزن الفارغة عند فشل الاستعلام دون رسالة تعذر التحميل", () => {
     mocks.summary.mockReturnValue({ isLoading: false, isError: true, data: undefined });
     render(<Inventory />);
-    expect(screen.getByText("إدارة المخزنة")).toBeTruthy();
-    expect(screen.queryByText("تعذر تحميل بيانات المخزنة.")).toBeNull();
-    expect(screen.getAllByText("لا توجد حركات مخزنة بعد.").length).toBeGreaterThan(0);
+    expect(screen.getByText("إدارة المخزن")).toBeTruthy();
+    expect(screen.queryByText("تعذر تحميل بيانات المخزن.")).toBeNull();
+    expect(screen.getAllByText("لا توجد حركات في المخزن بعد.").length).toBeGreaterThan(0);
   });
 });
