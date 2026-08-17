@@ -4,6 +4,8 @@ import {
   customerRowsForExcel,
   reminderExcelHeaders,
   reminderRowsForExcel,
+  visitExcelHeaders,
+  visitRowsForExcel,
   withArabicHeaders,
 } from "./excelExport";
 
@@ -24,6 +26,12 @@ describe("Excel export rows", () => {
     expect(withArabicHeaders(rows, customerExcelHeaders)[0]["اسم الفني لآخر زيارة"]).toBe("أحمد");
   });
 
+  it("يحوّل الزيارات الحالية إلى صفوف عربية قابلة للتصدير", () => {
+    const rows = visitRowsForExcel([{ customer: { manualCode: "ع-1", name: "عميل", phone: "0500", address: "العنوان" }, visitType: "maintenance", visitDate: "2026-08-17T10:00:00.000Z", technicianName: "فني", collectedAmount: 12500, visitResult: "تمت الصيانة" }]);
+    expect(rows[0]).toMatchObject({ customerCode: "ع-1", customerName: "عميل", visitType: "صيانة", technicianName: "فني", collectedAmount: 125, visitResult: "تمت الصيانة" });
+    expect(withArabicHeaders(rows, visitExcelHeaders)[0]["نتيجة الزيارة"]).toBe("تمت الصيانة");
+  });
+
   it("يبني صفوف التذكيرات باسم العميل وأيام التأخر", () => {
     const rows = reminderRowsForExcel([
       {
@@ -38,3 +46,4 @@ describe("Excel export rows", () => {
     expect(arabicRows[0]).toMatchObject({ "اسم العميل": "عميل آخر", "أيام التأخر": 2, "نوع آخر خدمة": "تركيب فلتر", الحالة: "معلق" });
   });
 });
+

@@ -13,6 +13,18 @@ export type CustomerExportRow = {
   totalCollectedAmount: number;
 };
 
+export type VisitExportRow = {
+  customerCode: string;
+  customerName: string;
+  phone: string;
+  address: string;
+  visitType: string;
+  visitDate: string;
+  technicianName: string;
+  collectedAmount: number;
+  visitResult: string;
+};
+
 export type ReminderExportRow = {
   customerCode: string;
   customerName: string;
@@ -35,6 +47,20 @@ export function customerRowsForExcel(customers: Array<any>): CustomerExportRow[]
     lastServiceType: labelVisitType(customer.followUp?.lastServiceVisitType),
     latestTechnicianName: customer.latestTechnicianName || "",
     totalCollectedAmount: Number(customer.totalCollectedAmount || 0) / 100,
+  }));
+}
+
+export function visitRowsForExcel(visits: Array<any>): VisitExportRow[] {
+  return visits.map(visit => ({
+    customerCode: visit.customer?.manualCode || visit.customer?.customerCode || "",
+    customerName: visit.customer?.name || "",
+    phone: visit.customer?.phone || "",
+    address: visit.customer?.address || "",
+    visitType: labelVisitType(visit.visitType),
+    visitDate: visit.visitDate ? new Date(visit.visitDate).toLocaleString("ar-EG") : "",
+    technicianName: visit.technicianName || "",
+    collectedAmount: Number(visit.collectedAmount || 0) / 100,
+    visitResult: visit.visitResult || visit.visitOutcome || visit.result || visit.notes || "",
   }));
 }
 
@@ -68,6 +94,18 @@ export const customerExcelHeaders: Record<keyof CustomerExportRow, string> = {
   lastServiceType: "نوع آخر خدمة",
   latestTechnicianName: "اسم الفني لآخر زيارة",
   totalCollectedAmount: "إجمالي المحصل",
+};
+
+export const visitExcelHeaders: Record<keyof VisitExportRow, string> = {
+  customerCode: "كود العميل",
+  customerName: "اسم العميل",
+  phone: "الهاتف",
+  address: "العنوان",
+  visitType: "نوع الزيارة",
+  visitDate: "تاريخ ووقت الزيارة",
+  technicianName: "اسم الفني",
+  collectedAmount: "المبلغ المحصل",
+  visitResult: "نتيجة الزيارة",
 };
 
 export const reminderExcelHeaders: Record<keyof ReminderExportRow, string> = {
