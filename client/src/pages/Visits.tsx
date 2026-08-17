@@ -4,7 +4,7 @@ import { cacheOfflineCustomers, cacheOfflineVisits, getOfflineCustomers, getOffl
 import { moveToTrash } from "@/lib/trashBin";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { trpc } from "@/lib/trpc";
-import { ClipboardList, Maximize2, Search, X } from "lucide-react";
+import { ClipboardList, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -28,7 +28,6 @@ export default function Visits() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [wideLayout, setWideLayout] = useState(() => localStorage.getItem("visits-layout-width") !== "balanced");
   const deleteVisit = trpc.filters.visits.delete.useMutation({ onSuccess: () => { setDeleteId(null); toast.success("تم حذف الزيارة ونقل نسختها إلى سلة المحذوفات"); }, onError: error => toast.error(error.message || "تعذر حذف الزيارة.") });
 
   useEffect(() => { if (customers) cacheOfflineCustomers(customers); }, [customers]);
@@ -41,16 +40,11 @@ export default function Visits() {
     ...visits.map(visit => ({ ...visit, customer: ("customer" in visit ? visit.customer : undefined) ?? customerMap.get(visit.customerId) })),
     ...pendingVisits.map(visit => ({ ...visit, id: -Math.abs(String(visit.clientOperationId ?? visit.visitDate).length), customer: customerMap.get(visit.customerId) })),
   ], { search, type: typeFilter, dateFrom, dateTo }), [customerMap, dateFrom, dateTo, pendingVisits, search, typeFilter, visits]);
-  const totalCollected = rows.reduce((sum, visit) => sum + (visit.collectedAmount ?? 0), 0);
   const clearFilters = () => { setSearch(""); setTypeFilter("all"); setDateFrom(""); setDateTo(""); };
   const selectedVisit: VisitRow | null = deleteId === null ? null : (rows.find(visit => visit.id === deleteId) ?? null);
-  const changeLayoutWidth = (wide: boolean) => { setWideLayout(wide); localStorage.setItem("visits-layout-width", wide ? "wide" : "balanced"); };
 
-  return <div className={`${wideLayout ? "-mx-4 w-[calc(100%+2rem)] sm:-mx-6 sm:w-[calc(100%+3rem)] lg:-mx-8 lg:w-[calc(100%+4rem)]" : "mx-auto w-full max-w-6xl"} -mt-2 space-y-4 px-0`}>
-    <header className="soft-card flex flex-col gap-3 border-teal-100 bg-gradient-to-l from-teal-50 via-white to-cyan-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-      <div><div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-teal-100 text-teal-800"><ClipboardList className="h-5 w-5" /></span><div><p className="text-xs font-bold text-teal-700">متابعة العمل اليومية</p><h1 className="text-2xl font-black tracking-tight text-teal-950">سجل الزيارات</h1></div></div><p className="mt-2 text-sm text-muted-foreground">راجع الزيارات وابحث فيها بسرعة من جدول واحد.</p></div>
-      <div className="flex flex-wrap items-center gap-2 self-start sm:justify-end sm:self-center"><div className="flex items-center rounded-xl border border-teal-200 bg-white/80 p-1" aria-label="التحكم في هامش الصفحة"><button type="button" onClick={() => changeLayoutWidth(false)} aria-pressed={!wideLayout} className={`rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${!wideLayout ? "bg-teal-700 text-white shadow-sm" : "text-teal-800 hover:bg-teal-50"}`}>هامش مريح</button><button type="button" onClick={() => changeLayoutWidth(true)} aria-pressed={wideLayout} className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${wideLayout ? "bg-teal-700 text-white shadow-sm" : "text-teal-800 hover:bg-teal-50"}`}><Maximize2 className="h-3.5 w-3.5" />عرض أوسع</button></div><span className="rounded-xl bg-teal-100 px-3 py-2 text-sm font-black text-teal-800">{rows.length.toLocaleString("ar-SA")} زيارة</span><span className={`rounded-xl px-3 py-2 text-sm font-bold ${online ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{online ? "متصل" : "دون نت"}</span></div>
-    </header>
+  return <div className="-mx-4 -mt-2 w-[calc(100%+2rem)] max-w-none space-y-4 px-0 sm:-mx-6 sm:w-[calc(100%+3rem)] lg:-mx-8 lg:w-[calc(100%+4rem)]">
+    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-teal-100 text-teal-800"><ClipboardList className="h-5 w-5" /></span><div><h1 className="page-heading">سجل الزيارات</h1><p className="page-subheading">راجع الزيارات المسجلة وابحث فيها بسرعة.</p></div></div></div><div className="flex items-center gap-2 self-start sm:self-end"><span className="rounded-xl bg-teal-100 px-3 py-2 text-sm font-black text-teal-800">{rows.length.toLocaleString("ar-SA")} زيارة</span><span className={`rounded-xl px-3 py-2 text-sm font-bold ${online ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{online ? "متصل" : "دون نت"}</span></div></div>
 
     <VisitHistory rows={rows} search={search} onSearchChange={setSearch} typeFilter={typeFilter} onTypeFilterChange={setTypeFilter} dateFrom={dateFrom} onDateFromChange={setDateFrom} dateTo={dateTo} onDateToChange={setDateTo} onClearFilters={clearFilters} onOpenCustomer={customer => setLocation(`/customers/${customer.id}`)} onDelete={visit => setDeleteId(visit.id)} />
     <PinVerificationDialog open={deleteId !== null} onOpenChange={open => { if (!open) setDeleteId(null); }} busy={deleteVisit.isPending} title="تأكيد حذف الزيارة" description="ستُنقل نسخة الزيارة إلى سلة المحذوفات قبل حذفها من السجل." onConfirm={pin => { if (!selectedVisit || !deleteId) return; moveToTrash({ entityType: "visit", entityLabel: `زيارة: ${selectedVisit.customer?.name ?? "عميل"}`, payload: selectedVisit }); if (!navigator.onLine && offlineUser) { queueOfflineDelete(offlineUser.id, { entity: "visit", id: deleteId, pin }); cacheOfflineVisits(getOfflineVisits().filter(visit => visit.id !== deleteId)); setDeleteId(null); toast.success("تم حذف الزيارة محليًا ونقل نسختها إلى السلة"); } else { deleteVisit.mutate({ id: deleteId, pin }); } }} />
