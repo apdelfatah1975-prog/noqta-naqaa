@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { getOfflineCash, getOfflineSession, getOfflineVisits } from "@/lib/offlineSync";
 import { getAppSettings, saveAppSettings, type AppSettings } from "@/lib/appSettings";
+import { printArabicPdf } from "@/lib/pdfExport";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
@@ -130,12 +131,20 @@ export default function TechnicianPayroll() {
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(selected.flatMap(row => row.transactions.map(item => ({ الفني: row.technician, التاريخ: dateLabel(item.transactionDate), التصنيف: item.category, "المبلغ": item.amount / 100, الملاحظات: item.notes || "" })))), "تفاصيل العمليات");
     XLSX.writeFile(workbook, `كشف-رواتب-الفنيين-${month}.xlsx`);
   };
+  const exportPdf = () => {
+    const rows = selected.map(row => ({ الفني: row.technician, الحالة: row.status === "paid" ? "مدفوع" : "متبقي", المستحق: (row.required / 100).toFixed(2), المدفوع: (row.paid / 100).toFixed(2), المتبقي: (row.remaining / 100).toFixed(2), "عدد العمليات": row.transactions.length }));
+    const opened = printArabicPdf(`كشف رواتب الفنيين - ${month}`, rows, [
+      { key: "الفني", label: "الفني" }, { key: "الحالة", label: "الحالة" }, { key: "المستحق", label: "المستحق" },
+      { key: "المدفوع", label: "المدفوع" }, { key: "المتبقي", label: "المتبقي" }, { key: "عدد العمليات", label: "عدد العمليات" },
+    ]);
+    if (opened) toast.success("تم تجهيز PDF لكشف الرواتب"); else toast.error("تعذر فتح نافذة PDF؛ اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى");
+  };
   return <div dir="rtl" className="mx-auto max-w-7xl space-y-6 print:bg-white">
     <header className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-teal-950 via-teal-800 to-cyan-700 p-6 text-white shadow-xl shadow-teal-950/10 sm:p-8 print:hidden">
       <div className="absolute -left-12 -top-16 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
       <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl"><p className="mb-2 text-sm font-bold text-teal-100">الإدارة المالية · فريق العمل</p><h1 className="text-3xl font-black tracking-tight sm:text-4xl">إدارة الفنيين والرواتب</h1><p className="mt-3 text-sm leading-7 text-teal-50/90">تابع راتب كل فني وعمولاته وما تم دفعه والمتبقي له من شاشة واحدة، مع حفظ الإعدادات تلقائيًا على هذا الجهاز.</p></div>
-        <div className="flex flex-wrap gap-2"><Button variant="outline" className="h-11 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => query.refetch()}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button><Button variant="outline" className="h-11 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => window.print()}><Printer className="ml-2 h-4 w-4" />طباعة / PDF</Button><Button className="h-11 rounded-xl bg-white text-teal-900 hover:bg-teal-50" onClick={exportExcel}><Download className="ml-2 h-4 w-4" />تصدير Excel</Button></div>
+        <div className="flex flex-wrap gap-2"><Button variant="outline" className="h-11 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => query.refetch()}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button><Button variant="outline" className="h-11 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => window.print()}><Printer className="ml-2 h-4 w-4" />طباعة / PDF</Button><Button variant="outline" className="h-11 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={exportPdf}><Download className="ml-2 h-4 w-4" />PDF</Button><Button className="h-11 rounded-xl bg-white text-teal-900 hover:bg-teal-50" onClick={exportExcel}><Download className="ml-2 h-4 w-4" />تصدير Excel</Button></div>
       </div>
     </header>
     {!query.data ? <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 print:hidden"><span className="grid h-8 w-8 place-items-center rounded-full bg-amber-100">!</span><span>يُعرض الكشف من البيانات المحلية؛ يمكنك متابعة الرواتب والتصدير دون اتصال.</span></div> : null}

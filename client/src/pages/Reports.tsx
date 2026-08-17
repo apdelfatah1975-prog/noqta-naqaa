@@ -4,6 +4,8 @@ import { trpc } from "@/lib/trpc";
 import { cacheOfflineReport, getLatestOfflineReport, getOfflineReport, getOfflineSession } from "@/lib/offlineSync";
 import { CalendarDays, Download, FileBarChart, PackageSearch, Printer, RefreshCw, WalletCards } from "lucide-react";
 import { labelVisitType } from "@/lib/filterUi";
+import { printArabicPdf } from "@/lib/pdfExport";
+import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
 const money = (amount: number) => new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 2 }).format(amount / 100);
@@ -67,6 +69,26 @@ export default function Reports() {
     XLSX.writeFile(workbook, `تقرير-نقطة-نقاء-${dateFrom}-${dateTo}.xlsx`);
   };
 
+  const exportPdf = () => {
+    const rows = [
+      { البيان: "الفترة من", القيمة: data.period.dateFrom },
+      { البيان: "الفترة إلى", القيمة: data.period.dateTo },
+      { البيان: "عدد الزيارات", القيمة: number(data.summary.visits) },
+      { البيان: "عدد العملاء الذين تمت زيارتهم", القيمة: number(data.summary.customers) },
+      { البيان: "الإيرادات", القيمة: money(data.summary.income) },
+      { البيان: "المصروفات", القيمة: money(data.summary.expense) },
+      { البيان: "صافي الحركة", القيمة: money(data.summary.balance) },
+      { البيان: "المتابعات المعلقة", القيمة: number(data.summary.pendingReminders) },
+      { البيان: "أصناف منخفضة الرصيد", القيمة: number(data.summary.lowStock) },
+      ...financial.technicianPaymentsByName.map(row => ({ البيان: `الفني: ${row.technician}`, القيمة: `${row.status === "paid" ? "مدفوع" : "متبقي"} — المستحق ${money(row.requiredAmount)} — المدفوع ${money(row.totalPaid)} — المتبقي ${money(row.remainingAmount)}` })),
+    ];
+    const opened = printArabicPdf(`تقرير نقطة نقاء - ${dateFrom} إلى ${dateTo}`, rows, [
+      { key: "البيان", label: "البيان" },
+      { key: "القيمة", label: "القيمة" },
+    ]);
+    if (opened) toast.success("تم تجهيز PDF للتقرير"); else toast.error("تعذر فتح نافذة PDF؛ اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى");
+  };
+
   const cards = useMemo(() => data ? [
     { label: "الزيارات المنفذة", value: number(data.summary.visits), tone: "bg-teal-50 text-teal-900", icon: CalendarDays },
     { label: "الإيرادات", value: money(data.summary.income), tone: "bg-emerald-50 text-emerald-900", icon: WalletCards },
@@ -82,7 +104,7 @@ export default function Reports() {
   return <div dir="rtl" className="mx-auto max-w-7xl space-y-6 print:bg-white">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between print:hidden">
       <div><p className="text-sm font-bold text-teal-700">مركز الإدارة</p><h1 className="page-heading">التقارير</h1><p className="page-subheading">ملخص سريع، ثم تفاصيل كل جانب من العمل عند الحاجة.</p></div>
-      <div className="flex flex-wrap gap-2"><Button variant="outline" className="h-11 rounded-xl" onClick={() => query.refetch()}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button><Button variant="outline" className="h-11 rounded-xl" onClick={() => window.print()} disabled={!data}><Printer className="ml-2 h-4 w-4" />طباعة / PDF</Button><Button className="h-11 rounded-xl bg-teal-700 hover:bg-teal-800" onClick={exportExcel} disabled={!data}><Download className="ml-2 h-4 w-4" />تصدير Excel</Button></div>
+      <div className="flex flex-wrap gap-2"><Button variant="outline" className="h-11 rounded-xl" onClick={() => query.refetch()}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button><Button variant="outline" className="h-11 rounded-xl" onClick={() => window.print()} disabled={!data}><Printer className="ml-2 h-4 w-4" />طباعة / PDF</Button><Button variant="outline" className="h-11 rounded-xl" onClick={exportPdf} disabled={!data}><Download className="ml-2 h-4 w-4" />PDF</Button><Button className="h-11 rounded-xl bg-teal-700 hover:bg-teal-800" onClick={exportExcel} disabled={!data}><Download className="ml-2 h-4 w-4" />تصدير Excel</Button></div>
     </div>
 
     <section className="soft-card flex flex-col gap-4 p-5 sm:flex-row sm:items-end print:hidden">

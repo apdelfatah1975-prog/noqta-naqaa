@@ -11,7 +11,6 @@ import React from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
-function inventoryItemCode(id: number) { return `#${String(id).padStart(4, "0")}`; }
 function inventoryVisual(category?: string | null, name?: string) {
   const value = `${category ?? ""} ${name ?? ""}`;
   if (value.includes("مبرد") || value.includes("ثلاج")) return { icon: Refrigerator, tone: "bg-sky-100 text-sky-700", label: "مبردة" };

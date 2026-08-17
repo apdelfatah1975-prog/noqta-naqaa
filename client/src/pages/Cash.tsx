@@ -158,8 +158,8 @@ export default function Cash() {
       <div className="flex flex-wrap gap-2"><Button onClick={() => { setTransactionType("income"); setOpen(true); }} className="h-11 rounded-xl bg-teal-700 px-4 font-bold hover:bg-teal-800"><ArrowDownRight className="ml-2 h-5 w-5" />تسجيل إيراد</Button><Button onClick={() => { setTransactionType("expense"); setOpen(true); }} className="h-11 rounded-xl bg-amber-600 px-4 font-bold text-white hover:bg-amber-700"><ArrowUpLeft className="ml-2 h-5 w-5" />تسجيل مصروف</Button></div>
     </div>
 
-    <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {summaryCards.map(card => <article key={`${card.currency}-${card.label}`} className={`rounded-2xl p-5 shadow-sm ${card.tone}`}><div className="flex items-center justify-between"><p className="text-sm font-bold opacity-80">{card.label}</p><card.icon className="h-5 w-5 opacity-80" /></div><p className="mt-4 text-2xl font-extrabold tracking-tight">{formatMoney(card.amount, card.currency)}</p></article>)}
+    <section className="grid gap-2 sm:grid-cols-3">
+      {summaryCards.map(card => <article key={`${card.currency}-${card.label}`} className={`rounded-xl p-3 shadow-sm ${card.tone}`}><div className="flex items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/70"><card.icon className="h-4 w-4 opacity-80" /></span><div className="min-w-0"><p className="truncate text-xs font-bold opacity-80">{card.label}</p><p className="mt-1 text-base font-extrabold tracking-tight">{formatMoney(card.amount, card.currency)}</p></div></div></article>)}
     </section>
 
     <details className="soft-card group">

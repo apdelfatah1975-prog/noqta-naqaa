@@ -64,8 +64,7 @@ describe("تفاصيل المنصرف في المخزون", () => {
     render(<Inventory />);
 
     expect(screen.getAllByText("شمعة كربون 10 بوصة").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("#0004").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("الصنف ورقم المخزون").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("الصنف").length).toBeGreaterThan(0);
     expect(screen.getAllByText("منصرف").length).toBeGreaterThan(0);
     expect(screen.getAllByText("محمد الفني").length).toBeGreaterThan(0);
     expect(screen.getAllByText("صرف لتركيب جديد").length).toBeGreaterThan(0);
