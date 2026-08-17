@@ -16,10 +16,12 @@ describe("Excel export rows", () => {
         phone: "01000000000",
         address: "العنوان",
         followUp: { nextVisitDate: "2026-08-20T00:00:00.000Z", daysRemaining: 5, lastServiceVisitType: "maintenance" },
+        latestTechnicianName: "أحمد",
       },
     ]);
-    expect(rows[0]).toMatchObject({ customerCode: "C-000001", name: "عميل تجريبي", followUpDays: "5 يوم", lastServiceType: "صيانة" });
+    expect(rows[0]).toMatchObject({ customerCode: "C-000001", name: "عميل تجريبي", followUpDays: "5 يوم", lastServiceType: "صيانة", latestTechnicianName: "أحمد" });
     expect(withArabicHeaders(rows, customerExcelHeaders)[0]["كود العميل"]).toBe("C-000001");
+    expect(withArabicHeaders(rows, customerExcelHeaders)[0]["اسم الفني لآخر زيارة"]).toBe("أحمد");
   });
 
   it("يبني صفوف التذكيرات باسم العميل وأيام التأخر", () => {

@@ -506,6 +506,7 @@ export const filterManagementRouter = router({
           return {
             ...shaped,
             lastVisitDate: latestVisit?.visitDate ?? null,
+            latestTechnicianName: latestVisit?.technicianName ?? null,
             collectedAmount: latestIncome?.amount ?? 0,
             totalCollectedAmount: totalIncomeByCustomer.get(customer.id) ?? 0,
             collectedCurrency: latestIncome?.currency ?? "SAR",
