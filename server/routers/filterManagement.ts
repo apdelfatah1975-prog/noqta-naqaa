@@ -475,7 +475,7 @@ export const filterManagementRouter = router({
       visitDateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       collectedAmountMin: z.number().int().nonnegative().optional(),
       collectedAmountMax: z.number().int().nonnegative().optional(),
-      sortBy: z.enum(["created_desc", "next_asc", "next_desc", "status"]).default("created_desc"),
+      sortBy: z.enum(["created_desc", "next_asc", "next_desc", "status", "collected_desc", "collected_asc"]).default("created_desc"),
     })).query(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const ownerFilter = eq(customers.ownerId, ctx.user.id);
@@ -491,6 +491,12 @@ export const filterManagementRouter = router({
       const visitsByCustomer = new Map<number, Array<typeof visits.$inferSelect>>();
       ownerVisits.forEach(visit => visitsByCustomer.set(visit.customerId, [...(visitsByCustomer.get(visit.customerId) ?? []), visit]));
       const incomeByVisit = new Map(ownerIncome.map(transaction => [transaction.sourceVisitId, transaction]));
+      const totalIncomeByCustomer = new Map<number, number>();
+      ownerIncome.forEach(transaction => {
+        if (transaction.sourceVisitId === null) return;
+        const visit = ownerVisits.find(item => item.id === transaction.sourceVisitId);
+        if (visit) totalIncomeByCustomer.set(visit.customerId, (totalIncomeByCustomer.get(visit.customerId) ?? 0) + transaction.amount);
+      });
       const search = input.search?.toLocaleLowerCase("ar-EG");
       return customerRows
         .map(customer => {
@@ -501,6 +507,7 @@ export const filterManagementRouter = router({
             ...shaped,
             lastVisitDate: latestVisit?.visitDate ?? null,
             collectedAmount: latestIncome?.amount ?? 0,
+            totalCollectedAmount: totalIncomeByCustomer.get(customer.id) ?? 0,
             collectedCurrency: latestIncome?.currency ?? "SAR",
           };
         })
@@ -516,8 +523,8 @@ export const filterManagementRouter = router({
           const matchesDate = !input.followUpDate || Boolean(followUp && followUp.nextVisitDate.toISOString().slice(0, 10) === input.followUpDate);
           const matchesVisitDateFrom = !input.visitDateFrom || Boolean(lastVisitDate && lastVisitDate >= input.visitDateFrom);
           const matchesVisitDateTo = !input.visitDateTo || Boolean(lastVisitDate && lastVisitDate <= input.visitDateTo);
-          const matchesCollectedMin = input.collectedAmountMin === undefined || customer.collectedAmount >= input.collectedAmountMin;
-          const matchesCollectedMax = input.collectedAmountMax === undefined || customer.collectedAmount <= input.collectedAmountMax;
+          const matchesCollectedMin = input.collectedAmountMin === undefined || customer.totalCollectedAmount >= input.collectedAmountMin;
+          const matchesCollectedMax = input.collectedAmountMax === undefined || customer.totalCollectedAmount <= input.collectedAmountMax;
           return matchesSearch && matchesStatus && matchesDate && matchesVisitDateFrom && matchesVisitDateTo && matchesCollectedMin && matchesCollectedMax;
         })
         .sort((left, right) => {
@@ -530,6 +537,10 @@ export const filterManagementRouter = router({
           if (input.sortBy === "status") {
             const statusRank = (customer: typeof left) => !customer.followUp ? 4 : customer.followUp.daysRemaining < 0 ? 1 : customer.followUp.daysRemaining === 0 ? 2 : 3;
             return statusRank(left) - statusRank(right) || left.name.localeCompare(right.name, "ar-EG");
+          }
+          if (input.sortBy === "collected_desc" || input.sortBy === "collected_asc") {
+            const difference = left.totalCollectedAmount - right.totalCollectedAmount;
+            return (input.sortBy === "collected_desc" ? -1 : 1) * difference || left.name.localeCompare(right.name, "ar-EG");
           }
           return left.createdAt.getTime() - right.createdAt.getTime() || left.id - right.id;
         });

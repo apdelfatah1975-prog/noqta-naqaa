@@ -29,6 +29,11 @@ export default function Settings() {
   const [technicianNameDraft, setTechnicianNameDraft] = useState("");
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>(() => getActivityLog());
   const [trashItems, setTrashItems] = useState<TrashItem[]>(() => getTrashItems());
+  const restoreCustomer = trpc.filters.customers.create.useMutation();
+  const restoreVisit = trpc.filters.visits.create.useMutation();
+  const restoreCash = trpc.filters.cash.create.useMutation();
+  const restoreInventoryItem = trpc.filters.inventory.createItem.useMutation();
+  const restoreInventoryMovement = trpc.filters.inventory.createMovement.useMutation();
   const setPin = trpc.filters.notifications.setPin.useMutation({
     onSuccess: () => { setCurrentPin(""); setNewPin(""); setConfirmPin(""); toast.success("تم تغيير الرقم السري بنجاح"); },
     onError: error => toast.error(error.message || "تعذر تغيير الرقم السري."),
@@ -90,17 +95,38 @@ export default function Settings() {
     toast.success("نُقلت إعدادات الفني إلى سلة المحذوفات");
   }
 
-  function restoreTrashItem(item: TrashItem) {
+  async function restoreTrashItem(item: TrashItem) {
     if (settings.confirmDestructiveActions && !window.confirm(`استعادة ${item.entityLabel}؟`)) return;
-    if (item.entityType === "technician-settings" && item.payload && typeof item.payload === "object" && "name" in item.payload && "profile" in item.payload) {
-      const payload = item.payload as { name: string; profile: AppSettings["technicianPayroll"][string] };
-      if (settings.technicianPayroll[payload.name]) { toast.error("يوجد فني بنفس الاسم حاليًا؛ احذف التعارض أو غيّر الاسم أولًا."); return; }
-      update("technicianPayroll", { ...settings.technicianPayroll, [payload.name]: payload.profile });
+    try {
+      if (item.entityType === "technician-settings" && item.payload && typeof item.payload === "object" && "name" in item.payload && "profile" in item.payload) {
+        const payload = item.payload as { name: string; profile: AppSettings["technicianPayroll"][string] };
+        if (settings.technicianPayroll[payload.name]) { toast.error("يوجد فني بنفس الاسم حاليًا؛ احذف التعارض أو غيّر الاسم أولًا."); return; }
+        update("technicianPayroll", { ...settings.technicianPayroll, [payload.name]: payload.profile });
+      } else if (item.entityType === "customer") {
+        const payload = item.payload as { name: string; phone: string; address?: string | null; latitude?: string | null; longitude?: string | null; notes?: string | null; manualCode?: string | null };
+        await restoreCustomer.mutateAsync({ name: payload.name, phone: payload.phone, address: payload.address ?? null, latitude: payload.latitude ?? null, longitude: payload.longitude ?? null, notes: payload.notes ?? null, manualCode: payload.manualCode ?? undefined });
+      } else if (item.entityType === "visit") {
+        const payload = item.payload as { customerId: number; visitType: "installation" | "maintenance" | "cartridge_change" | "follow_up" | "other"; visitDate: string; technicianName?: string | null; notes?: string | null; collectedAmount?: number };
+        await restoreVisit.mutateAsync({ customerId: payload.customerId, visitType: payload.visitType, visitDate: new Date(payload.visitDate), technicianName: payload.technicianName ?? null, notes: payload.notes ?? null, collectedAmount: payload.collectedAmount ?? 0, collectedCurrency: "SAR" });
+      } else if (item.entityType === "cash") {
+        const payload = item.payload as { transactionType: "income" | "expense"; amount: number; category: string; transactionDate: string; recipientName?: string | null; notes?: string | null };
+        await restoreCash.mutateAsync({ transactionType: payload.transactionType, amount: payload.amount, category: payload.category, transactionDate: new Date(payload.transactionDate), recipientName: payload.recipientName ?? null, notes: payload.notes ?? null, currency: "SAR" });
+      } else if (item.entityType === "inventory") {
+        const payload = item.payload as { kind: "item" | "movement"; target: any; relatedMovements?: any[] };
+        if (payload.kind === "item") {
+          const created = await restoreInventoryItem.mutateAsync({ name: payload.target.name, openingQuantity: payload.target.openingQuantity ?? 0, notes: payload.target.notes ?? null });
+          for (const movement of payload.relatedMovements ?? []) await restoreInventoryMovement.mutateAsync({ inventoryItemId: created.id, movementType: movement.movementType, quantity: movement.quantity, unitCost: movement.unitCost ?? 0, currency: "SAR", movementDate: new Date(movement.movementDate), technicianName: movement.technicianName ?? null, notes: movement.notes ?? null });
+        } else {
+          await restoreInventoryMovement.mutateAsync({ inventoryItemId: payload.target.inventoryItemId, movementType: payload.target.movementType, quantity: payload.target.quantity, unitCost: payload.target.unitCost ?? 0, currency: "SAR", movementDate: new Date(payload.target.movementDate), technicianName: payload.target.technicianName ?? null, notes: payload.target.notes ?? null });
+        }
+      }
+      restoreFromTrash(item.id);
+      appendActivityLog("استعادة من سلة المحذوفات", item.entityLabel);
+      setActivityLog(getActivityLog());
+      toast.success("تمت استعادة العنصر بنجاح");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذرت الاستعادة؛ بقي العنصر في السلة.");
     }
-    restoreFromTrash(item.id);
-    appendActivityLog("استعادة من سلة المحذوفات", item.entityLabel);
-    setActivityLog(getActivityLog());
-    toast.success("تمت الاستعادة محليًا");
   }
 
   function permanentlyDeleteTrashItem(item: TrashItem) {

@@ -4,12 +4,14 @@ import {
   getPendingCustomers,
   getPendingOperationCount,
   getPendingVisits,
+  getPendingVisitDeletes,
   getPendingCash,
   getPendingInventory,
   removePendingCash,
   removePendingInventory,
   removePendingCustomer,
   removePendingVisit,
+  removePendingVisitDelete,
   replaceOfflineCustomerId,
 } from "@/lib/offlineSync";
 import { CloudOff, CloudUpload } from "lucide-react";
@@ -26,6 +28,7 @@ export function OfflineSyncManager() {
   const utils = trpc.useUtils();
   const { mutateAsync: syncCustomer } = trpc.filters.customers.create.useMutation();
   const { mutateAsync: syncVisit } = trpc.filters.visits.create.useMutation();
+  const { mutateAsync: deleteVisit } = trpc.filters.visits.delete.useMutation();
   const { mutateAsync: syncCash } = trpc.filters.cash.create.useMutation();
   const { mutateAsync: syncInventoryItem } = trpc.filters.inventory.createItem.useMutation();
   const { mutateAsync: syncInventoryMovement } = trpc.filters.inventory.createMovement.useMutation();
@@ -91,6 +94,17 @@ export function OfflineSyncManager() {
         break;
       }
     }
+    for (const operation of getPendingVisitDeletes(user.id)) {
+      try {
+        await deleteVisit({ id: operation.id, pin: operation.pin });
+        removePendingVisitDelete(user.id, operation.clientOperationId);
+        syncedCount += 1;
+      } catch {
+        batchFailed = true;
+        setSyncFailed(true);
+        break;
+      }
+    }
     const inventoryIdMap = new Map<number, number>();
     for (const operation of getPendingInventory(user.id)) {
       try {
@@ -143,7 +157,7 @@ export function OfflineSyncManager() {
       utils.filters.cash.summary.invalidate(),
       utils.filters.inventory.summary.invalidate(),
     ]);
-  }, [deleteCash, deleteInventoryItem, deleteInventoryMovement, refreshCount, syncCash, syncCustomer, syncInventoryItem, syncInventoryMovement, syncVisit, user, utils]);
+  }, [deleteCash, deleteInventoryItem, deleteInventoryMovement, deleteVisit, refreshCount, syncCash, syncCustomer, syncInventoryItem, syncInventoryMovement, syncVisit, user, utils]);
 
   useEffect(() => {
     const goOnline = () => { setOnline(true); void syncPendingOperations(); };

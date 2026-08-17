@@ -15,6 +15,13 @@ vi.mock("@/lib/trpc", () => ({
       notifications: {
         setPin: { useMutation: () => ({ mutate: mocks.mutate, isPending: false }) },
       },
+      customers: { create: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) } },
+      visits: { create: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) } },
+      cash: { create: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) } },
+      inventory: {
+        createItem: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
+        createMovement: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
+      },
     },
   },
 }));

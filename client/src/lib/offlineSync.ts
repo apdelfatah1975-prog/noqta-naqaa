@@ -5,6 +5,7 @@ const CUSTOMERS_KEY = "purepoint-offline-customers";
 const VISITS_KEY = "purepoint-offline-visits";
 const CUSTOMER_QUEUE_PREFIX = "purepoint-pending-customers";
 const VISIT_QUEUE_PREFIX = "purepoint-pending-visits";
+const VISIT_DELETE_QUEUE_PREFIX = "purepoint-pending-visit-deletes";
 const DASHBOARD_KEY = "purepoint-offline-dashboard";
 const CASH_KEY_PREFIX = "purepoint-offline-cash";
 const INVENTORY_KEY_PREFIX = "purepoint-offline-inventory";
@@ -99,7 +100,7 @@ export type PendingInventoryMovement = {
 
 export type PendingOfflineDelete = {
   clientOperationId: string;
-  entity: "cash" | "inventoryItem" | "inventoryMovement";
+  entity: "cash" | "inventoryItem" | "inventoryMovement" | "visit";
   id: number;
   pin: string;
   createdAt: string;
@@ -268,6 +269,14 @@ export function getOfflineInventory<T>(ownerId: number) {
   return readJson<T | null>(ownerDataKey(INVENTORY_KEY_PREFIX, ownerId), null);
 }
 
+export function getPendingVisitDeletes(ownerId: number) {
+  return readJson<PendingOfflineDelete[]>(queueKey(VISIT_DELETE_QUEUE_PREFIX, ownerId), []);
+}
+
+export function removePendingVisitDelete(ownerId: number, clientOperationId: string) {
+  writeJson(queueKey(VISIT_DELETE_QUEUE_PREFIX, ownerId), getPendingVisitDeletes(ownerId).filter(item => item.clientOperationId !== clientOperationId));
+}
+
 export function getPendingCash(ownerId: number) {
   return readJson<Array<PendingCashTransaction | PendingOfflineDelete>>(queueKey(CASH_QUEUE_PREFIX, ownerId), []);
 }
@@ -300,8 +309,12 @@ export function queueOfflineInventoryMovement(ownerId: number, input: Omit<Pendi
 
 export function queueOfflineDelete(ownerId: number, input: Omit<PendingOfflineDelete, "clientOperationId" | "createdAt">) {
   const pending = { ...input, clientOperationId: newOperationId(), createdAt: new Date().toISOString() };
-  const prefix = input.entity === "cash" ? CASH_QUEUE_PREFIX : INVENTORY_QUEUE_PREFIX;
-  writeJson(queueKey(prefix, ownerId), [...(input.entity === "cash" ? getPendingCash(ownerId) : getPendingInventory(ownerId)), pending]);
+  if (input.entity === "visit") {
+    writeJson(queueKey(VISIT_DELETE_QUEUE_PREFIX, ownerId), [...getPendingVisitDeletes(ownerId), pending]);
+  } else {
+    const prefix = input.entity === "cash" ? CASH_QUEUE_PREFIX : INVENTORY_QUEUE_PREFIX;
+    writeJson(queueKey(prefix, ownerId), [...(input.entity === "cash" ? getPendingCash(ownerId) : getPendingInventory(ownerId)), pending]);
+  }
   return pending;
 }
 
@@ -310,7 +323,7 @@ export function removePendingInventory(ownerId: number, clientOperationId: strin
 }
 
 export function getPendingOperationCount(ownerId: number) {
-  return getPendingCustomers(ownerId).length + getPendingVisits(ownerId).length + getPendingCash(ownerId).length + getPendingInventory(ownerId).length;
+  return getPendingCustomers(ownerId).length + getPendingVisits(ownerId).length + getPendingVisitDeletes(ownerId).length + getPendingCash(ownerId).length + getPendingInventory(ownerId).length;
 }
 
 export type OfflineBackup = {

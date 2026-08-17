@@ -11,10 +11,13 @@ import {
   getPendingCustomers,
   queueOfflineCash,
   getPendingVisits,
+  getPendingVisitDeletes,
   queueOfflineCustomer,
   queueOfflineVisit,
   rememberOfflineSession,
   removePendingVisit,
+  queueOfflineDelete,
+  removePendingVisitDelete,
   restoreOfflineBackup,
   downloadOfflineBackup,
   restoreOfflineBackupFromExcel,
@@ -53,6 +56,14 @@ describe("التخزين المحلي للمزامنة", () => {
     expect(getPendingVisits(6)).toEqual([]);
     removePendingVisit(5, pending.clientOperationId);
     expect(getPendingVisits(5)).toEqual([]);
+  });
+
+  it("يحفظ حذف الزيارة في طابور مستقل ثم يزيله بعد المزامنة", () => {
+    const pending = queueOfflineDelete(5, { entity: "visit", id: 17, pin: "1234" });
+
+    expect(getPendingVisitDeletes(5)).toEqual([expect.objectContaining({ clientOperationId: pending.clientOperationId, id: 17, entity: "visit" })]);
+    removePendingVisitDelete(5, pending.clientOperationId);
+    expect(getPendingVisitDeletes(5)).toEqual([]);
   });
 
   it("يحفظ التقرير محليًا ليستعمله التصدير دون اتصال", () => {

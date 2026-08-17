@@ -118,6 +118,22 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(latestInput.followUpStatus).toBe("all");
   });
 
+  it("يعرض إجمالي المحصل ويتيح ترتيب الأعلى تحصيلًا مع رأس جدول مثبت", () => {
+    mocks.list.mockReturnValue({
+      data: [
+        { id: 12, name: "عميل قديم", phone: "01000000000", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000012", totalCollectedAmount: 125000, collectedAmount: 25000, followUp: null },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+    render(<Customers />);
+    expect(screen.getByText("إجمالي المحصل")).toBeTruthy();
+    expect(screen.getByText("١٬٢٥٠٫٠٠")).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "إجمالي المحصل" }).className).toContain("sticky");
+    fireEvent.change(screen.getByLabelText("ترتيب العملاء"), { target: { value: "collected_desc" } });
+    expect(mocks.list.mock.calls.at(-1)?.[0].sortBy).toBe("collected_desc");
+  });
+
   it("يعرض القائمة المحلية عند فشل الاتصال بالخادم", () => {
     localStorage.setItem("purepoint-offline-customers", JSON.stringify([
       { id: 44, manualCode: "٤٤", name: "عميل محفوظ محليًا", phone: "0500000000", address: "عنوان محلي", latitude: null, longitude: null, notes: null },

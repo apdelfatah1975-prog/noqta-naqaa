@@ -9,6 +9,7 @@ export type CustomerExportRow = {
   followUpDate: string;
   followUpDays: string;
   lastServiceType: string;
+  totalCollectedAmount: number;
 };
 
 export type ReminderExportRow = {
@@ -31,6 +32,7 @@ export function customerRowsForExcel(customers: Array<any>): CustomerExportRow[]
     followUpDate: customer.followUp?.nextVisitDate ? new Date(customer.followUp.nextVisitDate).toLocaleDateString("ar-EG") : "",
     followUpDays: customer.followUp ? (customer.followUp.daysRemaining < 0 ? `متأخر ${Math.abs(customer.followUp.daysRemaining)} يوم` : customer.followUp.daysRemaining === 0 ? "اليوم" : `${customer.followUp.daysRemaining} يوم`) : "لا يوجد موعد",
     lastServiceType: labelVisitType(customer.followUp?.lastServiceVisitType),
+    totalCollectedAmount: Number(customer.totalCollectedAmount || 0) / 100,
   }));
 }
 
@@ -62,6 +64,7 @@ export const customerExcelHeaders: Record<keyof CustomerExportRow, string> = {
   followUpDate: "موعد المتابعة",
   followUpDays: "الأيام المتبقية",
   lastServiceType: "نوع آخر خدمة",
+  totalCollectedAmount: "إجمالي المحصل",
 };
 
 export const reminderExcelHeaders: Record<keyof ReminderExportRow, string> = {
