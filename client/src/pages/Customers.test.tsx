@@ -265,10 +265,9 @@ describe("ترابط تعديل بيانات العميل", () => {
     fireEvent.click(screen.getByRole("button", { name: "تسجيل زيارة" }));
     const searchInput = screen.getByPlaceholderText("اكتب الاسم أو الهاتف أو كود العميل");
     fireEvent.change(searchInput, { target: { value: "0501234567" } });
-    const customerSelect = screen.getByRole("combobox", { name: "العميل" });
-    expect(customerSelect.textContent).toContain("عميل آخر");
-    fireEvent.change(customerSelect, { target: { value: "13" } });
-    fireEvent.click(screen.getByRole("button", { name: "فتح بطاقة التسجيل" }));
+    const customerOption = screen.getByRole("option", { name: /عميل آخر/ });
+    expect(customerOption).toBeTruthy();
+    fireEvent.click(customerOption);
     expect(screen.getByText(/للعميل: عميل آخر/)).toBeTruthy();
   });
 
