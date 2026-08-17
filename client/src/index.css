@@ -70,6 +70,13 @@
 }
 
 @layer base {
+  :root {
+    --page-teal: 20 184 166;
+    --page-sky: 14 165 233;
+    --page-amber: 245 158 11;
+    --page-violet: 139 92 246;
+  }
+
   * { @apply border-border outline-ring/50; }
   html, body, #root { width: 100%; max-width: 100%; overflow-x: hidden; }
   html { direction: rtl; }
@@ -78,6 +85,17 @@
 }
 
 @layer components {
+  .dashboard-card {
+    border: 1px solid rgb(15 118 110 / 0.10);
+    background: linear-gradient(145deg, rgb(255 255 255 / 0.98), rgb(240 253 250 / 0.78));
+    box-shadow: 0 8px 24px rgb(15 118 110 / 0.07);
+  }
+
+  .page-section-title {
+    color: rgb(15 118 110);
+    letter-spacing: -0.01em;
+  }
+
   .page-heading { @apply text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl; }
   .page-subheading { @apply mt-2 text-sm leading-7 text-muted-foreground; }
   .soft-card { @apply rounded-2xl border border-teal-950/6 bg-card shadow-[0_8px_24px_rgba(8,83,78,.045)]; }
