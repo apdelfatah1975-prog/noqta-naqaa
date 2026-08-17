@@ -215,6 +215,24 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(latestInput.collectedAmountMin).toBeUndefined();
   });
 
+  it("يعرض بطاقات الحالات الثلاث ويربط بطاقة المتأخرين بفلتر العملاء", () => {
+    mocks.list.mockReturnValue({
+      data: [
+        { id: 12, name: "عميل متأخر", phone: "01000000000", address: "العنوان", customerCode: "C-000012", followUp: { nextVisitDate: new Date("2026-08-10T09:00:00Z"), daysRemaining: -2 } },
+        { id: 13, name: "عميل قريب", phone: "01000000001", address: "العنوان", customerCode: "C-000013", followUp: { nextVisitDate: new Date("2026-08-18T09:00:00Z"), daysRemaining: 3 } },
+        { id: 14, name: "عميل منتظم", phone: "01000000002", address: "العنوان", customerCode: "C-000014", followUp: { nextVisitDate: new Date("2026-09-10T09:00:00Z"), daysRemaining: 26 } },
+      ],
+      isLoading: false,
+      isError: false,
+    });
+    render(<Customers />);
+    expect(screen.getByRole("button", { name: "عرض تواصل الآن" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "عرض متأخرون" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "عرض تمت المتابعة" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "عرض متأخرون" }));
+    expect(mocks.list.mock.calls.at(-1)?.[0].followUpStatus).toBe("overdue");
+  });
+
   it("يفعّل فلتر الحالة عند النقر على أيقونة العميل", () => {
     mocks.list.mockReturnValue({
       data: [
