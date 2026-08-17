@@ -3,8 +3,9 @@ import { trpc } from "@/lib/trpc";
 import { cacheOfflineCash, cacheOfflineDashboard, downloadOfflineBackup, getOfflineBackupKeyCount, getOfflineDashboard, getOfflineSession, getPendingOperationCount, restoreOfflineBackupFromExcel } from "@/lib/offlineSync";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { AppSettings, getAppSettings } from "@/lib/appSettings";
+import { getTrashItems } from "@/lib/trashBin";
 import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
-import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, CloudOff, CloudUpload, Download, Info, PackageSearch, Plus, RefreshCw, Upload, UsersRound } from "lucide-react";
+import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, CloudOff, CloudUpload, Download, Info, PackageSearch, Plus, RefreshCw, Trash2, Upload, UsersRound } from "lucide-react";
 import React from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -29,6 +30,7 @@ export default function Home() {
   const [appSettings, setAppSettings] = React.useState<AppSettings>(() => getAppSettings());
   const [online, setOnline] = React.useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [pendingCount, setPendingCount] = React.useState(() => offlineOwnerId ? getPendingOperationCount(offlineOwnerId) : 0);
+  const [trashCount, setTrashCount] = React.useState(() => getTrashItems().length);
   const restoreInputRef = React.useRef<HTMLInputElement>(null);
   React.useEffect(() => {
     const onSettingsChange = (event: Event) => setAppSettings((event as CustomEvent<AppSettings>).detail);
@@ -36,16 +38,21 @@ export default function Home() {
     return () => window.removeEventListener("purepoint-settings-changed", onSettingsChange);
   }, []);
   React.useEffect(() => {
-    const refreshStatus = () => setPendingCount(offlineOwnerId ? getPendingOperationCount(offlineOwnerId) : 0);
+    const refreshStatus = () => {
+      setPendingCount(offlineOwnerId ? getPendingOperationCount(offlineOwnerId) : 0);
+      setTrashCount(getTrashItems().length);
+    };
     const goOnline = () => setOnline(true);
     const goOffline = () => setOnline(false);
     refreshStatus();
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
+    window.addEventListener("purepoint-trash-bin-changed", refreshStatus);
     const interval = window.setInterval(refreshStatus, 1500);
     return () => {
       window.removeEventListener("online", goOnline);
       window.removeEventListener("offline", goOffline);
+      window.removeEventListener("purepoint-trash-bin-changed", refreshStatus);
       window.clearInterval(interval);
     };
   }, [offlineOwnerId]);
@@ -147,6 +154,12 @@ export default function Home() {
           </button>
         ))}
       </section>
+
+      <button type="button" onClick={() => setLocation("/settings")} className="soft-card group flex w-full items-center gap-4 border border-rose-100 bg-rose-50/70 p-4 text-right transition hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2" aria-label="فتح سلة المحذوفات">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-900/10"><Trash2 className="h-5 w-5" /></div>
+        <div className="min-w-0 flex-1"><p className="font-extrabold text-rose-950">سلة المحذوفات</p><p className="mt-1 text-xs font-semibold text-rose-800">راجع العناصر المحذوفة واستعدها عند الحاجة</p></div>
+        <span className="rounded-full bg-white px-3 py-1.5 text-sm font-extrabold text-rose-700 shadow-sm">{trashCount.toLocaleString("ar-SA")}</span><ChevronLeft className="h-5 w-5 text-rose-600 transition group-hover:-translate-x-1" />
+      </button>
 
       <ReminderAlertBanner />
 

@@ -90,4 +90,17 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     fireEvent.click(cashCard);
     expect(mocks.setLocation).toHaveBeenCalledWith("/cash");
   });
+
+  it("تعرض زر سلة المحذوفات وعدد العناصر وتفتح الإعدادات", () => {
+    localStorage.setItem("purepoint-trash-bin", JSON.stringify([
+      { id: "customer-1", entityType: "customer", entityLabel: "عميل تجريبي", payload: {}, deletedAt: new Date().toISOString() },
+      { id: "cash-2", entityType: "cash", entityLabel: "عملية خزينة", payload: {}, deletedAt: new Date().toISOString() },
+    ]));
+    render(<Home />);
+    const trashButton = screen.getByRole("button", { name: "فتح سلة المحذوفات" });
+    expect(trashButton.textContent).toContain("سلة المحذوفات");
+    expect(trashButton.textContent).toContain("٢");
+    fireEvent.click(trashButton);
+    expect(mocks.setLocation).toHaveBeenCalledWith("/settings");
+  });
 });
