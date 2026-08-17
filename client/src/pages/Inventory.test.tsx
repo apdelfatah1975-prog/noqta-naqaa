@@ -43,7 +43,7 @@ describe("تفاصيل المنصرف في المخزون", () => {
       isLoading: false,
       isError: false,
       data: {
-        items: [{ id: 4, name: "شمعة كربون 10 بوصة", notes: null, openingQuantity: 10, currentBalance: 7 }],
+        items: [{ id: 4, name: "شمعة كربون 10 بوصة", notes: null, openingQuantity: 10, currentBalance: 7, reorderLevel: 2 }],
         movements: [{
           id: 8,
           inventoryItemId: 4,
@@ -71,6 +71,8 @@ describe("تفاصيل المنصرف في المخزون", () => {
     expect(screen.getAllByText("محمد الفني").length).toBeGreaterThan(0);
     expect(screen.getAllByText("صرف لتركيب جديد").length).toBeGreaterThan(0);
     expect(screen.getAllByText("الفني / المستلم").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("(7)").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("متوفر").length).toBeGreaterThan(0);
   });
 
   it("يفتح زر صرف الصنف نموذج المنصرف مباشرة", () => {

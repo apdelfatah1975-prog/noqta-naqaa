@@ -2,7 +2,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CustomerContactActions } from "@/components/CustomerContactActions";
 import { PinVerificationDialog } from "@/components/PinVerificationDialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { UsedItemsSection, addOrIncrementVisitItem, type CatalogItem, type UsedVisitItem } from "@/pages/Customers";
 import { trpc } from "@/lib/trpc";
 import { formatDateTime, reminderStatusLabels, toDateTimeLocal, visitTypeLabels } from "@/lib/filterUi";
 import { ArrowRight, BellRing, CalendarClock, CalendarPlus, Edit3, Loader2 } from "lucide-react";
@@ -21,10 +22,18 @@ export default function CustomerProfile() {
   const customerId = Number(params?.id);
   const queryInput = useMemo(() => ({ id: customerId }), [customerId]);
   const { data, isLoading } = trpc.filters.customers.get.useQuery(queryInput, { enabled: Number.isFinite(customerId) });
+  const { data: inventoryData } = trpc.filters.inventory.summary.useQuery(undefined, { retry: false, staleTime: 60_000 });
+  const catalogItems: CatalogItem[] = (inventoryData?.items ?? []).map(item => ({ id: item.id, name: item.name, unit: item.unit, currentBalance: item.currentBalance }));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [visitType, setVisitType] = useState<keyof typeof visitTypeLabels>("maintenance");
   const [visitDate, setVisitDate] = useState(toDateTimeLocal());
   const [notes, setNotes] = useState("");
+  const [visitResult, setVisitResult] = useState("");
+  const [visitTechnicianName, setVisitTechnicianName] = useState("");
+  const [visitCollectedAmount, setVisitCollectedAmount] = useState("");
+  const [visitItems, setVisitItems] = useState<UsedVisitItem[]>([]);
+  const [manualItemName, setManualItemName] = useState("");
+  const [manualItemQuantity, setManualItemQuantity] = useState("1");
   const [editingVisitId, setEditingVisitId] = useState<number | null>(null);
   const [visitPinOpen, setVisitPinOpen] = useState(false);
   const [editingVisitDate, setEditingVisitDate] = useState(toDateTimeLocal());
@@ -47,7 +56,7 @@ export default function CustomerProfile() {
       setDialogOpen(true);
       setVisitType("maintenance");
       setVisitDate(toDateTimeLocal());
-      setNotes("");
+      setNotes(""); setVisitResult(""); setVisitTechnicianName(""); setVisitCollectedAmount(""); setVisitItems([]); setManualItemName(""); setManualItemQuantity("1");
       window.history.replaceState({}, "", `/customers/${customerId}`);
     }
   }, [customerId, data]);
@@ -60,7 +69,7 @@ export default function CustomerProfile() {
       utils.filters.reminders.due.invalidate();
       toast.success(result.reminderCreated ? "تم تسجيل الزيارة وإنشاء تذكير بعد 120 يومًا" : "تم تسجيل الزيارة بنجاح");
       setDialogOpen(false);
-      setNotes("");
+      setNotes(""); setVisitResult(""); setVisitTechnicianName(""); setVisitCollectedAmount(""); setVisitItems([]); setManualItemName(""); setManualItemQuantity("1");
     },
     onError: error => toast.error(error.message || "تعذر تسجيل الزيارة. يرجى المحاولة مرة أخرى."),
   });
@@ -73,7 +82,8 @@ export default function CustomerProfile() {
 
   function submitVisit(event: FormEvent) {
     event.preventDefault();
-    createVisit.mutate({ customerId, visitType, visitDate: new Date(visitDate), notes: notes || null });
+    const collectedAmount = Math.round((Number.parseFloat(visitCollectedAmount) || 0) * 100);
+    createVisit.mutate({ customerId, visitType, visitDate: new Date(visitDate), technicianName: visitTechnicianName || null, visitResult: visitResult || null, collectedAmount, collectedCurrency: "SAR", notes: notes || null, items: visitItems.filter(item => item.quantity > 0) });
   }
 
   return (
@@ -86,7 +96,7 @@ export default function CustomerProfile() {
             <div className="mt-1 flex flex-wrap items-center gap-2"><h1 className="text-2xl font-extrabold">{customer.name}</h1><span className="text-lg font-extrabold text-white" dir="ltr">{customer.customerCode}</span></div>
             <p className="mt-2 text-sm text-teal-50/80" dir="ltr">{customer.phone}</p>
           </div>
-          <Button onClick={() => { setVisitType("maintenance"); setVisitDate(toDateTimeLocal()); setNotes(""); setDialogOpen(true); }} className="mt-5 rounded-xl bg-white text-teal-800 hover:bg-teal-50 sm:mt-0"><CalendarPlus className="ml-2 h-4 w-4" />تسجيل زيارة</Button>
+          <Button onClick={() => {       setVisitType("maintenance"); setVisitDate(toDateTimeLocal()); setNotes(""); setVisitResult(""); setVisitTechnicianName(""); setVisitCollectedAmount(""); setVisitItems([]); setManualItemName(""); setManualItemQuantity("1"); setDialogOpen(true); }} className="mt-5 rounded-xl bg-white text-teal-800 hover:bg-teal-50 sm:mt-0"><CalendarPlus className="ml-2 h-4 w-4" />تسجيل زيارة</Button>
         </div>
         <div className="grid gap-4 p-6 sm:grid-cols-3">
           <div><p className="text-xs font-bold text-muted-foreground">العنوان</p><p className="mt-2 text-sm leading-6">{customer.address || "غير مسجل"}</p></div>
@@ -105,7 +115,7 @@ export default function CustomerProfile() {
       </section>
       <Dialog open={editingVisitId !== null} onOpenChange={open => { if (!open) setEditingVisitId(null); }}><DialogContent dir="rtl"><DialogHeader><DialogTitle>تعديل تاريخ ووقت الخدمة</DialogTitle></DialogHeader><form onSubmit={event => { event.preventDefault(); if (editingVisitId !== null) setVisitPinOpen(true); }} className="space-y-4 py-2"><label><span className="field-label">تاريخ ووقت الخدمة</span><input type="datetime-local" className="field-input" value={editingVisitDate} onChange={event => setEditingVisitDate(event.target.value)} required /></label><div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => setEditingVisitId(null)} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={updateVisitDate.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">{updateVisitDate.isPending ? "جارٍ الحفظ…" : "حفظ التعديل"}</Button></div></form></DialogContent></Dialog>
       <PinVerificationDialog open={visitPinOpen} onOpenChange={open => { if (!open) setVisitPinOpen(false); }} busy={updateVisitDate.isPending} title="تأكيد تعديل تاريخ الزيارة" onConfirm={pin => { if (editingVisitId !== null) updateVisitDate.mutate({ visitId: editingVisitId, visitDate: new Date(editingVisitDate), pin }); }} />
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}><DialogContent dir="rtl"><DialogHeader><DialogTitle>تسجيل زيارة للعميل</DialogTitle></DialogHeader><form onSubmit={submitVisit} className="space-y-4 py-2"><label><span className="field-label">نوع الزيارة</span><select className="field-input" value={visitType} onChange={event => setVisitType(event.target.value as keyof typeof visitTypeLabels)}>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label><span className="field-label">تاريخ ووقت الزيارة</span><input type="datetime-local" className="field-input" value={visitDate} onChange={event => setVisitDate(event.target.value)} required /></label><label><span className="field-label">ملاحظات الزيارة</span><textarea className="field-textarea" value={notes} onChange={event => setNotes(event.target.value)} placeholder="اكتب تفاصيل مختصرة عن الخدمة" /></label><div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={createVisit.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">{createVisit.isPending ? "جارٍ التسجيل…" : "حفظ الزيارة"}</Button></div></form></DialogContent></Dialog>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}><DialogContent dir="rtl" className="flex max-h-[90vh] flex-col overflow-hidden"><DialogHeader className="shrink-0"><DialogTitle>تسجيل زيارة جديدة</DialogTitle><DialogDescription>للعميل: {customer.name} — {customer.customerCode}</DialogDescription></DialogHeader><form onSubmit={submitVisit} className="min-h-0 space-y-4 overflow-y-auto py-2 pl-1"><label><span className="field-label">نوع الزيارة</span><select className="field-input" value={visitType} onChange={event => setVisitType(event.target.value as keyof typeof visitTypeLabels)}>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label><span className="field-label">تاريخ ووقت الزيارة</span><input type="datetime-local" className="field-input" value={visitDate} onChange={event => setVisitDate(event.target.value)} required /></label><label><span className="field-label">اسم الفني</span><input className="field-input" value={visitTechnicianName} onChange={event => setVisitTechnicianName(event.target.value)} placeholder="مثال: أحمد" /></label><label><span className="field-label">المبلغ المحصل</span><input type="number" inputMode="decimal" min="0" step="0.01" className="field-input min-h-12 w-full text-lg" value={visitCollectedAmount} onChange={event => setVisitCollectedAmount(event.target.value)} placeholder="مثال: 250" /></label><label><span className="field-label">نتيجة الزيارة</span><textarea className="field-textarea" value={visitResult} onChange={event => setVisitResult(event.target.value)} placeholder="ما الذي تم تنفيذه؟" /></label><label><span className="field-label">ملاحظات الزيارة</span><textarea className="field-textarea" value={notes} onChange={event => setNotes(event.target.value)} placeholder="اكتب تفاصيل مختصرة عن الخدمة" /></label><UsedItemsSection items={visitItems} setItems={setVisitItems} catalogItems={catalogItems} manualName={manualItemName} setManualName={setManualItemName} manualQuantity={manualItemQuantity} setManualQuantity={setManualItemQuantity} onAdd={() => { const item = catalogItems.find(entry => entry.name.trim() === manualItemName.trim()); const quantity = Number.parseInt(manualItemQuantity, 10); if (!item || !Number.isInteger(quantity) || quantity <= 0) return; setVisitItems(current => addOrIncrementVisitItem(current, item, quantity)); setManualItemName(""); setManualItemQuantity("1"); }} onQuickAdd={item => setVisitItems(current => addOrIncrementVisitItem(current, item))} listId="profile-visit-inventory-items" /><div className="sticky bottom-0 flex justify-end gap-3 border-t border-teal-100 bg-white/95 pt-3 backdrop-blur"><Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={createVisit.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">{createVisit.isPending ? "جارٍ التسجيل…" : "حفظ الزيارة"}</Button></div></form></DialogContent></Dialog>
     </div>
   );
 }
