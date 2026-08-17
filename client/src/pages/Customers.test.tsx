@@ -82,7 +82,7 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(screen.getByLabelText("موعد متابعة العميل قريب وهو اليوم")).toBeTruthy();
     expect(screen.getByLabelText("العميل متأخر عن موعد المتابعة")).toBeTruthy();
     expect(screen.getByLabelText("موعد متابعة العميل قريب")).toBeTruthy();
-    expect(screen.getByLabelText("موعد متابعة العميل بعيد")).toBeTruthy();
+    expect(screen.getByLabelText("تمت متابعة العميل ولا توجد متابعة مستحقة حاليًا")).toBeTruthy();
   });
 
   it("يفتح بطاقة تسجيل الزيارة مباشرة من بطاقة العميل ويُبقي السجل مستقلًا", () => {
