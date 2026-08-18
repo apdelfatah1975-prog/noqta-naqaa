@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { queueOfflineWorkOrderUpdate } from "@/lib/offlineSync";
+import { queueOfflineWorkOrderProof, queueOfflineWorkOrderUpdate } from "@/lib/offlineSync";
 
 const statusLabels: Record<string, string> = {
   assigned: "مسند",
@@ -41,7 +41,7 @@ export default function TechnicianPreview() {
   const drawing = useRef(false);
   const clearSignature = () => { const canvas = signatureCanvas.current; if (!canvas) return; canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height); };
   const signaturePoint = (event: React.PointerEvent<HTMLCanvasElement>) => { const canvas = signatureCanvas.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineWidth = 2.5; context.lineCap = "round"; context.strokeStyle = "#0f766e"; context.lineTo((event.clientX - rect.left) * canvas.width / rect.width, (event.clientY - rect.top) * canvas.height / rect.height); context.stroke(); };
-  const saveSignature = () => { const canvas = signatureCanvas.current; if (!selected || !canvas) return; const dataUrl = canvas.toDataURL("image/png"); if (!dataUrl.endsWith("base64,")) proofUpload.mutate({ visitId: selected.id, kind: "signature", dataUrl }); };
+  const saveSignature = () => { const canvas = signatureCanvas.current; if (!selected || !canvas) return; const dataUrl = canvas.toDataURL("image/png"); if (!dataUrl.endsWith("base64,")) return; if (!online && user) { queueOfflineWorkOrderProof(user.id, { visitId: selected.id, kind: "signature", dataUrl }); toast.success("تم حفظ التوقيع على الهاتف، وستتم مزامنته عند عودة الإنترنت"); return; } proofUpload.mutate({ visitId: selected.id, kind: "signature", dataUrl }); };
   useEffect(() => {
     const goOnline = () => setOnline(true);
     const goOffline = () => setOnline(false);
@@ -104,7 +104,7 @@ export default function TechnicianPreview() {
     if (!selected || !file) return;
     if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) { toast.error("اختر صورة لا تتجاوز 5 ميجابايت"); return; }
     const reader = new FileReader();
-    reader.onload = () => { if (typeof reader.result === "string") proofUpload.mutate({ visitId: selected.id, kind, dataUrl: reader.result }); };
+    reader.onload = () => { if (typeof reader.result !== "string") return; if (!online && user) { queueOfflineWorkOrderProof(user.id, { visitId: selected.id, kind, dataUrl: reader.result }); toast.success("تم حفظ الدليل على الهاتف، وستتم مزامنته عند عودة الإنترنت"); return; } proofUpload.mutate({ visitId: selected.id, kind, dataUrl: reader.result }); };
     reader.readAsDataURL(file);
   };
 

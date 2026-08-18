@@ -7,6 +7,7 @@ const CUSTOMER_QUEUE_PREFIX = "purepoint-pending-customers";
 const VISIT_QUEUE_PREFIX = "purepoint-pending-visits";
 const VISIT_DELETE_QUEUE_PREFIX = "purepoint-pending-visit-deletes";
 const WORK_ORDER_QUEUE_PREFIX = "purepoint-pending-work-orders";
+const WORK_ORDER_PROOF_QUEUE_PREFIX = "purepoint-pending-work-order-proofs";
 const DASHBOARD_KEY = "purepoint-offline-dashboard";
 const CASH_KEY_PREFIX = "purepoint-offline-cash";
 const INVENTORY_KEY_PREFIX = "purepoint-offline-inventory";
@@ -63,6 +64,14 @@ export type OfflineVisit = {
   collectedAmount?: number;
   collectedCurrency?: "SAR";
   items?: OfflineVisitItem[];
+};
+
+export type PendingWorkOrderProof = {
+  clientOperationId: string;
+  visitId: number;
+  kind: "photo" | "signature";
+  dataUrl: string;
+  createdAt: string;
 };
 
 export type PendingWorkOrderUpdate = {
@@ -295,6 +304,20 @@ export function queueOfflineWorkOrderUpdate(ownerId: number, input: Omit<Pending
 
 export function removePendingWorkOrderUpdate(ownerId: number, clientOperationId: string) {
   writeJson(queueKey(WORK_ORDER_QUEUE_PREFIX, ownerId), getPendingWorkOrderUpdates(ownerId).filter(item => item.clientOperationId !== clientOperationId));
+}
+
+export function getPendingWorkOrderProofs(ownerId: number) {
+  return readJson<PendingWorkOrderProof[]>(queueKey(WORK_ORDER_PROOF_QUEUE_PREFIX, ownerId), []);
+}
+
+export function queueOfflineWorkOrderProof(ownerId: number, input: Omit<PendingWorkOrderProof, "clientOperationId" | "createdAt">) {
+  const pending: PendingWorkOrderProof = { ...input, clientOperationId: newOperationId(), createdAt: new Date().toISOString() };
+  writeJson(queueKey(WORK_ORDER_PROOF_QUEUE_PREFIX, ownerId), [...getPendingWorkOrderProofs(ownerId), pending]);
+  return pending;
+}
+
+export function removePendingWorkOrderProof(ownerId: number, clientOperationId: string) {
+  writeJson(queueKey(WORK_ORDER_PROOF_QUEUE_PREFIX, ownerId), getPendingWorkOrderProofs(ownerId).filter(item => item.clientOperationId !== clientOperationId));
 }
 
 export function cacheOfflineReport<T>(ownerId: number, dateFrom: string, dateTo: string, value: T) {

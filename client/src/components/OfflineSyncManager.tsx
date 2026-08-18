@@ -6,6 +6,7 @@ import {
   getPendingVisits,
   getPendingVisitDeletes,
   getPendingWorkOrderUpdates,
+  getPendingWorkOrderProofs,
   getPendingCash,
   getPendingInventory,
   removePendingCash,
@@ -14,6 +15,7 @@ import {
   removePendingVisit,
   removePendingVisitDelete,
   removePendingWorkOrderUpdate,
+  removePendingWorkOrderProof,
   replaceOfflineCustomerId,
 } from "@/lib/offlineSync";
 import { CloudOff, CloudUpload } from "lucide-react";
@@ -32,6 +34,7 @@ export function OfflineSyncManager() {
   const { mutateAsync: syncVisit } = trpc.filters.visits.create.useMutation();
   const { mutateAsync: deleteVisit } = trpc.filters.visits.delete.useMutation();
   const { mutateAsync: syncWorkOrderUpdate } = trpc.filters.workOrders.updateStatus.useMutation();
+  const { mutateAsync: syncWorkOrderProof } = trpc.filters.workOrders.addProof.useMutation();
   const { mutateAsync: syncCash } = trpc.filters.cash.create.useMutation();
   const { mutateAsync: syncInventoryItem } = trpc.filters.inventory.createItem.useMutation();
   const { mutateAsync: syncInventoryMovement } = trpc.filters.inventory.createMovement.useMutation();
@@ -126,6 +129,17 @@ export function OfflineSyncManager() {
           items: operation.items ?? [],
         });
         removePendingWorkOrderUpdate(user.id, operation.clientOperationId);
+        syncedCount += 1;
+      } catch {
+        batchFailed = true;
+        setSyncFailed(true);
+        break;
+      }
+    }
+    for (const operation of getPendingWorkOrderProofs(user.id)) {
+      try {
+        await syncWorkOrderProof({ visitId: operation.visitId, kind: operation.kind, dataUrl: operation.dataUrl });
+        removePendingWorkOrderProof(user.id, operation.clientOperationId);
         syncedCount += 1;
       } catch {
         batchFailed = true;
