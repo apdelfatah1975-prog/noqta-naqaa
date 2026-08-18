@@ -5,6 +5,8 @@ import {
   getPendingOperationCount,
   getPendingVisits,
   getPendingVisitDeletes,
+  getPendingWorkOrderUpdates,
+  getPendingWorkOrderProofs,
   getPendingCash,
   getPendingInventory,
   removePendingCash,
@@ -12,6 +14,8 @@ import {
   removePendingCustomer,
   removePendingVisit,
   removePendingVisitDelete,
+  removePendingWorkOrderUpdate,
+  removePendingWorkOrderProof,
   replaceOfflineCustomerId,
 } from "@/lib/offlineSync";
 import { CloudOff, CloudUpload } from "lucide-react";
@@ -29,6 +33,8 @@ export function OfflineSyncManager() {
   const { mutateAsync: syncCustomer } = trpc.filters.customers.create.useMutation();
   const { mutateAsync: syncVisit } = trpc.filters.visits.create.useMutation();
   const { mutateAsync: deleteVisit } = trpc.filters.visits.delete.useMutation();
+  const { mutateAsync: syncWorkOrderUpdate } = trpc.filters.workOrders.updateStatus.useMutation();
+  const { mutateAsync: syncWorkOrderProof } = trpc.filters.workOrders.addProof.useMutation();
   const { mutateAsync: syncCash } = trpc.filters.cash.create.useMutation();
   const { mutateAsync: syncInventoryItem } = trpc.filters.inventory.createItem.useMutation();
   const { mutateAsync: syncInventoryMovement } = trpc.filters.inventory.createMovement.useMutation();
@@ -111,6 +117,36 @@ export function OfflineSyncManager() {
         break;
       }
     }
+    for (const operation of getPendingWorkOrderUpdates(user.id)) {
+      try {
+        await syncWorkOrderUpdate({
+          id: operation.id,
+          status: operation.status,
+          visitResult: operation.visitResult ?? null,
+          notes: operation.notes ?? null,
+          collectedAmount: operation.collectedAmount ?? 0,
+          collectedCurrency: operation.collectedCurrency ?? "SAR",
+          items: operation.items ?? [],
+        });
+        removePendingWorkOrderUpdate(user.id, operation.clientOperationId);
+        syncedCount += 1;
+      } catch {
+        batchFailed = true;
+        setSyncFailed(true);
+        break;
+      }
+    }
+    for (const operation of getPendingWorkOrderProofs(user.id)) {
+      try {
+        await syncWorkOrderProof({ visitId: operation.visitId, kind: operation.kind, dataUrl: operation.dataUrl });
+        removePendingWorkOrderProof(user.id, operation.clientOperationId);
+        syncedCount += 1;
+      } catch {
+        batchFailed = true;
+        setSyncFailed(true);
+        break;
+      }
+    }
     const inventoryIdMap = new Map<number, number>();
     for (const operation of getPendingInventory(user.id)) {
       try {
@@ -160,10 +196,11 @@ export function OfflineSyncManager() {
       utils.filters.customers.list.invalidate(),
       utils.filters.customers.get.invalidate(),
       utils.filters.reminders.due.invalidate(),
+      utils.filters.workOrders.list.invalidate(),
       utils.filters.cash.summary.invalidate(),
       utils.filters.inventory.summary.invalidate(),
     ]);
-  }, [deleteCash, deleteInventoryItem, deleteInventoryMovement, deleteVisit, refreshCount, syncCash, syncCustomer, syncInventoryItem, syncInventoryMovement, syncVisit, user, utils]);
+  }, [deleteCash, deleteInventoryItem, deleteInventoryMovement, deleteVisit, refreshCount, syncCash, syncCustomer, syncInventoryItem, syncInventoryMovement, syncVisit, syncWorkOrderUpdate, user, utils]);
 
   useEffect(() => {
     const goOnline = () => { setOnline(true); void syncPendingOperations(); };

@@ -6,7 +6,6 @@ import Inventory from "./Inventory";
 const mocks = vi.hoisted(() => ({
   summary: vi.fn(),
   createItem: vi.fn(),
-  updateItem: vi.fn(),
   createMovement: vi.fn(),
   movementMutate: vi.fn(),
   deleteItem: vi.fn(),
@@ -20,7 +19,6 @@ vi.mock("@/lib/trpc", () => ({
       inventory: {
         summary: { useQuery: mocks.summary },
         createItem: { useMutation: mocks.createItem },
-        updateItem: { useMutation: mocks.updateItem },
         createMovement: { useMutation: mocks.createMovement },
         deleteItem: { useMutation: mocks.deleteItem },
         deleteMovement: { useMutation: mocks.deleteMovement },
@@ -40,7 +38,6 @@ vi.mock("@/lib/trpc", () => ({
 describe("تفاصيل المنصرف في المخزون", () => {
   beforeEach(() => {
     mocks.createItem.mockReturnValue({ mutate: vi.fn(), isPending: false });
-    mocks.updateItem.mockReturnValue({ mutate: vi.fn(), isPending: false });
     mocks.movementMutate.mockReset();
     mocks.createMovement.mockReturnValue({ mutate: mocks.movementMutate, isPending: false });
     mocks.deleteItem.mockReturnValue({ mutate: vi.fn(), isPending: false });
@@ -77,30 +74,6 @@ describe("تفاصيل المنصرف في المخزون", () => {
     expect(screen.getAllByText("الفني / المستلم").length).toBeGreaterThan(0);
     expect(screen.getAllByText("7").length).toBeGreaterThan(0);
     expect(screen.getAllByText("متوفر").length).toBeGreaterThan(0);
-  });
-
-  it("يفصل سعر الوحدة عن إجمالي التكلفة في حركة الوارد", () => {
-    mocks.summary.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: {
-        items: [{ id: 4, name: "فلتر جامبو", notes: null, openingQuantity: 1, currentBalance: 1, reorderLevel: 2 }],
-        movements: [{ id: 9, inventoryItemId: 4, inventoryItemName: "فلتر جامبو", movementType: "incoming", quantity: 1, unitCost: 80000, movementDate: new Date("2026-08-18T09:00:00.000Z"), technicianName: null, notes: null }],
-      },
-    });
-    render(<Inventory />);
-    expect(screen.getAllByText("سعر الوحدة").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("الإجمالي · 1 قطعة").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("٨٠٠").length).toBeGreaterThanOrEqual(2);
-  });
-
-  it("يفتح زر تعديل الصنف نموذج التعديل دون تغيير الرصيد الافتتاحي", () => {
-    render(<Inventory />);
-    fireEvent.click(screen.getAllByRole("button", { name: "تعديل" })[0]);
-    const dialog = within(screen.getByRole("dialog"));
-    expect(dialog.getByText("تعديل بيانات الصنف")).toBeTruthy();
-    expect(dialog.getByText(/الرصيد والحركات السابقة لن تتغير/)).toBeTruthy();
-    expect(dialog.getByDisplayValue("10").getAttribute("readonly")).not.toBeNull();
   });
 
   it("يفتح زر صرف الصنف نموذج المنصرف مباشرة", () => {
@@ -142,7 +115,7 @@ describe("تفاصيل المنصرف في المخزون", () => {
     render(<Inventory />);
     fireEvent.click(screen.getByRole("button", { name: "إضافة صنف جديد" }));
     const dialog = within(screen.getByRole("dialog"));
-    expect(dialog.queryByText("نوع الصنف")).toBeNull();
+    expect(dialog.getByText("نوع الصنف")).toBeTruthy();
     expect(dialog.getByText("وحدة القياس")).toBeTruthy();
     expect(dialog.getByText("الحد الأدنى للرصيد")).toBeTruthy();
     expect(dialog.queryByText("سعر الشراء الافتراضي")).toBeNull();

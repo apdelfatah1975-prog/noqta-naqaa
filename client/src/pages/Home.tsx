@@ -146,50 +146,50 @@ export default function Home() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
-      <section className="flex flex-col justify-between gap-3 rounded-2xl bg-[linear-gradient(135deg,#064e4a,#0f766e)] px-4 py-4 text-white shadow-[0_12px_28px_rgba(6,78,74,.18)] sm:flex-row sm:items-center sm:px-6">
+    <div className="mx-auto max-w-7xl space-y-6">
+      <section className="flex flex-col justify-between gap-4 rounded-3xl bg-[linear-gradient(135deg,#064e4a,#0f766e)] px-6 py-7 text-white shadow-[0_16px_40px_rgba(6,78,74,.22)] sm:flex-row sm:items-center sm:px-8">
         <div>
           <p className="text-sm font-bold text-teal-100">{appSettings.companyName}</p>
           <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">كل عملياتك في مكان واحد</h1>
           <p className="mt-2 text-sm text-teal-50/80">تابع الزيارات والعملاء والمخزن بسرعة ووضوح.</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button onClick={() => setLocation("/customers?new=1")} className="h-10 rounded-xl bg-white px-4 font-bold text-teal-800 hover:bg-teal-50">
+          <Button onClick={() => setLocation("/customers?new=1")} className="h-11 rounded-xl bg-white px-5 font-bold text-teal-800 hover:bg-teal-50">
             <Plus className="ml-2 h-5 w-5" /> تسجيل عميل جديد
           </Button>
-          <Button onClick={() => setLocation("/customers?visit=1")} variant="outline" className="h-10 rounded-xl border-white/40 bg-white/10 px-4 font-bold text-white hover:bg-white/20 hover:text-white">
+          <Button onClick={() => setLocation("/customers?visit=1")} variant="outline" className="h-11 rounded-xl border-white/40 bg-white/10 px-5 font-bold text-white hover:bg-white/20 hover:text-white">
             <CalendarDays className="ml-2 h-5 w-5" /> تسجيل زيارة جديدة
           </Button>
-          <Button onClick={() => setLocation("/cash?entry=expense")} variant="outline" className="h-10 rounded-xl border-white/40 bg-white/10 px-4 font-bold text-white hover:bg-white/20 hover:text-white">
+          <Button onClick={() => setLocation("/cash?entry=expense")} variant="outline" className="h-11 rounded-xl border-white/40 bg-white/10 px-5 font-bold text-white hover:bg-white/20 hover:text-white">
             <CircleDollarSign className="ml-2 h-5 w-5" /> تسجيل مصروف
           </Button>
         </div>
       </section>
 
-      <section className={`soft-card flex flex-col gap-2 border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${online ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/80"}`} role="status" aria-live="polite">
+      <section className={`soft-card flex flex-col gap-3 border px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${online ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/80"}`} role="status" aria-live="polite">
         <div className="flex items-start gap-3">
           <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white ${online ? "bg-emerald-600" : "bg-amber-500"}`}>{online ? <CloudUpload className="h-5 w-5" /> : <CloudOff className="h-5 w-5" />}</div>
           <div>
-            <p className={`font-extrabold ${online ? "text-emerald-900" : "text-amber-900"}`}>{online ? "متصل — البيانات متزامنة" : "دون اتصال — الحفظ محلي"}</p>
+            <p className={`font-extrabold ${online ? "text-emerald-900" : "text-amber-900"}`}>{online ? "متصل — التطبيق جاهز للعمل دون إنترنت" : "وضع دون إنترنت — يمكنك التسجيل بأمان"}</p>
             <p className={`mt-1 text-xs font-semibold ${online ? "text-emerald-700" : "text-amber-800"}`}>{pendingCount > 0 ? `${pendingCount} عملية محفوظة محليًا ${online ? "وتنتظر المزامنة" : "وستتزامن عند عودة الاتصال"}` : online ? "البيانات متزامنة ولا توجد عمليات معلقة" : "ستُحفظ البيانات محليًا وتتم مزامنتها عند عودة الاتصال"}</p>
           </div>
         </div>
         <button type="button" onClick={saveLocalSnapshot} className={`rounded-full px-3 py-1.5 text-xs font-extrabold transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${pendingCount > 0 ? "bg-sky-100 text-sky-800 hover:bg-sky-200" : online ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" : "bg-amber-100 text-amber-800 hover:bg-amber-200"}`} aria-label="حفظ البيانات الحالية محليًا">{pendingCount > 0 ? "حفظ محلي الآن" : online ? "حفظ محلي" : "حفظ محلي الآن"}</button>
       </section>
 
-      <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         {statStyles.filter(card => card.key !== "upcoming" || appSettings.dashboardShowUpcoming).filter(card => card.key !== "due" || appSettings.dashboardShowDue).filter(card => card.key !== "cash" || appSettings.dashboardShowCash).filter(card => card.key !== "inventory" || appSettings.dashboardShowInventory).map(({ icon: Icon, color, label, key, href }) => (
           <button
             key={key}
             type="button"
             onClick={() => setLocation(href)}
             aria-label={`فتح تفاصيل ${label}`}
-            className="soft-card group flex items-center gap-3 p-3 text-right transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(13,82,76,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
+            className="soft-card group flex items-center gap-4 p-5 text-right transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(13,82,76,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"
           >
-            <div className={`grid h-10 w-10 place-items-center rounded-xl ${color} text-white shadow-lg shadow-black/10`}><Icon className="h-5 w-5" /></div>
+            <div className={`grid h-12 w-12 place-items-center rounded-2xl ${color} text-white shadow-lg shadow-black/10`}><Icon className="h-5 w-5" /></div>
             <div className="min-w-0 flex-1">
               <p className="text-sm text-muted-foreground">{label}</p>
-              <p className="mt-1 text-xl font-extrabold">{isLoading ? "—" : counts[key]}</p><p className="mt-1 line-clamp-1 text-[11px] font-semibold text-muted-foreground" title={cardDetails[key]}>{isLoading ? "جارٍ التحميل…" : cardDetails[key]}</p>
+              <p className="mt-1 text-2xl font-extrabold">{isLoading ? "—" : counts[key]}</p><p className="mt-1 line-clamp-1 text-[11px] font-semibold text-muted-foreground" title={cardDetails[key]}>{isLoading ? "جارٍ التحميل…" : cardDetails[key]}</p>
             </div>
             <ChevronLeft className="h-5 w-5 text-teal-700 opacity-0 transition group-hover:translate-x-[-2px] group-hover:opacity-100" />
           </button>

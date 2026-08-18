@@ -1,1 +1,0 @@
-ALTER TABLE `cashTransactions` ADD `paymentMethod` varchar(40) DEFAULT 'نقدي' NOT NULL;

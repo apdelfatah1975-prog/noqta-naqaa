@@ -6,7 +6,6 @@ import {
   clearOfflineState,
   getOfflineCustomers,
   getOfflineReport,
-  getOfflineReportSyncMeta,
   getLatestOfflineReport,
   getOfflineSession,
   getPendingCustomers,
@@ -119,12 +118,6 @@ describe("التخزين المحلي للمزامنة", () => {
     cacheOfflineReport(5, "2026-08-01", "2026-08-16", report);
     expect(getOfflineReport(5, "2026-08-01", "2026-08-16")).toEqual(report);
     expect(getOfflineReport(5, "2026-07-01", "2026-07-31")).toBeNull();
-  });
-
-  it("يسجل آخر مزامنة للتقرير المحلي مع الفترة الصحيحة", () => {
-    cacheOfflineReport(5, "2026-08-01", "2026-08-16", { period: { dateFrom: "2026-08-01", dateTo: "2026-08-16" } });
-    expect(getOfflineReportSyncMeta(5)).toMatchObject({ dateFrom: "2026-08-01", dateTo: "2026-08-16" });
-    expect(new Date(getOfflineReportSyncMeta(5)!.lastSyncedAt).getTime()).toBeGreaterThan(0);
   });
 
   it("يسترجع أحدث تقرير محلي عند عدم وجود الفترة المطلوبة", () => {

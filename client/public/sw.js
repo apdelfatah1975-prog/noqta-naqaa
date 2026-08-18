@@ -1,4 +1,4 @@
-const CACHE_NAME = "purepoint-shell-v12";
+const CACHE_NAME = "purepoint-shell-v13";
 const APP_SHELL = ["/", "/offline.html", "/manifest.webmanifest", "/app-icon.svg"];
 
 self.addEventListener("install", event => {

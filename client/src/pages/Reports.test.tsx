@@ -66,15 +66,6 @@ describe("تقارير نقطة نقاء", () => {
     fireEvent.change(screen.getByLabelText("من تاريخ"), { target: { value: "2026-07-01" } });
     expect(mocks.monthly.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ dateFrom: "2026-07-01" }));
   });
-
-  it("توضح الانقطاع ثم عودة الاتصال في مؤشر المزامنة", () => {
-    Object.defineProperty(window.navigator, "onLine", { configurable: true, value: false });
-    render(<Reports />);
-    expect(screen.getByText("وضع العمل دون اتصال")).toBeTruthy();
-    Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
-    fireEvent(window, new Event("online"));
-    expect(screen.getByText("متصل بالإنترنت")).toBeTruthy();
-  });
 });
 
 

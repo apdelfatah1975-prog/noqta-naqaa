@@ -6,13 +6,14 @@ const VISITS_KEY = "purepoint-offline-visits";
 const CUSTOMER_QUEUE_PREFIX = "purepoint-pending-customers";
 const VISIT_QUEUE_PREFIX = "purepoint-pending-visits";
 const VISIT_DELETE_QUEUE_PREFIX = "purepoint-pending-visit-deletes";
+const WORK_ORDER_QUEUE_PREFIX = "purepoint-pending-work-orders";
+const WORK_ORDER_PROOF_QUEUE_PREFIX = "purepoint-pending-work-order-proofs";
 const DASHBOARD_KEY = "purepoint-offline-dashboard";
 const CASH_KEY_PREFIX = "purepoint-offline-cash";
 const INVENTORY_KEY_PREFIX = "purepoint-offline-inventory";
 const CASH_QUEUE_PREFIX = "purepoint-pending-cash";
 const INVENTORY_QUEUE_PREFIX = "purepoint-pending-inventory";
 const REPORT_KEY_PREFIX = "purepoint-offline-report";
-const REPORT_SYNC_META_PREFIX = "purepoint-offline-report-sync";
 const SERVICE_CATALOG_KEY = "purepoint-offline-service-catalog";
 
 export type OfflineCustomer = {
@@ -63,6 +64,26 @@ export type OfflineVisit = {
   collectedAmount?: number;
   collectedCurrency?: "SAR";
   items?: OfflineVisitItem[];
+};
+
+export type PendingWorkOrderProof = {
+  clientOperationId: string;
+  visitId: number;
+  kind: "photo" | "signature";
+  dataUrl: string;
+  createdAt: string;
+};
+
+export type PendingWorkOrderUpdate = {
+  clientOperationId: string;
+  id: number;
+  status: "assigned" | "en_route" | "arrived" | "in_progress" | "completed" | "postponed" | "cancelled";
+  visitResult?: string | null;
+  notes?: string | null;
+  collectedAmount?: number;
+  collectedCurrency?: "SAR";
+  items?: OfflineVisitItem[];
+  createdAt: string;
 };
 
 export type PendingVisit = {
@@ -186,6 +207,7 @@ export function clearOfflineState() {
   if (session) {
     localStorage.removeItem(queueKey(CUSTOMER_QUEUE_PREFIX, session.id));
     localStorage.removeItem(queueKey(VISIT_QUEUE_PREFIX, session.id));
+    localStorage.removeItem(queueKey(WORK_ORDER_QUEUE_PREFIX, session.id));
   }
 }
 
@@ -270,15 +292,36 @@ export function removePendingVisit(ownerId: number, clientOperationId: string) {
   writeJson(queueKey(VISIT_QUEUE_PREFIX, ownerId), getPendingVisits(ownerId).filter(item => item.clientOperationId !== clientOperationId));
 }
 
-export type OfflineReportSyncMeta = { lastSyncedAt: string; dateFrom: string; dateTo: string };
+export function getPendingWorkOrderUpdates(ownerId: number) {
+  return readJson<PendingWorkOrderUpdate[]>(queueKey(WORK_ORDER_QUEUE_PREFIX, ownerId), []);
+}
+
+export function queueOfflineWorkOrderUpdate(ownerId: number, input: Omit<PendingWorkOrderUpdate, "clientOperationId" | "createdAt">) {
+  const pending: PendingWorkOrderUpdate = { ...input, clientOperationId: newOperationId(), createdAt: new Date().toISOString() };
+  writeJson(queueKey(WORK_ORDER_QUEUE_PREFIX, ownerId), [...getPendingWorkOrderUpdates(ownerId), pending]);
+  return pending;
+}
+
+export function removePendingWorkOrderUpdate(ownerId: number, clientOperationId: string) {
+  writeJson(queueKey(WORK_ORDER_QUEUE_PREFIX, ownerId), getPendingWorkOrderUpdates(ownerId).filter(item => item.clientOperationId !== clientOperationId));
+}
+
+export function getPendingWorkOrderProofs(ownerId: number) {
+  return readJson<PendingWorkOrderProof[]>(queueKey(WORK_ORDER_PROOF_QUEUE_PREFIX, ownerId), []);
+}
+
+export function queueOfflineWorkOrderProof(ownerId: number, input: Omit<PendingWorkOrderProof, "clientOperationId" | "createdAt">) {
+  const pending: PendingWorkOrderProof = { ...input, clientOperationId: newOperationId(), createdAt: new Date().toISOString() };
+  writeJson(queueKey(WORK_ORDER_PROOF_QUEUE_PREFIX, ownerId), [...getPendingWorkOrderProofs(ownerId), pending]);
+  return pending;
+}
+
+export function removePendingWorkOrderProof(ownerId: number, clientOperationId: string) {
+  writeJson(queueKey(WORK_ORDER_PROOF_QUEUE_PREFIX, ownerId), getPendingWorkOrderProofs(ownerId).filter(item => item.clientOperationId !== clientOperationId));
+}
 
 export function cacheOfflineReport<T>(ownerId: number, dateFrom: string, dateTo: string, value: T) {
   writeJson(`${REPORT_KEY_PREFIX}-${ownerId}-${dateFrom}-${dateTo}`, value);
-  writeJson(ownerDataKey(REPORT_SYNC_META_PREFIX, ownerId), { lastSyncedAt: new Date().toISOString(), dateFrom, dateTo } satisfies OfflineReportSyncMeta);
-}
-
-export function getOfflineReportSyncMeta(ownerId: number) {
-  return readJson<OfflineReportSyncMeta | null>(ownerDataKey(REPORT_SYNC_META_PREFIX, ownerId), null);
 }
 
 export function getOfflineReport<T>(ownerId: number, dateFrom: string, dateTo: string) {
@@ -373,7 +416,7 @@ export function removePendingInventory(ownerId: number, clientOperationId: strin
 }
 
 export function getPendingOperationCount(ownerId: number) {
-  return getPendingCustomers(ownerId).length + getPendingVisits(ownerId).length + getPendingVisitDeletes(ownerId).length + getPendingCash(ownerId).length + getPendingInventory(ownerId).length;
+  return getPendingCustomers(ownerId).length + getPendingVisits(ownerId).length + getPendingVisitDeletes(ownerId).length + getPendingWorkOrderUpdates(ownerId).length + getPendingCash(ownerId).length + getPendingInventory(ownerId).length;
 }
 
 export type OfflineBackup = {
