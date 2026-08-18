@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { formatDate, toDateTimeLocal } from "@/lib/filterUi";
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Boxes, Droplets, Filter, PackagePlus, PackageSearch, Plus, Refrigerator, Snowflake } from "lucide-react";
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Boxes, Droplets, Filter, PackageMinus, PackagePlus, PackageSearch, Plus, Refrigerator, Snowflake } from "lucide-react";
 
 const INVENTORY_CATEGORY_OPTIONS = ["فلتر ٧ مراحل كلاسيك", "فلاتر جامبو", "مبردة", "قارورة", "شمعات", "ممبرين", "وصلات", "مستلزمات تركيب", "أخرى"] as const;
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
@@ -197,7 +197,7 @@ export default function Inventory() {
                 <div><p className="text-xs text-muted-foreground">الرصيد الحالي</p><p className={`mt-1 text-lg font-extrabold ${balanceTextClass(item.currentBalance, item.reorderLevel)}`}>{item.currentBalance}</p></div>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                <div className="grid grid-cols-2 gap-2"><Button size="sm" variant="outline" onClick={() => openMovement({ id: item.id, name: item.name, defaultUnitCost: item.defaultUnitCost }, "incoming")} className="w-full rounded-xl border-emerald-200 text-emerald-800 hover:bg-emerald-50"><PackagePlus className="ml-1 h-4 w-4" />إضافة وارد</Button><Button size="sm" variant="outline" onClick={() => openMovement({ id: item.id, name: item.name, defaultUnitCost: item.defaultUnitCost }, "outgoing")} className="w-full rounded-xl border-teal-700/20 text-teal-800 hover:bg-teal-50"><PackagePlus className="ml-1 h-4 w-4" />صرف صنف</Button></div>
+                <div className="grid grid-cols-2 gap-2"><Button size="sm" variant="outline" onClick={() => openMovement({ id: item.id, name: item.name, defaultUnitCost: item.defaultUnitCost }, "incoming")} className="w-full rounded-xl border-emerald-200 text-emerald-800 hover:bg-emerald-50"><PackagePlus className="ml-1 h-4 w-4" />إضافة وارد</Button><Button size="sm" variant="outline" onClick={() => openMovement({ id: item.id, name: item.name, defaultUnitCost: item.defaultUnitCost }, "outgoing")} className="w-full rounded-xl border-teal-700/20 text-teal-800 hover:bg-teal-50"><PackageMinus className="ml-1 h-4 w-4" />صرف صنف</Button></div>
                 <Button size="sm" variant="outline" onClick={() => setPinAction({ kind: "item", id: item.id })} className="w-full rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50">حذف الصنف</Button>
               </div>
             </div>

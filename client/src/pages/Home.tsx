@@ -153,14 +153,14 @@ export default function Home() {
           <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">كل عملياتك في مكان واحد</h1>
           <p className="mt-2 text-sm text-teal-50/80">تابع الزيارات والعملاء والمخزن بسرعة ووضوح.</p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button onClick={() => setLocation("/customers?new=1")} className="h-11 rounded-xl bg-white px-5 font-bold text-teal-800 hover:bg-teal-50">
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-row">
+          <Button onClick={() => setLocation("/customers?new=1")} className="h-11 w-full rounded-xl bg-white px-5 font-bold text-teal-800 hover:bg-teal-50 sm:w-auto">
             <Plus className="ml-2 h-5 w-5" /> تسجيل عميل جديد
           </Button>
-          <Button onClick={() => setLocation("/customers?visit=1")} variant="outline" className="h-11 rounded-xl border-white/40 bg-white/10 px-5 font-bold text-white hover:bg-white/20 hover:text-white">
+          <Button onClick={() => setLocation("/customers?visit=1")} variant="outline" className="h-11 w-full rounded-xl border-white/40 bg-white/10 px-5 font-bold text-white hover:bg-white/20 hover:text-white sm:w-auto">
             <CalendarDays className="ml-2 h-5 w-5" /> تسجيل زيارة جديدة
           </Button>
-          <Button onClick={() => setLocation("/cash?entry=expense")} variant="outline" className="h-11 rounded-xl border-white/40 bg-white/10 px-5 font-bold text-white hover:bg-white/20 hover:text-white">
+          <Button onClick={() => setLocation("/cash?entry=expense")} variant="outline" className="h-11 w-full rounded-xl border-white/40 bg-white/10 px-5 font-bold text-white hover:bg-white/20 hover:text-white sm:w-auto">
             <CircleDollarSign className="ml-2 h-5 w-5" /> تسجيل مصروف
           </Button>
         </div>
@@ -256,9 +256,9 @@ export default function Home() {
           </div>
           <div className="flex flex-col gap-2 sm:min-w-52 sm:flex-row">
             <input ref={restoreInputRef} type="file" accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx" className="hidden" onChange={async event => { const file = event.target.files?.[0]; event.target.value = ""; if (!file) return; if (!window.confirm("تحذير: ستستبدل الاستعادة البيانات المحلية الحالية. يفضل تنزيل نسخة حالية أولًا. هل تريد المتابعة؟")) return; try { const result = restoreOfflineBackupFromExcel(await file.arrayBuffer()); toast.success(`تمت استعادة ${result.restoredKeys} عناصر محلية. سيعاد تحميل التطبيق الآن.`); window.setTimeout(() => window.location.reload(), 700); } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر استعادة ملف Excel."); } }} aria-label="اختيار ملف Excel للاستعادة" />
-            <button type="button" onClick={() => { const downloaded = downloadOfflineBackup(); toast(downloaded ? `تم تنزيل ملف Excel العربي الشامل (${getOfflineBackupKeyCount()} عناصر محلية).` : "تعذر إنشاء ملف النسخة الاحتياطية."); }} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-sky-700 px-4 text-sm font-extrabold text-white transition hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"><Download className="h-4 w-4" />تنزيل Excel</button>
-            <button type="button" onClick={downloadDashboardPdf} disabled={!displayData} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 text-sm font-extrabold text-teal-800 transition hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"><Printer className="h-4 w-4" />تنزيل PDF</button>
-            <button type="button" onClick={() => restoreInputRef.current?.click()} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sky-200 bg-white px-4 text-sm font-extrabold text-sky-800 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"><Upload className="h-4 w-4" />استعادة Excel</button>
+            <button type="button" onClick={() => { const downloaded = downloadOfflineBackup(); toast(downloaded ? `تم تنزيل ملف Excel العربي الشامل (${getOfflineBackupKeyCount()} عناصر محلية).` : "تعذر إنشاء ملف النسخة الاحتياطية."); }} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-sky-700 sm:w-auto px-4 text-sm font-extrabold text-white transition hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"><Download className="h-4 w-4" />تنزيل Excel</button>
+            <button type="button" onClick={downloadDashboardPdf} disabled={!displayData} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-teal-200 sm:w-auto bg-teal-50 px-4 text-sm font-extrabold text-teal-800 transition hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2"><Printer className="h-4 w-4" />تنزيل PDF</button>
+            <button type="button" onClick={() => restoreInputRef.current?.click()} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-sky-200 sm:w-auto bg-white px-4 text-sm font-extrabold text-sky-800 transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"><Upload className="h-4 w-4" />استعادة Excel</button>
           </div>
         </div>
       </section>

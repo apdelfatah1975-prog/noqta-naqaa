@@ -155,7 +155,7 @@ export default function Cash() {
   return <div className="mx-auto max-w-7xl space-y-6">
     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div><h1 className="page-heading">الخزينة</h1><p className="page-subheading">الإيرادات والمصروفات والرصيد في مكان واحد.</p></div>
-      <div className="flex flex-wrap gap-2"><Button onClick={() => { setTransactionType("income"); setOpen(true); }} className="h-11 rounded-xl bg-teal-700 px-4 font-bold hover:bg-teal-800"><ArrowDownRight className="ml-2 h-5 w-5" />تسجيل إيراد</Button><Button onClick={() => { setTransactionType("expense"); setOpen(true); }} className="h-11 rounded-xl bg-amber-600 px-4 font-bold text-white hover:bg-amber-700"><ArrowUpLeft className="ml-2 h-5 w-5" />تسجيل مصروف</Button></div>
+      <div className="flex flex-wrap gap-2"><Button onClick={() => { setTransactionType("income"); setOpen(true); }} className="h-11 w-full rounded-xl bg-teal-700 px-4 font-bold hover:bg-teal-800 sm:w-auto"><ArrowDownRight className="ml-2 h-5 w-5" />تسجيل إيراد</Button><Button onClick={() => { setTransactionType("expense"); setOpen(true); }} className="h-11 w-full rounded-xl bg-amber-600 px-4 font-bold text-white hover:bg-amber-700 sm:w-auto"><ArrowUpLeft className="ml-2 h-5 w-5" />تسجيل مصروف</Button></div>
     </div>
 
     <section className="grid gap-2 sm:grid-cols-3">
