@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Droplets, MapPin, Phone, MessageCircle, ShieldCheck, Wrench, Clock3, CheckCircle2, ArrowLeft, Sparkles, Share2, Copy, Star } from "lucide-react";
 
-const whatsappNumber = "2010087977774";
+const whatsappNumber = "201008797774";
 const heroImage = "/manus-storage/purepoint-hero-installation_f76e76d6.jpg";
 const cartridgesImage = "/manus-storage/purepoint-cartridges_5a1dea2a.jpg";
 const maintenanceImage = "/manus-storage/purepoint-maintenance_c1ab05d9.jpg";
@@ -40,7 +40,7 @@ export default function PublicDemo() {
       <header className="sticky top-0 z-20 border-b border-teal-950/10 bg-white/90 backdrop-blur-lg">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <a href="#top" className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-teal-700 text-white shadow-lg shadow-teal-700/20"><Droplets className="h-6 w-6" /></span><span><strong className="block text-base font-black text-teal-950">نقطة نقاء</strong><small className="text-xs font-bold text-teal-700">فلاتر مياه في الرياض</small></span></a>
-          <a href="tel:+2010087977774" className="hidden items-center gap-2 rounded-xl bg-teal-50 px-4 py-2.5 text-sm font-black text-teal-800 sm:flex"><Phone className="h-4 w-4" /> اتصل الآن</a>
+          <a href="tel:+201008797774" className="hidden items-center gap-2 rounded-xl bg-teal-50 px-4 py-2.5 text-sm font-black text-teal-800 sm:flex"><Phone className="h-4 w-4" /> اتصل الآن</a>
         </div>
       </header>
 
