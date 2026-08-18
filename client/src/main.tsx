@@ -5,7 +5,9 @@ import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
+import PublicDemo from "./pages/PublicDemo";
 import { startLogin } from "./const";
+import { useLocation } from "wouter";
 import "./index.css";
 
 if ("serviceWorker" in navigator) {
@@ -85,10 +87,16 @@ const trpcClient = trpc.createClient({
   ],
 });
 
-createRoot(document.getElementById("root")!).render(
-  <trpc.Provider client={trpcClient} queryClient={queryClient}>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </trpc.Provider>
-);
+function ConditionalApp() {
+  const [location] = useLocation();
+  if (location === "/demo") return <PublicDemo />;
+  return (
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </trpc.Provider>
+  );
+}
+
+createRoot(document.getElementById("root")!).render(<ConditionalApp />);

@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "./_core/hooks/useAuth";
 import type { ReactNode } from "react";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import DashboardLayout from "./components/DashboardLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import Reminders from "./pages/Reminders";
 import Reports from "./pages/Reports";
 import TechnicianPayroll from "./pages/TechnicianPayroll";
+import PublicDemo from "./pages/PublicDemo";
 import Settings from "./pages/Settings";
 import Visits from "./pages/Visits";
 
@@ -41,6 +42,8 @@ function AdminReports() { return <AdminOnly><Reports /></AdminOnly>; }
 function AdminTechnicianPayroll() { return <AdminOnly><TechnicianPayroll /></AdminOnly>; }
 
 function Router() {
+  const [location] = useLocation();
+  if (location === "/demo") return <PublicDemo />;
   return (
     <DashboardLayout>
       <Switch>
