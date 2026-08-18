@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getTrashItems, moveToTrash, permanentlyDeleteFromTrash, restoreFromTrash, TRASH_BIN_KEY } from "./trashBin";
+import { emptyTrash, filterTrashItems, getTrashItems, moveToTrash, permanentlyDeleteFromTrash, restoreFromTrash, TRASH_BIN_KEY } from "./trashBin";
 
 describe("سلة المحذوفات المحلية", () => {
   afterEach(() => localStorage.clear());
@@ -27,6 +27,30 @@ describe("سلة المحذوفات المحلية", () => {
   it("تحذف العنصر نهائيًا ولا تتركه في التخزين المحلي", () => {
     const item = moveToTrash({ entityType: "customer", entityLabel: "عميل تجريبي", payload: { id: 4 } });
     permanentlyDeleteFromTrash(item.id);
+    expect(getTrashItems()).toEqual([]);
+    expect(localStorage.getItem(TRASH_BIN_KEY)).toBe("[]");
+  });
+
+  it("تحافظ على أكثر من مئة عنصر دون إسقاط العناصر الأقدم", () => {
+    for (let index = 0; index < 125; index += 1) {
+      moveToTrash({ entityType: "customer", entityLabel: `عميل ${index}`, payload: { index } });
+    }
+    expect(getTrashItems()).toHaveLength(125);
+    expect(getTrashItems().at(-1)?.entityLabel).toBe("عميل 0");
+  });
+
+  it("تبحث في اسم العنصر وبياناته وتصفّي حسب النوع", () => {
+    const customer = moveToTrash({ entityType: "customer", entityLabel: "العميل محمد", payload: { phone: "0501234567" } });
+    moveToTrash({ entityType: "visit", entityLabel: "زيارة صيانة", payload: { technicianName: "أحمد" } });
+    expect(filterTrashItems(getTrashItems(), "محمد")).toEqual([expect.objectContaining({ id: customer.id })]);
+    expect(filterTrashItems(getTrashItems(), "0501234567")).toHaveLength(1);
+    expect(filterTrashItems(getTrashItems(), "", "visit")).toHaveLength(1);
+    expect(filterTrashItems(getTrashItems(), "غير موجود")).toHaveLength(0);
+  });
+
+  it("تفرغ السلة بالكامل عند استدعاء العملية المحلية", () => {
+    moveToTrash({ entityType: "cash", entityLabel: "عملية تجريبية", payload: { id: 9 } });
+    emptyTrash();
     expect(getTrashItems()).toEqual([]);
     expect(localStorage.getItem(TRASH_BIN_KEY)).toBe("[]");
   });

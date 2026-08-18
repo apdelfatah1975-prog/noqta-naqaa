@@ -132,3 +132,27 @@
     transition: none !important;
   }
 }
+
+
+/* تحسين القراءة على الهاتف: خط أكبر وتباعد أوضح دون تكبير يسبب تمددًا أفقيًا */
+@media (max-width: 640px) {
+  html { font-size: 16px; }
+  body { font-size: 1rem; letter-spacing: 0.012em; }
+  .page-heading { font-size: 1.55rem !important; line-height: 1.45 !important; letter-spacing: 0.005em !important; }
+  .page-subheading { font-size: 1rem !important; line-height: 1.9 !important; letter-spacing: 0.012em !important; }
+  .field-label { font-size: 1rem !important; line-height: 1.7 !important; letter-spacing: 0.012em !important; }
+  .field-input { min-height: 3rem; height: 3rem; font-size: 1rem !important; line-height: 1.6 !important; letter-spacing: 0.012em !important; }
+  .field-textarea { min-height: 7rem; font-size: 1rem !important; line-height: 1.8 !important; letter-spacing: 0.012em !important; }
+  button, [role="button"], a[href], select { letter-spacing: 0.008em; }
+  .mobile-readable { font-size: 1rem !important; line-height: 1.75 !important; letter-spacing: 0.012em !important; }
+}
+
+
+@media (max-width: 767px) {
+  .compact-mobile-visit-table th:nth-child(3),
+  .compact-mobile-visit-table td:nth-child(3),
+  .compact-mobile-visit-table th:nth-child(5),
+  .compact-mobile-visit-table td:nth-child(5) {
+    display: none;
+  }
+}
