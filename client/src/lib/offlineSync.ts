@@ -12,6 +12,7 @@ const INVENTORY_KEY_PREFIX = "purepoint-offline-inventory";
 const CASH_QUEUE_PREFIX = "purepoint-pending-cash";
 const INVENTORY_QUEUE_PREFIX = "purepoint-pending-inventory";
 const REPORT_KEY_PREFIX = "purepoint-offline-report";
+const REPORT_SYNC_META_PREFIX = "purepoint-offline-report-sync";
 const SERVICE_CATALOG_KEY = "purepoint-offline-service-catalog";
 
 export type OfflineCustomer = {
@@ -269,8 +270,15 @@ export function removePendingVisit(ownerId: number, clientOperationId: string) {
   writeJson(queueKey(VISIT_QUEUE_PREFIX, ownerId), getPendingVisits(ownerId).filter(item => item.clientOperationId !== clientOperationId));
 }
 
+export type OfflineReportSyncMeta = { lastSyncedAt: string; dateFrom: string; dateTo: string };
+
 export function cacheOfflineReport<T>(ownerId: number, dateFrom: string, dateTo: string, value: T) {
   writeJson(`${REPORT_KEY_PREFIX}-${ownerId}-${dateFrom}-${dateTo}`, value);
+  writeJson(ownerDataKey(REPORT_SYNC_META_PREFIX, ownerId), { lastSyncedAt: new Date().toISOString(), dateFrom, dateTo } satisfies OfflineReportSyncMeta);
+}
+
+export function getOfflineReportSyncMeta(ownerId: number) {
+  return readJson<OfflineReportSyncMeta | null>(ownerDataKey(REPORT_SYNC_META_PREFIX, ownerId), null);
 }
 
 export function getOfflineReport<T>(ownerId: number, dateFrom: string, dateTo: string) {

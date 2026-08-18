@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { cacheOfflineReport, getLatestOfflineReport, getOfflineReport, getOfflineSession } from "@/lib/offlineSync";
+import { cacheOfflineReport, getLatestOfflineReport, getOfflineReport, getOfflineReportSyncMeta, getOfflineSession, getPendingOperationCount } from "@/lib/offlineSync";
 import { CalendarDays, Download, FileBarChart, PackageSearch, Printer, RefreshCw, WalletCards } from "lucide-react";
 import { labelVisitType } from "@/lib/filterUi";
 import { printArabicPdf } from "@/lib/pdfExport";
@@ -23,6 +23,11 @@ export default function Reports() {
   const query = trpc.filters.reports.monthly.useQuery({ dateFrom, dateTo }, { retry: false, staleTime: 60_000 });
   const cachedReport = getOfflineReport<typeof query.data>(user?.id ?? 0, dateFrom, dateTo);
   const latestCachedReport = getLatestOfflineReport<NonNullable<typeof query.data>>(user?.id ?? 0);
+  const [syncSnapshot, setSyncSnapshot] = useState(() => ({
+    online: typeof navigator === "undefined" ? true : navigator.onLine,
+    pending: user ? getPendingOperationCount(user.id) : 0,
+    meta: user ? getOfflineReportSyncMeta(user.id) : null,
+  }));
   const emptyReport = {
     period: { dateFrom, dateTo },
     summary: { visits: 0, customers: 0, income: 0, expense: 0, balance: 0, pendingReminders: 0, lowStock: 0 },
@@ -35,6 +40,19 @@ export default function Reports() {
   useEffect(() => {
     if (query.data && user) cacheOfflineReport(user.id, dateFrom, dateTo, query.data);
   }, [dateFrom, dateTo, query.data, user]);
+
+  useEffect(() => {
+    const refreshSyncSnapshot = () => setSyncSnapshot({
+      online: typeof navigator === "undefined" ? true : navigator.onLine,
+      pending: user ? getPendingOperationCount(user.id) : 0,
+      meta: user ? getOfflineReportSyncMeta(user.id) : null,
+    });
+    refreshSyncSnapshot();
+    window.addEventListener("online", refreshSyncSnapshot);
+    window.addEventListener("offline", refreshSyncSnapshot);
+    const timer = window.setInterval(refreshSyncSnapshot, 1500);
+    return () => { window.removeEventListener("online", refreshSyncSnapshot); window.removeEventListener("offline", refreshSyncSnapshot); window.clearInterval(timer); };
+  }, [user]);
 
   const exportExcel = () => {
     if (!data) return;
@@ -103,7 +121,7 @@ export default function Reports() {
 
   return <div dir="rtl" className="mx-auto max-w-7xl space-y-6 print:bg-white">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between print:hidden">
-      <div><p className="text-sm font-bold text-teal-700">مركز الإدارة</p><h1 className="page-heading">التقارير</h1><p className="page-subheading">ملخص سريع، ثم تفاصيل كل جانب من العمل عند الحاجة.</p></div>
+      <div><p className="text-sm font-bold text-teal-700">مركز الإدارة</p><h1 className="page-heading">التقارير</h1><p className="page-subheading">ملخص سريع، ثم تفاصيل كل جانب من العمل عند الحاجة.</p><div className="mt-3 flex flex-wrap gap-2 text-xs font-bold"><span className={`rounded-full px-3 py-1.5 ${syncSnapshot.online ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>{syncSnapshot.online ? "متصل بالإنترنت" : "وضع العمل دون اتصال"}</span><span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">عمليات محلية معلقة: {number(syncSnapshot.pending)}</span>{syncSnapshot.meta ? <span className="rounded-full bg-teal-50 px-3 py-1.5 text-teal-800">آخر مزامنة: {new Date(syncSnapshot.meta.lastSyncedAt).toLocaleString("ar-SA", { dateStyle: "short", timeStyle: "short" })}</span> : null}</div></div>
       <div className="flex flex-wrap gap-2"><Button variant="outline" className="h-11 rounded-xl" onClick={() => query.refetch()}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button><Button variant="outline" className="h-11 rounded-xl" onClick={() => window.print()} disabled={!data}><Printer className="ml-2 h-4 w-4" />طباعة / PDF</Button><Button variant="outline" className="h-11 rounded-xl" onClick={exportPdf} disabled={!data}><Download className="ml-2 h-4 w-4" />PDF</Button><Button className="h-11 rounded-xl bg-teal-700 hover:bg-teal-800" onClick={exportExcel} disabled={!data}><Download className="ml-2 h-4 w-4" />تصدير Excel</Button></div>
     </div>
 
