@@ -262,7 +262,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             ) : null}
           </div>
         </header>
-        <main className="min-h-[calc(100vh-4rem)] min-w-0 overflow-x-hidden px-3 pb-24 pt-4 sm:px-6 sm:pb-24 sm:pt-6 lg:px-8 lg:pb-8 lg:pt-8">{children}</main>
+        <main className="mobile-portrait-main min-h-[calc(100vh-4rem)] min-w-0 overflow-x-hidden px-3 pb-24 pt-4 sm:px-6 sm:pb-24 sm:pt-6 lg:px-8 lg:pb-8 lg:pt-8">{children}</main>
       </SidebarInset>
       {isMobile ? <nav ref={mobileNavRef} onScroll={updateMobileNavScrollHint} aria-label="التنقل السريع" className="relative fixed inset-x-0 bottom-0 z-40 min-h-[5.25rem] overflow-x-auto border-t border-teal-950/10 bg-white/95 px-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(13,82,76,.10)] backdrop-blur-lg [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {showMobileNavHint ? <div className="pointer-events-auto absolute bottom-full left-3 right-3 mb-2 flex items-center justify-between gap-3 rounded-2xl bg-teal-900 px-4 py-3 text-right text-xs font-bold leading-5 text-white shadow-xl" role="status"><span>مرّر الشريط إلى اليسار لرؤية بقية الصفحات</span><button type="button" onClick={dismissMobileNavHint} className="shrink-0 rounded-lg px-2 py-1 text-teal-100 transition hover:bg-white/10" aria-label="إغلاق تلميح شريط التنقل">حسنًا</button></div> : null}

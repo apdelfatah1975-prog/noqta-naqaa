@@ -156,3 +156,43 @@
     display: none;
   }
 }
+
+
+/* تحسين واجهة الهاتف في الوضع الطولي فقط */
+@media (max-width: 640px) and (orientation: portrait) {
+  .mobile-portrait-main {
+    padding-inline: 0.75rem !important;
+    padding-top: 0.75rem !important;
+    padding-bottom: 7.5rem !important;
+  }
+
+  .mobile-portrait-main > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .mobile-portrait-main .page-heading {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-portrait-main .dashboard-card,
+  .mobile-portrait-main .soft-card {
+    border-radius: 1rem;
+  }
+
+  .mobile-portrait-main button,
+  .mobile-portrait-main [role="button"] {
+    min-height: 2.75rem;
+  }
+
+  .mobile-portrait-main input,
+  .mobile-portrait-main select,
+  .mobile-portrait-main textarea {
+    max-width: 100%;
+  }
+
+  .mobile-portrait-main table {
+    font-size: 0.9rem;
+  }
+}
