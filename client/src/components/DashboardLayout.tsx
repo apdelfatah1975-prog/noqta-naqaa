@@ -26,7 +26,6 @@ import { trpc } from "@/lib/trpc";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   BellRing,
-  ClipboardList,
   CalendarPlus,
   CircleDollarSign,
   FileBarChart,
@@ -38,8 +37,6 @@ import {
   PackageSearch,
   Settings,
   UsersRound,
-  MapPinned,
-  UserRoundPlus,
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -53,14 +50,11 @@ const menuItems = [
   { icon: LayoutDashboard, label: "الرئيسية", path: "/" },
   { icon: UsersRound, label: "العملاء", path: "/customers" },
   { icon: CalendarPlus, label: "سجل الزيارات", path: "/visits" },
-  { icon: ClipboardList, label: "أوامر الفنيين", path: "/work-orders" },
   { icon: BellRing, label: "التذكيرات", path: "/reminders" },
   { icon: PackageSearch, label: "المخزن", path: "/inventory" },
   { icon: CircleDollarSign, label: "الخزينة والمصروفات", path: "/cash" },
   { icon: FileBarChart, label: "التقارير", path: "/reports" },
   { icon: WalletCards, label: "كشف رواتب الفنيين", path: "/technician-payroll" },
-  { icon: MapPinned, label: "خريطة الفنيين", path: "/technician-locations" },
-  { icon: UserRoundPlus, label: "الحسابات المسموح بها", path: "/allowed-technicians" },
   { icon: Settings, label: "الإعدادات", path: "/settings" },
 ];
 
@@ -103,9 +97,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const utils = trpc.useUtils();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
-  const visibleMenuItems = user?.role === "admin"
-    ? menuItems
-    : menuItems.filter(item => !["/inventory", "/cash", "/reports", "/technician-payroll", "/technician-locations", "/allowed-technicians"].includes(item.path));
+  const visibleMenuItems = user?.role === "admin" ? menuItems : menuItems.filter(item => item.path !== "/inventory" && item.path !== "/cash" && item.path !== "/reports" && item.path !== "/technician-payroll");
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();

@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { parse as parseCookie } from "cookie";
-import { and, asc, desc, eq, gte, inArray, lte, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, ne } from "drizzle-orm";
 import { z } from "zod";
 import {
   cashTransactions,
@@ -15,10 +15,6 @@ import {
   visitItems,
   reminders,
   visits,
-  users,
-  allowedTechnicianAccounts,
-  technicianLocations,
-  workOrderProofs,
 } from "../../drizzle/schema";
 import { calculateCashBreakdown, calculateCashSummaries, calculateCompanyFinancialOverview, calculatePurchaseBreakdown, cashCurrencies, cashTransactionTypes, matchesCashTransactionSearch } from "../../shared/cashBusiness";
 import {
@@ -36,12 +32,10 @@ import {
   needsAutomaticReminder,
   visitTypes,
 } from "../../shared/filterBusiness";
-import { getDb, upsertUser } from "../db";
+import { getDb } from "../db";
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
 import { COOKIE_NAME } from "../../shared/const";
-import { getSessionCookieOptions } from "../_core/cookies";
-import { sdk } from "../_core/sdk";
-import { adminProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 import { createOwnerBackup, refreshOwnerBackup } from "../backup";
 import { storageGet, storagePut } from "../storage";
 
@@ -77,12 +71,6 @@ const customerCreateInput = customerInput.extend({
   })).max(50).optional().default([]),
 });
 
-const workOrderProofInput = z.object({
-  visitId: z.number().int().positive(),
-  kind: z.enum(["photo", "signature"]),
-  dataUrl: z.string().regex(/^data:(image\/(?:jpeg|png|webp));base64,[A-Za-z0-9+/=]+$/, "صيغة الدليل غير صالحة").max(7_000_000),
-});
-
 const visitItemInput = z.object({
   inventoryItemId: z.number().int().positive(),
   quantity: z.number().int().positive("أدخل كمية أكبر من صفر"),
@@ -99,25 +87,6 @@ const visitInput = z.object({
   collectedAmount: z.number().int().nonnegative().optional().default(0),
   collectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
   clientOperationId: z.string().uuid().optional(),
-  items: z.array(visitItemInput).max(50).optional().default([]),
-});
-
-const workOrderStatusValues = ["assigned", "en_route", "arrived", "in_progress", "completed", "postponed", "cancelled"] as const;
-const workOrderCreateInput = z.object({
-  customerId: z.number().int().positive(),
-  visitType: z.enum(visitTypes),
-  visitDate: z.date(),
-  assignedTechnicianId: z.number().int().positive(),
-  notes: z.string().trim().max(2000).optional().nullable(),
-  clientOperationId: z.string().uuid().optional(),
-});
-const workOrderUpdateInput = z.object({
-  id: z.number().int().positive(),
-  status: z.enum(workOrderStatusValues),
-  visitResult: z.string().trim().max(2000).optional().nullable(),
-  notes: z.string().trim().max(2000).optional().nullable(),
-  collectedAmount: z.number().int().nonnegative().optional().default(0),
-  collectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
   items: z.array(visitItemInput).max(50).optional().default([]),
 });
 
@@ -184,13 +153,13 @@ const defaultNotificationSettings = {
 const sensitivePinInput = z.object({ pin: z.string().trim().min(4, "الرقم السري يجب أن يتكون من 4 أحرف أو أرقام على الأقل.").max(64) });
 const scryptAsync = promisify(scrypt);
 
-export async function hashPin(pin: string) {
+async function hashPin(pin: string) {
   const salt = randomBytes(16).toString("hex");
   const derivedKey = (await scryptAsync(pin, salt, 64)) as Buffer;
   return `${salt}:${derivedKey.toString("hex")}`;
 }
 
-export async function verifyPin(pin: string, encodedHash: string) {
+async function verifyPin(pin: string, encodedHash: string) {
   const [salt, storedHex] = encodedHash.split(":");
   if (!salt || !storedHex) return false;
   const stored = Buffer.from(storedHex, "hex");
@@ -412,71 +381,6 @@ async function requirePinIfConfigured(ownerId: number, pin?: string) {
 }
 
 export const filterManagementRouter = router({
-  technicianAuth: router({
-    login: publicProcedure.input(z.object({ email: z.string().trim().email("أدخل بريدًا إلكترونيًا صحيحًا").max(320), password: z.string().min(8, "كلمة السر يجب أن تتكون من 8 أحرف أو أرقام على الأقل.").max(128) })).mutation(async ({ ctx, input }) => {
-      const db = await databaseOrThrow();
-      const email = input.email.trim().toLowerCase();
-      const account = (await db.select().from(allowedTechnicianAccounts).where(and(eq(allowedTechnicianAccounts.email, email), eq(allowedTechnicianAccounts.isActive, true))).limit(1))[0];
-      if (!account?.passwordHash || !(await verifyPin(input.password, account.passwordHash))) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "البريد أو كلمة السر غير صحيحة، أو أن الحساب غير مفعل." });
-      }
-      let user = account.linkedUserId ? (await db.select().from(users).where(and(eq(users.id, account.linkedUserId), eq(users.role, "user"))).limit(1))[0] : undefined;
-      if (!user) {
-        const openId = `local-technician-${account.ownerId}-${account.id}`;
-        await upsertUser({ openId, name: account.displayName, email: account.email, loginMethod: "technician-password", role: "user", lastSignedIn: new Date() });
-        user = (await db.select().from(users).where(eq(users.openId, openId)).limit(1))[0];
-        if (user) await db.update(allowedTechnicianAccounts).set({ linkedUserId: user.id }).where(eq(allowedTechnicianAccounts.id, account.id));
-      } else {
-        await upsertUser({ openId: user.openId, name: account.displayName, email: account.email, loginMethod: "technician-password", role: "user", lastSignedIn: new Date() });
-        user = (await db.select().from(users).where(eq(users.id, user.id)).limit(1))[0];
-      }
-      if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر تجهيز حساب الفني." });
-      const token = await sdk.createSessionToken(user.openId, { name: user.name ?? account.displayName });
-      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: 30 * 24 * 60 * 60 * 1000 });
-      return { success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
-    }),
-  }),
-  allowedTechnicians: router({
-    list: adminProcedure.query(async ({ ctx }) => {
-      const db = await databaseOrThrow();
-      return db.select({ id: allowedTechnicianAccounts.id, ownerId: allowedTechnicianAccounts.ownerId, email: allowedTechnicianAccounts.email, displayName: allowedTechnicianAccounts.displayName, linkedUserId: allowedTechnicianAccounts.linkedUserId, isActive: allowedTechnicianAccounts.isActive, createdAt: allowedTechnicianAccounts.createdAt, updatedAt: allowedTechnicianAccounts.updatedAt, hasPassword: allowedTechnicianAccounts.passwordHash }).from(allowedTechnicianAccounts).where(eq(allowedTechnicianAccounts.ownerId, ctx.user.id)).orderBy(desc(allowedTechnicianAccounts.createdAt));
-    }),
-    create: adminProcedure.input(z.object({
-      email: z.string().trim().email("أدخل بريدًا إلكترونيًا صحيحًا").max(320),
-      displayName: z.string().trim().min(2, "أدخل اسم الفني").max(160),
-      password: z.string().min(8, "كلمة السر يجب أن تتكون من 8 أحرف أو أرقام على الأقل.").max(128),
-    })).mutation(async ({ ctx, input }) => {
-      const db = await databaseOrThrow();
-      const email = input.email.trim().toLowerCase();
-      const existing = await db.select({ id: allowedTechnicianAccounts.id }).from(allowedTechnicianAccounts).where(and(eq(allowedTechnicianAccounts.ownerId, ctx.user.id), eq(allowedTechnicianAccounts.email, email))).limit(1);
-      if (existing[0]) throw new TRPCError({ code: "CONFLICT", message: "هذا البريد مسجل بالفعل ضمن الحسابات المسموح بها." });
-      const matchedUser = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.email, email)).limit(1);
-      if (matchedUser[0]?.role === "admin") throw new TRPCError({ code: "CONFLICT", message: "لا يمكن اعتماد حساب إداري كحساب فني." });
-      const passwordHash = await hashPin(input.password);
-      const inserted = await db.insert(allowedTechnicianAccounts).values({ ownerId: ctx.user.id, email, displayName: input.displayName.trim(), linkedUserId: matchedUser[0]?.id ?? null, passwordHash, isActive: true });
-      const accountId = Number(inserted[0].insertId);
-      if (!matchedUser[0]) {
-        const openId = `local-technician-${ctx.user.id}-${accountId}`;
-        await upsertUser({ openId, name: input.displayName.trim(), email, loginMethod: "technician-password", role: "user", lastSignedIn: new Date() });
-        const localUser = await db.select({ id: users.id }).from(users).where(eq(users.openId, openId)).limit(1);
-        if (localUser[0]) await db.update(allowedTechnicianAccounts).set({ linkedUserId: localUser[0].id }).where(eq(allowedTechnicianAccounts.id, accountId));
-      }
-      return { id: accountId, linked: true };
-    }),
-    setPassword: adminProcedure.input(z.object({ id: z.number().int().positive(), password: z.string().min(8, "كلمة السر يجب أن تتكون من 8 أحرف أو أرقام على الأقل.").max(128) })).mutation(async ({ ctx, input }) => {
-      const db = await databaseOrThrow();
-      const passwordHash = await hashPin(input.password);
-      const updated = await db.update(allowedTechnicianAccounts).set({ passwordHash }).where(and(eq(allowedTechnicianAccounts.id, input.id), eq(allowedTechnicianAccounts.ownerId, ctx.user.id)));
-      if (!updated[0]?.affectedRows) throw new TRPCError({ code: "NOT_FOUND", message: "الحساب غير موجود." });
-      return { success: true };
-    }),
-    setActive: adminProcedure.input(z.object({ id: z.number().int().positive(), isActive: z.boolean() })).mutation(async ({ ctx, input }) => {
-      const db = await databaseOrThrow();
-      const updated = await db.update(allowedTechnicianAccounts).set({ isActive: input.isActive }).where(and(eq(allowedTechnicianAccounts.id, input.id), eq(allowedTechnicianAccounts.ownerId, ctx.user.id)));
-      if (!updated[0]?.affectedRows) throw new TRPCError({ code: "NOT_FOUND", message: "الحساب غير موجود." });
-      return { success: true };
-    }),
-  }),
   dashboard: protectedProcedure.query(async ({ ctx }) => {
     const db = await databaseOrThrow();
     const ownerId = ctx.user.id;
@@ -1001,10 +905,6 @@ export const filterManagementRouter = router({
       await refreshOwnerBackup(ctx.user.id);
       return { success: true };
     }),
-    verifyPin: protectedProcedure.input(sensitivePinInput).mutation(async ({ ctx, input }) => {
-      await requirePin(ctx.user.id, input.pin);
-      return { success: true };
-    }),
     enableScheduledAlerts: protectedProcedure.input(notificationSettingsSaveInput).mutation(async ({ ctx, input }) => {
       await requirePinIfConfigured(ctx.user.id, input.pin);
       const db = await databaseOrThrow();
@@ -1033,14 +933,6 @@ export const filterManagementRouter = router({
 
   inventory: router({
     summary: adminProcedure.query(({ ctx }) => inventorySummary(ctx.user.id)),
-    technicianSummary: protectedProcedure.query(async ({ ctx }) => {
-      const db = await databaseOrThrow();
-      const assigned = await db.select({ ownerId: visits.ownerId }).from(visits).where(eq(visits.assignedTechnicianId, ctx.user.id));
-      const ownerIds = Array.from(new Set(assigned.map(row => row.ownerId)));
-      if (!ownerIds.length) return { items: [] as Array<{ id: number; name: string; unit: string; reorderLevel: number; currentBalance: number }> };
-      const summaries = await Promise.all(ownerIds.map(ownerId => inventorySummary(ownerId)));
-      return { items: summaries.flatMap(summary => summary.items).map(item => ({ id: item.id, name: item.name, unit: item.unit, reorderLevel: item.reorderLevel, currentBalance: item.currentBalance })) };
-    }),
     createItem: adminProcedure.input(inventoryItemInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       if (input.clientOperationId) {
@@ -1169,136 +1061,6 @@ export const filterManagementRouter = router({
       await db.delete(cashTransactions).where(and(eq(cashTransactions.sourceInventoryMovementId, input.id), eq(cashTransactions.ownerId, ctx.user.id)));
       await db.delete(inventoryMovements).where(and(eq(inventoryMovements.id, input.id), eq(inventoryMovements.ownerId, ctx.user.id)));
       await refreshOwnerBackup(ctx.user.id);
-      return { success: true };
-    }),
-  }),
-
-  technicians: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const db = await databaseOrThrow();
-      return db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(eq(users.role, "user"));
-    }),
-    updateLocation: protectedProcedure.input(z.object({ latitude: z.string().regex(/^-?\d{1,3}(?:\.\d+)?$/), longitude: z.string().regex(/^-?\d{1,3}(?:\.\d+)?$/), accuracy: z.number().int().nonnegative().max(100000).optional(), sharingUntil: z.date().nullable().optional() })).mutation(async ({ ctx, input }) => {
-      if (ctx.user.role === "admin") throw new TRPCError({ code: "FORBIDDEN", message: "تحديث الموقع مخصص لحساب الفني." });
-      const db = await databaseOrThrow();
-      const assigned = await db.select({ ownerId: visits.ownerId }).from(visits).where(and(eq(visits.assignedTechnicianId, ctx.user.id), ne(visits.status, "completed"), ne(visits.status, "cancelled"))).limit(1);
-      const ownerId = assigned[0]?.ownerId;
-      if (!ownerId) throw new TRPCError({ code: "FORBIDDEN", message: "لا يوجد أمر عمل نشط يسمح بمشاركة الموقع." });
-      const now = new Date();
-      await db.insert(technicianLocations).values({ ownerId, technicianId: ctx.user.id, latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt: now, sharingUntil: input.sharingUntil ?? null }).onDuplicateKeyUpdate({ set: { latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt: now, sharingUntil: input.sharingUntil ?? null } });
-      return { success: true, recordedAt: now };
-    }),
-    latestLocations: adminProcedure.query(async ({ ctx }) => {
-      const db = await databaseOrThrow();
-      const [locations, techs] = await Promise.all([
-        db.select().from(technicianLocations).where(eq(technicianLocations.ownerId, ctx.user.id)),
-        db.select({ id: users.id, name: users.name }).from(users).where(eq(users.role, "user")),
-      ]);
-      const byTech = new Map(locations.map(location => [location.technicianId, location]));
-      return techs.map(tech => ({ technician: tech, location: byTech.get(tech.id) ?? null }));
-    }),
-  }),
-
-  workOrders: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const db = await databaseOrThrow();
-      const condition = ctx.user.role === "admin"
-        ? eq(visits.ownerId, ctx.user.id)
-        : eq(visits.assignedTechnicianId, ctx.user.id);
-      const rows = await db.select().from(visits).where(condition).orderBy(asc(visits.visitDate));
-      const ownerIds = Array.from(new Set(rows.map(row => row.ownerId)));
-      if (!ownerIds.length) return [];
-      const [customerRows, incomeRows] = await Promise.all([
-        db.select().from(customers).where(inArray(customers.ownerId, ownerIds)),
-        db.select().from(cashTransactions).where(and(inArray(cashTransactions.ownerId, ownerIds), eq(cashTransactions.transactionType, "income"))),
-      ]);
-      const customerById = new Map(customerRows.map(customer => [customer.id, customer]));
-      const incomeByVisit = new Map(incomeRows.filter(row => row.sourceVisitId).map(row => [row.sourceVisitId!, row]));
-      return rows.map(row => ({
-        ...row,
-        customer: customerById.get(row.customerId) ? {
-          id: customerById.get(row.customerId)!.id,
-          name: customerById.get(row.customerId)!.name,
-          phone: customerById.get(row.customerId)!.phone,
-          address: customerById.get(row.customerId)!.address,
-          latitude: customerById.get(row.customerId)!.latitude,
-          longitude: customerById.get(row.customerId)!.longitude,
-          manualCode: customerById.get(row.customerId)!.manualCode,
-        } : null,
-        collectedAmount: incomeByVisit.get(row.id)?.amount ?? 0,
-      }));
-    }),
-    create: adminProcedure.input(workOrderCreateInput).mutation(async ({ ctx, input }) => {
-      const db = await databaseOrThrow();
-      const customer = await getOwnedCustomer(ctx.user.id, input.customerId);
-      const technician = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, input.assignedTechnicianId)).limit(1);
-      if (!technician[0]) throw new TRPCError({ code: "NOT_FOUND", message: "الفني غير موجود." });
-      if (input.clientOperationId) {
-        const existing = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), eq(visits.clientOperationId, input.clientOperationId))).limit(1);
-        if (existing[0]) return { id: existing[0].id, alreadySynced: true };
-      }
-      const inserted = await db.insert(visits).values({ customerId: customer.id, ownerId: ctx.user.id, visitType: input.visitType, visitDate: input.visitDate, technicianName: technician[0].name, assignedTechnicianId: technician[0].id, status: "assigned", notes: input.notes ?? null, clientOperationId: input.clientOperationId });
-      await refreshOwnerBackup(ctx.user.id);
-      return { id: Number(inserted[0].insertId), alreadySynced: false };
-    }),
-    addProof: protectedProcedure.input(workOrderProofInput).mutation(async ({ ctx, input }) => {
-      const db = await databaseOrThrow();
-      const condition = ctx.user.role === "admin"
-        ? and(eq(visits.id, input.visitId), eq(visits.ownerId, ctx.user.id))
-        : and(eq(visits.id, input.visitId), eq(visits.assignedTechnicianId, ctx.user.id));
-      const visit = (await db.select({ id: visits.id, ownerId: visits.ownerId }).from(visits).where(condition).limit(1))[0];
-      if (!visit) throw new TRPCError({ code: "NOT_FOUND", message: "أمر العمل غير موجود أو غير مسند إليك." });
-      const match = input.dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
-      if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "صيغة الدليل غير صالحة." });
-      const mimeType = match[1];
-      const buffer = Buffer.from(match[2], "base64");
-      if (buffer.byteLength > 5 * 1024 * 1024) throw new TRPCError({ code: "BAD_REQUEST", message: "حجم الدليل أكبر من 5 ميجابايت." });
-      const extension = mimeType.split("/")[1];
-      const key = `water-filter-proofs/${visit.ownerId}/${visit.id}/${Date.now()}-${randomBytes(6).toString("hex")}.${extension}`;
-      const uploaded = await storagePut(key, buffer, mimeType);
-      const inserted = await db.insert(workOrderProofs).values({ ownerId: visit.ownerId, visitId: visit.id, uploadedBy: ctx.user.id, kind: input.kind, storageKey: uploaded.key, url: uploaded.url, mimeType });
-      return { id: Number(inserted[0].insertId), url: uploaded.url, kind: input.kind };
-    }),
-    listProofs: protectedProcedure.input(z.object({ visitId: z.number().int().positive() })).query(async ({ ctx, input }) => {
-      const db = await databaseOrThrow();
-      const condition = ctx.user.role === "admin"
-        ? and(eq(visits.id, input.visitId), eq(visits.ownerId, ctx.user.id))
-        : and(eq(visits.id, input.visitId), eq(visits.assignedTechnicianId, ctx.user.id));
-      const visit = (await db.select({ id: visits.id, ownerId: visits.ownerId }).from(visits).where(condition).limit(1))[0];
-      if (!visit) throw new TRPCError({ code: "NOT_FOUND", message: "أمر العمل غير موجود." });
-      return db.select({ id: workOrderProofs.id, kind: workOrderProofs.kind, url: workOrderProofs.url, mimeType: workOrderProofs.mimeType, createdAt: workOrderProofs.createdAt }).from(workOrderProofs).where(and(eq(workOrderProofs.visitId, visit.id), eq(workOrderProofs.ownerId, visit.ownerId))).orderBy(desc(workOrderProofs.createdAt));
-    }),
-    updateStatus: protectedProcedure.input(workOrderUpdateInput).mutation(async ({ ctx, input }) => {
-      const db = await databaseOrThrow();
-      const condition = ctx.user.role === "admin"
-        ? and(eq(visits.id, input.id), eq(visits.ownerId, ctx.user.id))
-        : and(eq(visits.id, input.id), eq(visits.assignedTechnicianId, ctx.user.id));
-      const rows = await db.select().from(visits).where(condition).limit(1);
-      const visit = rows[0];
-      if (!visit) throw new TRPCError({ code: "NOT_FOUND", message: "أمر العمل غير موجود." });
-      const allowed = ctx.user.role === "admin" || visit.assignedTechnicianId === ctx.user.id;
-      if (!allowed) throw new TRPCError({ code: "FORBIDDEN", message: "لا تملك صلاحية تعديل أمر العمل هذا." });
-      const ownerId = visit.ownerId;
-      const now = new Date();
-      await db.update(visits).set({ status: input.status, visitResult: input.visitResult ?? visit.visitResult, notes: input.notes ?? visit.notes, arrivedAt: input.status === "arrived" ? now : visit.arrivedAt, completedAt: input.status === "completed" ? now : visit.completedAt }).where(and(eq(visits.id, input.id), eq(visits.ownerId, ownerId)));
-      if (input.status === "completed" && visit.status !== "completed") {
-        const inventoryRows = input.items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ownerId), inArray(inventoryItems.id, input.items.map(item => item.inventoryItemId)))) : [];
-        const inventoryById = new Map(inventoryRows.map(item => [item.id, item]));
-        for (const requested of input.items) {
-          const item = inventoryById.get(requested.inventoryItemId);
-          if (!item) throw new TRPCError({ code: "NOT_FOUND", message: "أحد الأصناف غير موجود." });
-          const movements = await db.select().from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ownerId), eq(inventoryMovements.inventoryItemId, item.id)));
-          const balance = calculateStockBalance(item.openingQuantity, movements);
-          if (requested.quantity > balance) throw new TRPCError({ code: "BAD_REQUEST", message: `الرصيد غير كافٍ من صنف ${item.name}؛ المتاح ${balance}.` });
-          await db.insert(visitItems).values({ ownerId, visitId: visit.id, inventoryItemId: item.id, itemNameSnapshot: item.name, unitSnapshot: item.unit, quantity: requested.quantity, source: requested.source });
-          await db.insert(inventoryMovements).values({ ownerId, inventoryItemId: item.id, movementType: "outgoing", quantity: requested.quantity, unitCost: item.defaultUnitCost, currency: "SAR", movementDate: now, technicianName: visit.technicianName, notes: `منصرف لأمر عمل العميل ${visit.customerId}` });
-        }
-        if (input.collectedAmount > 0) {
-          const category = visit.visitType === "installation" ? "تحصيل تركيب" : visit.visitType === "maintenance" ? "تحصيل صيانة" : visit.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-          await db.insert(cashTransactions).values({ ownerId, transactionType: "income", currency: input.collectedCurrency, amount: input.collectedAmount, category, transactionDate: now, sourceVisitId: visit.id, recipientName: visit.technicianName, notes: `تحصيل من أمر عمل العميل ${visit.customerId}` });
-        }
-      }
-      await refreshOwnerBackup(ownerId);
       return { success: true };
     }),
   }),

@@ -26,48 +26,6 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-export const allowedTechnicianAccounts = mysqlTable(
-  "allowedTechnicianAccounts",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
-    email: varchar("email", { length: 320 }).notNull(),
-    displayName: varchar("displayName", { length: 160 }).notNull(),
-    linkedUserId: int("linkedUserId").references(() => users.id, { onDelete: "set null" }),
-    passwordHash: varchar("passwordHash", { length: 255 }),
-    isActive: boolean("isActive").default(true).notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    uniqueIndex("allowed_technician_owner_email_unique").on(table.ownerId, table.email),
-    index("allowed_technician_linked_user_idx").on(table.linkedUserId),
-  ],
-);
-
-export type AllowedTechnicianAccount = typeof allowedTechnicianAccounts.$inferSelect;
-export type InsertAllowedTechnicianAccount = typeof allowedTechnicianAccounts.$inferInsert;
-
-export const technicianLocations = mysqlTable(
-  "technicianLocations",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
-    technicianId: int("technicianId").notNull().references(() => users.id, { onDelete: "cascade" }),
-    latitude: varchar("latitude", { length: 32 }).notNull(),
-    longitude: varchar("longitude", { length: 32 }).notNull(),
-    accuracy: int("accuracy"),
-    recordedAt: timestamp("recordedAt").notNull(),
-    sharingUntil: timestamp("sharingUntil"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => [
-    uniqueIndex("technician_locations_owner_technician_unique").on(table.ownerId, table.technicianId),
-    index("technician_locations_owner_updated_idx").on(table.ownerId, table.updatedAt),
-  ],
-);
-
 export const visitTypeValues = [
   "installation",
   "maintenance",
@@ -109,10 +67,6 @@ export const visits = mysqlTable(
     visitType: mysqlEnum("visitType", visitTypeValues).notNull(),
     visitDate: timestamp("visitDate").notNull(),
     technicianName: varchar("technicianName", { length: 160 }),
-    status: mysqlEnum("status", ["assigned", "en_route", "arrived", "in_progress", "completed", "postponed", "cancelled"]).default("assigned").notNull(),
-    assignedTechnicianId: int("assignedTechnicianId").references(() => users.id, { onDelete: "set null" }),
-    arrivedAt: timestamp("arrivedAt"),
-    completedAt: timestamp("completedAt"),
     notes: text("notes"),
     visitResult: text("visitResult"),
     clientOperationId: varchar("clientOperationId", { length: 64 }),
@@ -281,25 +235,3 @@ export const visitItems = mysqlTable(
   table => [index("visit_items_visit_idx").on(table.visitId), uniqueIndex("visit_items_owner_operation_unique").on(table.ownerId, table.clientOperationId)],
 );
 
-
-
-export const workOrderProofKindValues = ["photo", "signature"] as const;
-
-export const workOrderProofs = mysqlTable(
-  "workOrderProofs",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
-    visitId: int("visitId").notNull().references(() => visits.id, { onDelete: "cascade" }),
-    uploadedBy: int("uploadedBy").notNull().references(() => users.id, { onDelete: "restrict" }),
-    kind: mysqlEnum("kind", workOrderProofKindValues).notNull(),
-    storageKey: varchar("storageKey", { length: 512 }).notNull(),
-    url: varchar("url", { length: 1024 }).notNull(),
-    mimeType: varchar("mimeType", { length: 120 }).notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => [
-    index("work_order_proofs_owner_visit_idx").on(table.ownerId, table.visitId),
-    index("work_order_proofs_uploaded_by_idx").on(table.uploadedBy),
-  ],
-);

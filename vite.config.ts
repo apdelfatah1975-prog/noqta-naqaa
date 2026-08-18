@@ -150,26 +150,16 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusDebugCollector()];
+const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
 
 export default defineConfig({
   plugins,
   resolve: {
-    dedupe: ["react", "react-dom"],
     alias: {
-      // Keep every package on the same React runtime. This is required by React 19
-      // because a second copy makes hooks fail inside providers such as tRPC.
-      react: path.resolve(PROJECT_ROOT, "node_modules/react"),
-      "react-dom": path.resolve(PROJECT_ROOT, "node_modules/react-dom"),
-      "react/jsx-runtime": path.resolve(PROJECT_ROOT, "node_modules/react/jsx-runtime.js"),
-      "react/jsx-dev-runtime": path.resolve(PROJECT_ROOT, "node_modules/react/jsx-dev-runtime.js"),
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
-  },
-  optimizeDeps: {
-    include: ["react", "react-dom", "react/jsx-runtime", "@trpc/react-query"],
   },
   envDir: path.resolve(import.meta.dirname),
   root: path.resolve(import.meta.dirname, "client"),

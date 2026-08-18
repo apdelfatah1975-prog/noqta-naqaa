@@ -6,8 +6,6 @@ const VISITS_KEY = "purepoint-offline-visits";
 const CUSTOMER_QUEUE_PREFIX = "purepoint-pending-customers";
 const VISIT_QUEUE_PREFIX = "purepoint-pending-visits";
 const VISIT_DELETE_QUEUE_PREFIX = "purepoint-pending-visit-deletes";
-const WORK_ORDER_QUEUE_PREFIX = "purepoint-pending-work-orders";
-const WORK_ORDER_PROOF_QUEUE_PREFIX = "purepoint-pending-work-order-proofs";
 const DASHBOARD_KEY = "purepoint-offline-dashboard";
 const CASH_KEY_PREFIX = "purepoint-offline-cash";
 const INVENTORY_KEY_PREFIX = "purepoint-offline-inventory";
@@ -64,26 +62,6 @@ export type OfflineVisit = {
   collectedAmount?: number;
   collectedCurrency?: "SAR";
   items?: OfflineVisitItem[];
-};
-
-export type PendingWorkOrderProof = {
-  clientOperationId: string;
-  visitId: number;
-  kind: "photo" | "signature";
-  dataUrl: string;
-  createdAt: string;
-};
-
-export type PendingWorkOrderUpdate = {
-  clientOperationId: string;
-  id: number;
-  status: "assigned" | "en_route" | "arrived" | "in_progress" | "completed" | "postponed" | "cancelled";
-  visitResult?: string | null;
-  notes?: string | null;
-  collectedAmount?: number;
-  collectedCurrency?: "SAR";
-  items?: OfflineVisitItem[];
-  createdAt: string;
 };
 
 export type PendingVisit = {
@@ -207,7 +185,6 @@ export function clearOfflineState() {
   if (session) {
     localStorage.removeItem(queueKey(CUSTOMER_QUEUE_PREFIX, session.id));
     localStorage.removeItem(queueKey(VISIT_QUEUE_PREFIX, session.id));
-    localStorage.removeItem(queueKey(WORK_ORDER_QUEUE_PREFIX, session.id));
   }
 }
 
@@ -290,34 +267,6 @@ export function queueOfflineVisit(ownerId: number, visit: Omit<PendingVisit, "cl
 
 export function removePendingVisit(ownerId: number, clientOperationId: string) {
   writeJson(queueKey(VISIT_QUEUE_PREFIX, ownerId), getPendingVisits(ownerId).filter(item => item.clientOperationId !== clientOperationId));
-}
-
-export function getPendingWorkOrderUpdates(ownerId: number) {
-  return readJson<PendingWorkOrderUpdate[]>(queueKey(WORK_ORDER_QUEUE_PREFIX, ownerId), []);
-}
-
-export function queueOfflineWorkOrderUpdate(ownerId: number, input: Omit<PendingWorkOrderUpdate, "clientOperationId" | "createdAt">) {
-  const pending: PendingWorkOrderUpdate = { ...input, clientOperationId: newOperationId(), createdAt: new Date().toISOString() };
-  writeJson(queueKey(WORK_ORDER_QUEUE_PREFIX, ownerId), [...getPendingWorkOrderUpdates(ownerId), pending]);
-  return pending;
-}
-
-export function removePendingWorkOrderUpdate(ownerId: number, clientOperationId: string) {
-  writeJson(queueKey(WORK_ORDER_QUEUE_PREFIX, ownerId), getPendingWorkOrderUpdates(ownerId).filter(item => item.clientOperationId !== clientOperationId));
-}
-
-export function getPendingWorkOrderProofs(ownerId: number) {
-  return readJson<PendingWorkOrderProof[]>(queueKey(WORK_ORDER_PROOF_QUEUE_PREFIX, ownerId), []);
-}
-
-export function queueOfflineWorkOrderProof(ownerId: number, input: Omit<PendingWorkOrderProof, "clientOperationId" | "createdAt">) {
-  const pending: PendingWorkOrderProof = { ...input, clientOperationId: newOperationId(), createdAt: new Date().toISOString() };
-  writeJson(queueKey(WORK_ORDER_PROOF_QUEUE_PREFIX, ownerId), [...getPendingWorkOrderProofs(ownerId), pending]);
-  return pending;
-}
-
-export function removePendingWorkOrderProof(ownerId: number, clientOperationId: string) {
-  writeJson(queueKey(WORK_ORDER_PROOF_QUEUE_PREFIX, ownerId), getPendingWorkOrderProofs(ownerId).filter(item => item.clientOperationId !== clientOperationId));
 }
 
 export function cacheOfflineReport<T>(ownerId: number, dateFrom: string, dateTo: string, value: T) {
@@ -416,7 +365,7 @@ export function removePendingInventory(ownerId: number, clientOperationId: strin
 }
 
 export function getPendingOperationCount(ownerId: number) {
-  return getPendingCustomers(ownerId).length + getPendingVisits(ownerId).length + getPendingVisitDeletes(ownerId).length + getPendingWorkOrderUpdates(ownerId).length + getPendingCash(ownerId).length + getPendingInventory(ownerId).length;
+  return getPendingCustomers(ownerId).length + getPendingVisits(ownerId).length + getPendingVisitDeletes(ownerId).length + getPendingCash(ownerId).length + getPendingInventory(ownerId).length;
 }
 
 export type OfflineBackup = {
@@ -585,21 +534,10 @@ function isOfflineBackup(value: unknown): value is OfflineBackup {
   return candidate.format === "purepoint-offline-backup" && candidate.version === 1 && typeof candidate.exportedAt === "string" && !!candidate.storage && typeof candidate.storage === "object" && !Array.isArray(candidate.storage);
 }
 
-function preserveCurrentTrashWhenBackupDoesNotIncludeIt(entries: Array<[string, unknown]>) {
-  if (entries.some(([key]) => key === "purepoint-trash-bin") || !available()) return entries;
-  const raw = localStorage.getItem("purepoint-trash-bin");
-  if (raw === null) return entries;
-  try {
-    return [...entries, ["purepoint-trash-bin", JSON.parse(raw)] as [string, unknown]];
-  } catch {
-    return entries;
-  }
-}
-
 export function restoreOfflineBackup(value: unknown): OfflineRestoreResult {
   if (!available()) throw new Error("التخزين المحلي غير متاح على هذا الجهاز.");
   if (!isOfflineBackup(value)) throw new Error("ملف النسخة الاحتياطية غير صالح أو غير مدعوم.");
-  const entries = preserveCurrentTrashWhenBackupDoesNotIncludeIt(Object.entries(value.storage).filter(([key, storedValue]) => key.startsWith("purepoint-") && storedValue !== undefined));
+  const entries = Object.entries(value.storage).filter(([key, storedValue]) => key.startsWith("purepoint-") && storedValue !== undefined);
   if (entries.length === 0) throw new Error("النسخة الاحتياطية لا تحتوي على بيانات نقطة نقاء.");
   const currentKeys: string[] = [];
   for (let index = 0; index < localStorage.length; index += 1) {
@@ -627,14 +565,13 @@ export function restoreOfflineBackupFromExcel(data: ArrayBuffer): OfflineRestore
     const sheet = workbook.Sheets["بيانات محلية"];
     if (!sheet) throw new Error("ملف Excel لا يحتوي على ورقة البيانات المحلية المطلوبة.");
     const rows = XLSX.utils.sheet_to_json<{ "مفتاح البيانات"?: string; "القيمة"?: string }>(sheet);
-    const parsedEntries: Array<[string, unknown]> = [];
+    const entries: Array<[string, unknown]> = [];
     for (const row of rows) {
       const key = row["مفتاح البيانات"];
       const raw = row["القيمة"];
       if (!key || key === "لا توجد بيانات" || !key.startsWith("purepoint-") || raw === undefined) continue;
-      try { parsedEntries.push([key, JSON.parse(String(raw))]); } catch { parsedEntries.push([key, raw]); }
+      try { entries.push([key, JSON.parse(String(raw))]); } catch { entries.push([key, raw]); }
     }
-    const entries = preserveCurrentTrashWhenBackupDoesNotIncludeIt(parsedEntries);
     if (entries.length === 0) throw new Error("النسخة الاحتياطية لا تحتوي على بيانات نقطة نقاء قابلة للاستعادة.");
     const currentKeys: string[] = [];
     for (let index = 0; index < localStorage.length; index += 1) {

@@ -14,7 +14,6 @@ vi.mock("@/lib/trpc", () => ({
     filters: {
       notifications: {
         setPin: { useMutation: () => ({ mutate: mocks.mutate, isPending: false }) },
-        verifyPin: { useMutation: () => ({ mutateAsync: vi.fn().mockResolvedValue({ success: true }), isPending: false }) },
       },
       customers: { create: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) } },
       visits: { create: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) } },
