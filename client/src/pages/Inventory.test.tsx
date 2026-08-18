@@ -6,6 +6,7 @@ import Inventory from "./Inventory";
 const mocks = vi.hoisted(() => ({
   summary: vi.fn(),
   createItem: vi.fn(),
+  updateItem: vi.fn(),
   createMovement: vi.fn(),
   movementMutate: vi.fn(),
   deleteItem: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock("@/lib/trpc", () => ({
       inventory: {
         summary: { useQuery: mocks.summary },
         createItem: { useMutation: mocks.createItem },
+        updateItem: { useMutation: mocks.updateItem },
         createMovement: { useMutation: mocks.createMovement },
         deleteItem: { useMutation: mocks.deleteItem },
         deleteMovement: { useMutation: mocks.deleteMovement },
@@ -38,6 +40,7 @@ vi.mock("@/lib/trpc", () => ({
 describe("تفاصيل المنصرف في المخزون", () => {
   beforeEach(() => {
     mocks.createItem.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    mocks.updateItem.mockReturnValue({ mutate: vi.fn(), isPending: false });
     mocks.movementMutate.mockReset();
     mocks.createMovement.mockReturnValue({ mutate: mocks.movementMutate, isPending: false });
     mocks.deleteItem.mockReturnValue({ mutate: vi.fn(), isPending: false });
@@ -89,6 +92,15 @@ describe("تفاصيل المنصرف في المخزون", () => {
     expect(screen.getAllByText("سعر الوحدة").length).toBeGreaterThan(0);
     expect(screen.getAllByText("الإجمالي · 1 قطعة").length).toBeGreaterThan(0);
     expect(screen.getAllByText("٨٠٠").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("يفتح زر تعديل الصنف نموذج التعديل دون تغيير الرصيد الافتتاحي", () => {
+    render(<Inventory />);
+    fireEvent.click(screen.getAllByRole("button", { name: "تعديل" })[0]);
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByText("تعديل بيانات الصنف")).toBeTruthy();
+    expect(dialog.getByText(/الرصيد والحركات السابقة لن تتغير/)).toBeTruthy();
+    expect(dialog.getByDisplayValue("10").getAttribute("readonly")).not.toBeNull();
   });
 
   it("يفتح زر صرف الصنف نموذج المنصرف مباشرة", () => {

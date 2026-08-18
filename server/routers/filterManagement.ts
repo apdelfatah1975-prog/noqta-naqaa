@@ -102,6 +102,16 @@ const inventoryItemInput = z.object({
   clientOperationId: z.string().uuid().optional(),
 });
 
+const inventoryUpdateInput = z.object({
+  inventoryItemId: z.number().int().positive(),
+  name: z.string().trim().min(2, "أدخل اسم الصنف").max(160),
+  category: z.string().trim().min(2).max(120).default("عام"),
+  unit: z.string().trim().min(1).max(40).default("قطعة"),
+  reorderLevel: z.number().int().min(0).max(999999).default(2),
+  defaultUnitCost: z.number().int().nonnegative().max(999999999).default(0),
+  notes: z.string().trim().max(2000).optional().nullable(),
+});
+
 const inventoryAppearanceInput = z.object({
   inventoryItemId: z.number().int().positive(),
   customEmoji: z.string().trim().max(8).optional().nullable(),
@@ -987,6 +997,17 @@ export const filterManagementRouter = router({
       const itemId = Number(result[0].insertId);
       await refreshOwnerBackup(ctx.user.id);
       return { id: itemId, merged: false, duplicate: false };
+    }),
+    updateItem: adminProcedure.input(inventoryUpdateInput).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const current = await db.select({ id: inventoryItems.id }).from(inventoryItems).where(and(eq(inventoryItems.id, input.inventoryItemId), eq(inventoryItems.ownerId, ctx.user.id))).limit(1);
+      if (!current[0]) throw new TRPCError({ code: "NOT_FOUND", message: "الصنف غير موجود." });
+      const normalizedName = input.name.trim();
+      const duplicate = await db.select({ id: inventoryItems.id }).from(inventoryItems).where(and(eq(inventoryItems.ownerId, ctx.user.id), eq(inventoryItems.name, normalizedName), ne(inventoryItems.id, input.inventoryItemId))).limit(1);
+      if (duplicate[0]) throw new TRPCError({ code: "CONFLICT", message: "يوجد صنف آخر بنفس الاسم. اختر اسمًا مختلفًا." });
+      await db.update(inventoryItems).set({ name: normalizedName, category: input.category.trim() || "عام", unit: input.unit.trim() || "قطعة", reorderLevel: input.reorderLevel, defaultUnitCost: input.defaultUnitCost, notes: input.notes || null }).where(and(eq(inventoryItems.id, input.inventoryItemId), eq(inventoryItems.ownerId, ctx.user.id)));
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true };
     }),
     updateAppearance: adminProcedure.input(inventoryAppearanceInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
