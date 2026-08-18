@@ -57,6 +57,7 @@ export default function Cash() {
   const [search, setSearch] = useState("");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const cashQueryInput = useMemo(() => ({ incomeFilter, category: categoryFilter || undefined, technician: technicianFilter || undefined, partyType: partyTypeFilter, itemName: itemNameFilter || undefined, month: dateFilterMode === "month" ? selectedMonth || undefined : undefined, startDate: dateFilterMode === "range" ? startDate || undefined : undefined, endDate: dateFilterMode === "range" ? endDate || undefined : undefined, search: search.trim() || undefined }), [incomeFilter, categoryFilter, technicianFilter, partyTypeFilter, itemNameFilter, dateFilterMode, selectedMonth, startDate, endDate, search]);
+  const isUnfilteredCashQuery = incomeFilter === "all" && !categoryFilter && !technicianFilter && partyTypeFilter === "all" && !itemNameFilter && dateFilterMode === "all" && !search.trim();
   const owner = getOfflineSession();
   const cashQuery = trpc.filters.cash.summary.useQuery(cashQueryInput, { retry: false, staleTime: 60_000 });
   const cachedCash = getOfflineCash<typeof cashQuery.data>(owner?.id ?? 0);
@@ -81,8 +82,9 @@ export default function Cash() {
   const data = cashQuery.data ?? locallyFilteredCash ?? emptyCash;
   const isLoading = cashQuery.isLoading && !cashQuery.data && !cachedCash;
   useEffect(() => {
-    if (cashQuery.data && owner) cacheOfflineCash(owner.id, cashQuery.data);
-  }, [cashQuery.data, owner]);
+    // لا نحفظ نتيجة مفلترة فوق النسخة الكاملة؛ وإلا قد تبدو الخزينة فارغة عند فتحها لاحقًا.
+    if (cashQuery.data && owner && isUnfilteredCashQuery) cacheOfflineCash(owner.id, cashQuery.data);
+  }, [cashQuery.data, owner, isUnfilteredCashQuery]);
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<"income" | "expense">("expense");

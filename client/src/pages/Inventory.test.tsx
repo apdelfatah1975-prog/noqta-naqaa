@@ -142,7 +142,7 @@ describe("تفاصيل المنصرف في المخزون", () => {
     render(<Inventory />);
     fireEvent.click(screen.getByRole("button", { name: "إضافة صنف جديد" }));
     const dialog = within(screen.getByRole("dialog"));
-    expect(dialog.getByText("نوع الصنف")).toBeTruthy();
+    expect(dialog.queryByText("نوع الصنف")).toBeNull();
     expect(dialog.getByText("وحدة القياس")).toBeTruthy();
     expect(dialog.getByText("الحد الأدنى للرصيد")).toBeTruthy();
     expect(dialog.queryByText("سعر الشراء الافتراضي")).toBeNull();
