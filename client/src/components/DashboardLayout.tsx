@@ -38,6 +38,8 @@ import {
   PackageSearch,
   Settings,
   UsersRound,
+  MapPinned,
+  UserRoundPlus,
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -57,6 +59,8 @@ const menuItems = [
   { icon: CircleDollarSign, label: "الخزينة والمصروفات", path: "/cash" },
   { icon: FileBarChart, label: "التقارير", path: "/reports" },
   { icon: WalletCards, label: "كشف رواتب الفنيين", path: "/technician-payroll" },
+  { icon: MapPinned, label: "خريطة الفنيين", path: "/technician-locations" },
+  { icon: UserRoundPlus, label: "الحسابات المسموح بها", path: "/allowed-technicians" },
   { icon: Settings, label: "الإعدادات", path: "/settings" },
 ];
 
@@ -99,7 +103,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const utils = trpc.useUtils();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
-  const visibleMenuItems = user?.role === "admin" ? menuItems : menuItems.filter(item => item.path !== "/inventory" && item.path !== "/cash" && item.path !== "/reports" && item.path !== "/technician-payroll");
+  const visibleMenuItems = user?.role === "admin"
+    ? menuItems
+    : menuItems.filter(item => !["/inventory", "/cash", "/reports", "/technician-payroll", "/technician-locations", "/allowed-technicians"].includes(item.path));
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();

@@ -19,6 +19,7 @@ import Settings from "./pages/Settings";
 import Visits from "./pages/Visits";
 import TechnicianPreview from "./pages/TechnicianPreview";
 import TechnicianLocations from "./pages/TechnicianLocations";
+import AllowedTechnicians from "./pages/AllowedTechnicians";
 import WorkOrders from "./pages/WorkOrders";
 
 function AdminOnly({ children }: { children: ReactNode }) {
@@ -70,6 +71,7 @@ function AdminCash() { return <AdminOnly><Cash /></AdminOnly>; }
 function AdminReports() { return <AdminOnly><Reports /></AdminOnly>; }
 function AdminTechnicianPayroll() { return <AdminOnly><TechnicianPayroll /></AdminOnly>; }
 function AdminTechnicianLocations() { return <AdminOnly><TechnicianLocations /></AdminOnly>; }
+function AdminAllowedTechnicians() { return <AdminOnly><AllowedTechnicians /></AdminOnly>; }
 
 function Router() {
   const [location] = useLocation();
@@ -77,6 +79,7 @@ function Router() {
   if (pathname.replace(/\/$/, "") === "/technician-preview") return <ProtectedTechnician />;
   if (pathname.replace(/\/$/, "") === "/work-orders") return <DashboardLayout><AdminOnly><WorkOrders /></AdminOnly></DashboardLayout>;
   if (pathname.replace(/\/$/, "") === "/technician-locations") return <DashboardLayout><AdminTechnicianLocations /></DashboardLayout>;
+  if (pathname.replace(/\/$/, "") === "/allowed-technicians") return <DashboardLayout><AdminAllowedTechnicians /></DashboardLayout>;
   return (
     <DashboardLayout>
       <Switch>
@@ -90,6 +93,7 @@ function Router() {
         <Route path="/reports" component={AdminReports} />
         <Route path="/technician-payroll" component={AdminTechnicianPayroll} />
         <Route path="/technician-locations" component={AdminTechnicianLocations} />
+        <Route path="/allowed-technicians" component={AdminAllowedTechnicians} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>

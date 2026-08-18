@@ -16,6 +16,7 @@ import {
   reminders,
   visits,
   users,
+  allowedTechnicianAccounts,
   technicianLocations,
   workOrderProofs,
 } from "../../drizzle/schema";
@@ -409,6 +410,31 @@ async function requirePinIfConfigured(ownerId: number, pin?: string) {
 }
 
 export const filterManagementRouter = router({
+  allowedTechnicians: router({
+    list: adminProcedure.query(async ({ ctx }) => {
+      const db = await databaseOrThrow();
+      return db.select().from(allowedTechnicianAccounts).where(eq(allowedTechnicianAccounts.ownerId, ctx.user.id)).orderBy(desc(allowedTechnicianAccounts.createdAt));
+    }),
+    create: adminProcedure.input(z.object({
+      email: z.string().trim().email("أدخل بريدًا إلكترونيًا صحيحًا").max(320),
+      displayName: z.string().trim().min(2, "أدخل اسم الفني").max(160),
+    })).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const email = input.email.trim().toLowerCase();
+      const existing = await db.select({ id: allowedTechnicianAccounts.id }).from(allowedTechnicianAccounts).where(and(eq(allowedTechnicianAccounts.ownerId, ctx.user.id), eq(allowedTechnicianAccounts.email, email))).limit(1);
+      if (existing[0]) throw new TRPCError({ code: "CONFLICT", message: "هذا البريد مسجل بالفعل ضمن الحسابات المسموح بها." });
+      const matchedUser = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.email, email)).limit(1);
+      if (matchedUser[0]?.role === "admin") throw new TRPCError({ code: "CONFLICT", message: "لا يمكن اعتماد حساب إداري كحساب فني." });
+      const inserted = await db.insert(allowedTechnicianAccounts).values({ ownerId: ctx.user.id, email, displayName: input.displayName.trim(), linkedUserId: matchedUser[0]?.id ?? null, isActive: true });
+      return { id: Number(inserted[0].insertId), linked: Boolean(matchedUser[0]) };
+    }),
+    setActive: adminProcedure.input(z.object({ id: z.number().int().positive(), isActive: z.boolean() })).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const updated = await db.update(allowedTechnicianAccounts).set({ isActive: input.isActive }).where(and(eq(allowedTechnicianAccounts.id, input.id), eq(allowedTechnicianAccounts.ownerId, ctx.user.id)));
+      if (!updated[0]?.affectedRows) throw new TRPCError({ code: "NOT_FOUND", message: "الحساب غير موجود." });
+      return { success: true };
+    }),
+  }),
   dashboard: protectedProcedure.query(async ({ ctx }) => {
     const db = await databaseOrThrow();
     const ownerId = ctx.user.id;

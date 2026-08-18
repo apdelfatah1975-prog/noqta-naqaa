@@ -26,6 +26,27 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+export const allowedTechnicianAccounts = mysqlTable(
+  "allowedTechnicianAccounts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    email: varchar("email", { length: 320 }).notNull(),
+    displayName: varchar("displayName", { length: 160 }).notNull(),
+    linkedUserId: int("linkedUserId").references(() => users.id, { onDelete: "set null" }),
+    isActive: boolean("isActive").default(true).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("allowed_technician_owner_email_unique").on(table.ownerId, table.email),
+    index("allowed_technician_linked_user_idx").on(table.linkedUserId),
+  ],
+);
+
+export type AllowedTechnicianAccount = typeof allowedTechnicianAccounts.$inferSelect;
+export type InsertAllowedTechnicianAccount = typeof allowedTechnicianAccounts.$inferInsert;
+
 export const technicianLocations = mysqlTable(
   "technicianLocations",
   {

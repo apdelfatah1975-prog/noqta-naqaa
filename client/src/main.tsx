@@ -8,9 +8,20 @@ import App from "./App";
 import { startLogin } from "./const";
 import "./index.css";
 
-if ("serviceWorker" in navigator) {
+if (!import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js?version=12").then(registration => {
+    void navigator.serviceWorker.getRegistrations().then(registrations => {
+      for (const registration of registrations) void registration.unregister();
+      return caches.keys();
+    }).then(cacheNames => {
+      for (const cacheName of cacheNames) void caches.delete(cacheName);
+    }).catch(() => {});
+  });
+}
+
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js?version=13").then(registration => {
       const update = () => void registration.update();
       if ("requestIdleCallback" in window) {
         window.requestIdleCallback(update, { timeout: 3000 });
