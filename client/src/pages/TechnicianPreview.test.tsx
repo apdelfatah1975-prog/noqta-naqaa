@@ -19,7 +19,7 @@ const orders = [
 ];
 
 vi.mock("wouter", () => ({ useLocation: () => ["/technician-preview", setLocation] }));
-vi.mock("@/_core/hooks/useAuth", () => ({ useAuth: () => ({ user: { name: "الفني التجريبي" } }) }));
+vi.mock("@/_core/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: 3, name: "الفني التجريبي", role: "user" } }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/trpc", () => ({
   trpc: {
@@ -29,7 +29,7 @@ vi.mock("@/lib/trpc", () => ({
         list: { useQuery: () => ({ data: orders, refetch }) },
         updateStatus: { useMutation: () => ({ mutate, isPending: false }) },
       },
-      inventory: { summary: { useQuery: () => ({ data: [] }) } },
+      inventory: { technicianSummary: { useQuery: () => ({ data: { items: [] } }) } },
     },
   },
 }));

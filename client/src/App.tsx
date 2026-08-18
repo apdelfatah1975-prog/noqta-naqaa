@@ -37,6 +37,33 @@ function AdminOnly({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function TechnicianOnly({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth({ redirectOnUnauthenticated: true });
+  if (loading || !user) {
+    return (
+      <section className="mx-auto flex min-h-screen max-w-xl items-center justify-center px-6 py-16 text-center" dir="rtl">
+        <div className="rounded-3xl border border-teal-100 bg-white p-8 shadow-sm">
+          <div className="mx-auto mb-4 h-10 w-10 animate-pulse rounded-full bg-teal-100" />
+          <p className="font-bold text-slate-800">جارٍ التحقق من حساب الفني…</p>
+          <p className="mt-2 text-sm text-slate-500">هذه الصفحة لا تعمل إلا بعد تسجيل الدخول بحساب فني مصرح.</p>
+        </div>
+      </section>
+    );
+  }
+  if (user.role !== "user") {
+    return (
+      <section className="mx-auto flex min-h-screen max-w-xl items-center justify-center px-6 py-16 text-center" dir="rtl">
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-8 shadow-sm">
+          <h1 className="text-xl font-black text-amber-950">الحساب غير مصرح له بواجهة الفني</h1>
+          <p className="mt-2 text-sm leading-7 text-amber-900/75">استخدم حساب الفني المخصص لك أو ارجع إلى لوحة الإدارة.</p>
+        </div>
+      </section>
+    );
+  }
+  return <>{children}</>;
+}
+
+function ProtectedTechnician() { return <TechnicianOnly><TechnicianPreview /></TechnicianOnly>; }
 function AdminInventory() { return <AdminOnly><Inventory /></AdminOnly>; }
 function AdminCash() { return <AdminOnly><Cash /></AdminOnly>; }
 function AdminReports() { return <AdminOnly><Reports /></AdminOnly>; }
@@ -44,8 +71,9 @@ function AdminTechnicianPayroll() { return <AdminOnly><TechnicianPayroll /></Adm
 
 function Router() {
   const [location] = useLocation();
-  if (location.replace(/\/$/, "") === "/technician-preview") return <TechnicianPreview />;
-  if (location.replace(/\/$/, "") === "/work-orders") return <DashboardLayout><AdminOnly><WorkOrders /></AdminOnly></DashboardLayout>;
+  const pathname = typeof window !== "undefined" ? window.location.pathname : location;
+  if (pathname.replace(/\/$/, "") === "/technician-preview") return <ProtectedTechnician />;
+  if (pathname.replace(/\/$/, "") === "/work-orders") return <DashboardLayout><AdminOnly><WorkOrders /></AdminOnly></DashboardLayout>;
   return (
     <DashboardLayout>
       <Switch>

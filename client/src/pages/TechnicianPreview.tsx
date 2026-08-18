@@ -45,7 +45,7 @@ export default function TechnicianPreview() {
     return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
   }, []);
   const query = trpc.filters.workOrders.list.useQuery(undefined, { retry: false, staleTime: 30_000 });
-  const inventoryQuery = trpc.filters.inventory.summary.useQuery(undefined, { retry: false, staleTime: 30_000 });
+  const inventoryQuery = trpc.filters.inventory.technicianSummary.useQuery(undefined, { retry: false, staleTime: 30_000 });
   const utils = trpc.useUtils();
   const update = trpc.filters.workOrders.updateStatus.useMutation({
     onSuccess: () => {

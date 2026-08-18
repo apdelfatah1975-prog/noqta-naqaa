@@ -26,6 +26,26 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+export const technicianLocations = mysqlTable(
+  "technicianLocations",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    technicianId: int("technicianId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    latitude: varchar("latitude", { length: 32 }).notNull(),
+    longitude: varchar("longitude", { length: 32 }).notNull(),
+    accuracy: int("accuracy"),
+    recordedAt: timestamp("recordedAt").notNull(),
+    sharingUntil: timestamp("sharingUntil"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("technician_locations_owner_technician_unique").on(table.ownerId, table.technicianId),
+    index("technician_locations_owner_updated_idx").on(table.ownerId, table.updatedAt),
+  ],
+);
+
 export const visitTypeValues = [
   "installation",
   "maintenance",

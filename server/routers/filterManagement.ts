@@ -957,6 +957,14 @@ export const filterManagementRouter = router({
 
   inventory: router({
     summary: adminProcedure.query(({ ctx }) => inventorySummary(ctx.user.id)),
+    technicianSummary: protectedProcedure.query(async ({ ctx }) => {
+      const db = await databaseOrThrow();
+      const assigned = await db.select({ ownerId: visits.ownerId }).from(visits).where(eq(visits.assignedTechnicianId, ctx.user.id));
+      const ownerIds = Array.from(new Set(assigned.map(row => row.ownerId)));
+      if (!ownerIds.length) return { items: [] as Array<{ id: number; name: string; unit: string; reorderLevel: number; currentBalance: number }> };
+      const summaries = await Promise.all(ownerIds.map(ownerId => inventorySummary(ownerId)));
+      return { items: summaries.flatMap(summary => summary.items).map(item => ({ id: item.id, name: item.name, unit: item.unit, reorderLevel: item.reorderLevel, currentBalance: item.currentBalance })) };
+    }),
     createItem: adminProcedure.input(inventoryItemInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       if (input.clientOperationId) {
@@ -1101,11 +1109,13 @@ export const filterManagementRouter = router({
       const db = await databaseOrThrow();
       const condition = ctx.user.role === "admin"
         ? eq(visits.ownerId, ctx.user.id)
-        : and(eq(visits.ownerId, ctx.user.id), eq(visits.assignedTechnicianId, ctx.user.id));
-      const [rows, customerRows, incomeRows] = await Promise.all([
-        db.select().from(visits).where(condition).orderBy(asc(visits.visitDate)),
-        db.select().from(customers).where(eq(customers.ownerId, ctx.user.id)),
-        db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.transactionType, "income"))),
+        : eq(visits.assignedTechnicianId, ctx.user.id);
+      const rows = await db.select().from(visits).where(condition).orderBy(asc(visits.visitDate));
+      const ownerIds = Array.from(new Set(rows.map(row => row.ownerId)));
+      if (!ownerIds.length) return [];
+      const [customerRows, incomeRows] = await Promise.all([
+        db.select().from(customers).where(inArray(customers.ownerId, ownerIds)),
+        db.select().from(cashTransactions).where(and(inArray(cashTransactions.ownerId, ownerIds), eq(cashTransactions.transactionType, "income"))),
       ]);
       const customerById = new Map(customerRows.map(customer => [customer.id, customer]));
       const incomeByVisit = new Map(incomeRows.filter(row => row.sourceVisitId).map(row => [row.sourceVisitId!, row]));
@@ -1138,31 +1148,35 @@ export const filterManagementRouter = router({
     }),
     updateStatus: protectedProcedure.input(workOrderUpdateInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
-      const rows = await db.select().from(visits).where(and(eq(visits.id, input.id), eq(visits.ownerId, ctx.user.id))).limit(1);
+      const condition = ctx.user.role === "admin"
+        ? and(eq(visits.id, input.id), eq(visits.ownerId, ctx.user.id))
+        : and(eq(visits.id, input.id), eq(visits.assignedTechnicianId, ctx.user.id));
+      const rows = await db.select().from(visits).where(condition).limit(1);
       const visit = rows[0];
       if (!visit) throw new TRPCError({ code: "NOT_FOUND", message: "أمر العمل غير موجود." });
       const allowed = ctx.user.role === "admin" || visit.assignedTechnicianId === ctx.user.id;
       if (!allowed) throw new TRPCError({ code: "FORBIDDEN", message: "لا تملك صلاحية تعديل أمر العمل هذا." });
+      const ownerId = visit.ownerId;
       const now = new Date();
-      await db.update(visits).set({ status: input.status, visitResult: input.visitResult ?? visit.visitResult, notes: input.notes ?? visit.notes, arrivedAt: input.status === "arrived" ? now : visit.arrivedAt, completedAt: input.status === "completed" ? now : visit.completedAt }).where(and(eq(visits.id, input.id), eq(visits.ownerId, ctx.user.id)));
+      await db.update(visits).set({ status: input.status, visitResult: input.visitResult ?? visit.visitResult, notes: input.notes ?? visit.notes, arrivedAt: input.status === "arrived" ? now : visit.arrivedAt, completedAt: input.status === "completed" ? now : visit.completedAt }).where(and(eq(visits.id, input.id), eq(visits.ownerId, ownerId)));
       if (input.status === "completed" && visit.status !== "completed") {
-        const inventoryRows = input.items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ctx.user.id), inArray(inventoryItems.id, input.items.map(item => item.inventoryItemId)))) : [];
+        const inventoryRows = input.items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ownerId), inArray(inventoryItems.id, input.items.map(item => item.inventoryItemId)))) : [];
         const inventoryById = new Map(inventoryRows.map(item => [item.id, item]));
         for (const requested of input.items) {
           const item = inventoryById.get(requested.inventoryItemId);
           if (!item) throw new TRPCError({ code: "NOT_FOUND", message: "أحد الأصناف غير موجود." });
-          const movements = await db.select().from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ctx.user.id), eq(inventoryMovements.inventoryItemId, item.id)));
+          const movements = await db.select().from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ownerId), eq(inventoryMovements.inventoryItemId, item.id)));
           const balance = calculateStockBalance(item.openingQuantity, movements);
           if (requested.quantity > balance) throw new TRPCError({ code: "BAD_REQUEST", message: `الرصيد غير كافٍ من صنف ${item.name}؛ المتاح ${balance}.` });
-          await db.insert(visitItems).values({ ownerId: ctx.user.id, visitId: visit.id, inventoryItemId: item.id, itemNameSnapshot: item.name, unitSnapshot: item.unit, quantity: requested.quantity, source: requested.source });
-          await db.insert(inventoryMovements).values({ ownerId: ctx.user.id, inventoryItemId: item.id, movementType: "outgoing", quantity: requested.quantity, unitCost: item.defaultUnitCost, currency: "SAR", movementDate: now, technicianName: visit.technicianName, notes: `منصرف لأمر عمل العميل ${visit.customerId}` });
+          await db.insert(visitItems).values({ ownerId, visitId: visit.id, inventoryItemId: item.id, itemNameSnapshot: item.name, unitSnapshot: item.unit, quantity: requested.quantity, source: requested.source });
+          await db.insert(inventoryMovements).values({ ownerId, inventoryItemId: item.id, movementType: "outgoing", quantity: requested.quantity, unitCost: item.defaultUnitCost, currency: "SAR", movementDate: now, technicianName: visit.technicianName, notes: `منصرف لأمر عمل العميل ${visit.customerId}` });
         }
         if (input.collectedAmount > 0) {
           const category = visit.visitType === "installation" ? "تحصيل تركيب" : visit.visitType === "maintenance" ? "تحصيل صيانة" : visit.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-          await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: input.collectedCurrency, amount: input.collectedAmount, category, transactionDate: now, sourceVisitId: visit.id, recipientName: visit.technicianName, notes: `تحصيل من أمر عمل العميل ${visit.customerId}` });
+          await db.insert(cashTransactions).values({ ownerId, transactionType: "income", currency: input.collectedCurrency, amount: input.collectedAmount, category, transactionDate: now, sourceVisitId: visit.id, recipientName: visit.technicianName, notes: `تحصيل من أمر عمل العميل ${visit.customerId}` });
         }
       }
-      await refreshOwnerBackup(ctx.user.id);
+      await refreshOwnerBackup(ownerId);
       return { success: true };
     }),
   }),
