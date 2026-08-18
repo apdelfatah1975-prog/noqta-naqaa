@@ -16,6 +16,7 @@ import {
   reminders,
   visits,
   users,
+  workOrderProofs,
 } from "../../drizzle/schema";
 import { calculateCashBreakdown, calculateCashSummaries, calculateCompanyFinancialOverview, calculatePurchaseBreakdown, cashCurrencies, cashTransactionTypes, matchesCashTransactionSearch } from "../../shared/cashBusiness";
 import {
@@ -70,6 +71,12 @@ const customerCreateInput = customerInput.extend({
     quantity: z.number().int().positive("أدخل كمية أكبر من صفر"),
     source: z.enum(["default", "manual"]).default("default"),
   })).max(50).optional().default([]),
+});
+
+const workOrderProofInput = z.object({
+  visitId: z.number().int().positive(),
+  kind: z.enum(["photo", "signature"]),
+  dataUrl: z.string().regex(/^data:(image\/(?:jpeg|png|webp));base64,[A-Za-z0-9+/=]+$/, "صيغة الدليل غير صالحة").max(7_000_000),
 });
 
 const visitItemInput = z.object({
@@ -1145,6 +1152,33 @@ export const filterManagementRouter = router({
       const inserted = await db.insert(visits).values({ customerId: customer.id, ownerId: ctx.user.id, visitType: input.visitType, visitDate: input.visitDate, technicianName: technician[0].name, assignedTechnicianId: technician[0].id, status: "assigned", notes: input.notes ?? null, clientOperationId: input.clientOperationId });
       await refreshOwnerBackup(ctx.user.id);
       return { id: Number(inserted[0].insertId), alreadySynced: false };
+    }),
+    addProof: protectedProcedure.input(workOrderProofInput).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const condition = ctx.user.role === "admin"
+        ? and(eq(visits.id, input.visitId), eq(visits.ownerId, ctx.user.id))
+        : and(eq(visits.id, input.visitId), eq(visits.assignedTechnicianId, ctx.user.id));
+      const visit = (await db.select({ id: visits.id, ownerId: visits.ownerId }).from(visits).where(condition).limit(1))[0];
+      if (!visit) throw new TRPCError({ code: "NOT_FOUND", message: "أمر العمل غير موجود أو غير مسند إليك." });
+      const match = input.dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
+      if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "صيغة الدليل غير صالحة." });
+      const mimeType = match[1];
+      const buffer = Buffer.from(match[2], "base64");
+      if (buffer.byteLength > 5 * 1024 * 1024) throw new TRPCError({ code: "BAD_REQUEST", message: "حجم الدليل أكبر من 5 ميجابايت." });
+      const extension = mimeType.split("/")[1];
+      const key = `water-filter-proofs/${visit.ownerId}/${visit.id}/${Date.now()}-${randomBytes(6).toString("hex")}.${extension}`;
+      const uploaded = await storagePut(key, buffer, mimeType);
+      const inserted = await db.insert(workOrderProofs).values({ ownerId: visit.ownerId, visitId: visit.id, uploadedBy: ctx.user.id, kind: input.kind, storageKey: uploaded.key, url: uploaded.url, mimeType });
+      return { id: Number(inserted[0].insertId), url: uploaded.url, kind: input.kind };
+    }),
+    listProofs: protectedProcedure.input(z.object({ visitId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const condition = ctx.user.role === "admin"
+        ? and(eq(visits.id, input.visitId), eq(visits.ownerId, ctx.user.id))
+        : and(eq(visits.id, input.visitId), eq(visits.assignedTechnicianId, ctx.user.id));
+      const visit = (await db.select({ id: visits.id, ownerId: visits.ownerId }).from(visits).where(condition).limit(1))[0];
+      if (!visit) throw new TRPCError({ code: "NOT_FOUND", message: "أمر العمل غير موجود." });
+      return db.select({ id: workOrderProofs.id, kind: workOrderProofs.kind, url: workOrderProofs.url, mimeType: workOrderProofs.mimeType, createdAt: workOrderProofs.createdAt }).from(workOrderProofs).where(and(eq(workOrderProofs.visitId, visit.id), eq(workOrderProofs.ownerId, visit.ownerId))).orderBy(desc(workOrderProofs.createdAt));
     }),
     updateStatus: protectedProcedure.input(workOrderUpdateInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();

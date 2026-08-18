@@ -28,6 +28,7 @@ vi.mock("@/lib/trpc", () => ({
       workOrders: {
         list: { useQuery: () => ({ data: orders, refetch }) },
         updateStatus: { useMutation: () => ({ mutate, isPending: false }) },
+        addProof: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       },
       inventory: { technicianSummary: { useQuery: () => ({ data: { items: [] } }) } },
     },

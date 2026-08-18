@@ -259,3 +259,25 @@ export const visitItems = mysqlTable(
   table => [index("visit_items_visit_idx").on(table.visitId), uniqueIndex("visit_items_owner_operation_unique").on(table.ownerId, table.clientOperationId)],
 );
 
+
+
+export const workOrderProofKindValues = ["photo", "signature"] as const;
+
+export const workOrderProofs = mysqlTable(
+  "workOrderProofs",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    visitId: int("visitId").notNull().references(() => visits.id, { onDelete: "cascade" }),
+    uploadedBy: int("uploadedBy").notNull().references(() => users.id, { onDelete: "restrict" }),
+    kind: mysqlEnum("kind", workOrderProofKindValues).notNull(),
+    storageKey: varchar("storageKey", { length: 512 }).notNull(),
+    url: varchar("url", { length: 1024 }).notNull(),
+    mimeType: varchar("mimeType", { length: 120 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [
+    index("work_order_proofs_owner_visit_idx").on(table.ownerId, table.visitId),
+    index("work_order_proofs_uploaded_by_idx").on(table.uploadedBy),
+  ],
+);
