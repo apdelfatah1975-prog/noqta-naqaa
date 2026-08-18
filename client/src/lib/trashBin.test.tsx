@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { emptyTrash, getTrashItems, moveToTrash, permanentlyDeleteFromTrash, restoreFromTrash, TRASH_BIN_KEY } from "./trashBin";
+import { emptyTrash, filterTrashItems, getTrashItems, moveToTrash, permanentlyDeleteFromTrash, restoreFromTrash, TRASH_BIN_KEY } from "./trashBin";
 
 describe("سلة المحذوفات المحلية", () => {
   afterEach(() => localStorage.clear());
@@ -37,6 +37,15 @@ describe("سلة المحذوفات المحلية", () => {
     }
     expect(getTrashItems()).toHaveLength(125);
     expect(getTrashItems().at(-1)?.entityLabel).toBe("عميل 0");
+  });
+
+  it("تبحث في اسم العنصر وبياناته وتصفّي حسب النوع", () => {
+    const customer = moveToTrash({ entityType: "customer", entityLabel: "العميل محمد", payload: { phone: "0501234567" } });
+    moveToTrash({ entityType: "visit", entityLabel: "زيارة صيانة", payload: { technicianName: "أحمد" } });
+    expect(filterTrashItems(getTrashItems(), "محمد")).toEqual([expect.objectContaining({ id: customer.id })]);
+    expect(filterTrashItems(getTrashItems(), "0501234567")).toHaveLength(1);
+    expect(filterTrashItems(getTrashItems(), "", "visit")).toHaveLength(1);
+    expect(filterTrashItems(getTrashItems(), "غير موجود")).toHaveLength(0);
   });
 
   it("تفرغ السلة بالكامل عند استدعاء العملية المحلية", () => {

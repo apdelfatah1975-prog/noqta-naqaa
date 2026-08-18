@@ -19,6 +19,16 @@ function notify() {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("purepoint-trash-bin-changed"));
 }
 
+export function filterTrashItems(items: TrashItem[], query: string, entityType: "all" | TrashItem["entityType"] = "all") {
+  const normalizedQuery = query.trim().toLowerCase();
+  return items.filter(item => {
+    if (entityType !== "all" && item.entityType !== entityType) return false;
+    if (!normalizedQuery) return true;
+    const searchable = `${item.entityLabel} ${item.entityType} ${JSON.stringify(item.payload ?? {})}`.toLowerCase();
+    return searchable.includes(normalizedQuery);
+  });
+}
+
 export function getTrashItems(): TrashItem[] {
   if (!canUseStorage()) return [];
   try {
