@@ -34,6 +34,7 @@ export const allowedTechnicianAccounts = mysqlTable(
     email: varchar("email", { length: 320 }).notNull(),
     displayName: varchar("displayName", { length: 160 }).notNull(),
     linkedUserId: int("linkedUserId").references(() => users.id, { onDelete: "set null" }),
+    passwordHash: varchar("passwordHash", { length: 255 }),
     isActive: boolean("isActive").default(true).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

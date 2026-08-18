@@ -36,10 +36,12 @@ import {
   needsAutomaticReminder,
   visitTypes,
 } from "../../shared/filterBusiness";
-import { getDb } from "../db";
+import { getDb, upsertUser } from "../db";
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
 import { COOKIE_NAME } from "../../shared/const";
-import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
+import { getSessionCookieOptions } from "../_core/cookies";
+import { sdk } from "../_core/sdk";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { createOwnerBackup, refreshOwnerBackup } from "../backup";
 import { storageGet, storagePut } from "../storage";
 
@@ -182,13 +184,13 @@ const defaultNotificationSettings = {
 const sensitivePinInput = z.object({ pin: z.string().trim().min(4, "الرقم السري يجب أن يتكون من 4 أحرف أو أرقام على الأقل.").max(64) });
 const scryptAsync = promisify(scrypt);
 
-async function hashPin(pin: string) {
+export async function hashPin(pin: string) {
   const salt = randomBytes(16).toString("hex");
   const derivedKey = (await scryptAsync(pin, salt, 64)) as Buffer;
   return `${salt}:${derivedKey.toString("hex")}`;
 }
 
-async function verifyPin(pin: string, encodedHash: string) {
+export async function verifyPin(pin: string, encodedHash: string) {
   const [salt, storedHex] = encodedHash.split(":");
   if (!salt || !storedHex) return false;
   const stored = Buffer.from(storedHex, "hex");
@@ -410,14 +412,39 @@ async function requirePinIfConfigured(ownerId: number, pin?: string) {
 }
 
 export const filterManagementRouter = router({
+  technicianAuth: router({
+    login: publicProcedure.input(z.object({ email: z.string().trim().email("أدخل بريدًا إلكترونيًا صحيحًا").max(320), password: z.string().min(8, "كلمة السر يجب أن تتكون من 8 أحرف أو أرقام على الأقل.").max(128) })).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const email = input.email.trim().toLowerCase();
+      const account = (await db.select().from(allowedTechnicianAccounts).where(and(eq(allowedTechnicianAccounts.email, email), eq(allowedTechnicianAccounts.isActive, true))).limit(1))[0];
+      if (!account?.passwordHash || !(await verifyPin(input.password, account.passwordHash))) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "البريد أو كلمة السر غير صحيحة، أو أن الحساب غير مفعل." });
+      }
+      let user = account.linkedUserId ? (await db.select().from(users).where(and(eq(users.id, account.linkedUserId), eq(users.role, "user"))).limit(1))[0] : undefined;
+      if (!user) {
+        const openId = `local-technician-${account.ownerId}-${account.id}`;
+        await upsertUser({ openId, name: account.displayName, email: account.email, loginMethod: "technician-password", role: "user", lastSignedIn: new Date() });
+        user = (await db.select().from(users).where(eq(users.openId, openId)).limit(1))[0];
+        if (user) await db.update(allowedTechnicianAccounts).set({ linkedUserId: user.id }).where(eq(allowedTechnicianAccounts.id, account.id));
+      } else {
+        await upsertUser({ openId: user.openId, name: account.displayName, email: account.email, loginMethod: "technician-password", role: "user", lastSignedIn: new Date() });
+        user = (await db.select().from(users).where(eq(users.id, user.id)).limit(1))[0];
+      }
+      if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر تجهيز حساب الفني." });
+      const token = await sdk.createSessionToken(user.openId, { name: user.name ?? account.displayName });
+      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: 30 * 24 * 60 * 60 * 1000 });
+      return { success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
+    }),
+  }),
   allowedTechnicians: router({
     list: adminProcedure.query(async ({ ctx }) => {
       const db = await databaseOrThrow();
-      return db.select().from(allowedTechnicianAccounts).where(eq(allowedTechnicianAccounts.ownerId, ctx.user.id)).orderBy(desc(allowedTechnicianAccounts.createdAt));
+      return db.select({ id: allowedTechnicianAccounts.id, ownerId: allowedTechnicianAccounts.ownerId, email: allowedTechnicianAccounts.email, displayName: allowedTechnicianAccounts.displayName, linkedUserId: allowedTechnicianAccounts.linkedUserId, isActive: allowedTechnicianAccounts.isActive, createdAt: allowedTechnicianAccounts.createdAt, updatedAt: allowedTechnicianAccounts.updatedAt, hasPassword: allowedTechnicianAccounts.passwordHash }).from(allowedTechnicianAccounts).where(eq(allowedTechnicianAccounts.ownerId, ctx.user.id)).orderBy(desc(allowedTechnicianAccounts.createdAt));
     }),
     create: adminProcedure.input(z.object({
       email: z.string().trim().email("أدخل بريدًا إلكترونيًا صحيحًا").max(320),
       displayName: z.string().trim().min(2, "أدخل اسم الفني").max(160),
+      password: z.string().min(8, "كلمة السر يجب أن تتكون من 8 أحرف أو أرقام على الأقل.").max(128),
     })).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const email = input.email.trim().toLowerCase();
@@ -425,8 +452,23 @@ export const filterManagementRouter = router({
       if (existing[0]) throw new TRPCError({ code: "CONFLICT", message: "هذا البريد مسجل بالفعل ضمن الحسابات المسموح بها." });
       const matchedUser = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.email, email)).limit(1);
       if (matchedUser[0]?.role === "admin") throw new TRPCError({ code: "CONFLICT", message: "لا يمكن اعتماد حساب إداري كحساب فني." });
-      const inserted = await db.insert(allowedTechnicianAccounts).values({ ownerId: ctx.user.id, email, displayName: input.displayName.trim(), linkedUserId: matchedUser[0]?.id ?? null, isActive: true });
-      return { id: Number(inserted[0].insertId), linked: Boolean(matchedUser[0]) };
+      const passwordHash = await hashPin(input.password);
+      const inserted = await db.insert(allowedTechnicianAccounts).values({ ownerId: ctx.user.id, email, displayName: input.displayName.trim(), linkedUserId: matchedUser[0]?.id ?? null, passwordHash, isActive: true });
+      const accountId = Number(inserted[0].insertId);
+      if (!matchedUser[0]) {
+        const openId = `local-technician-${ctx.user.id}-${accountId}`;
+        await upsertUser({ openId, name: input.displayName.trim(), email, loginMethod: "technician-password", role: "user", lastSignedIn: new Date() });
+        const localUser = await db.select({ id: users.id }).from(users).where(eq(users.openId, openId)).limit(1);
+        if (localUser[0]) await db.update(allowedTechnicianAccounts).set({ linkedUserId: localUser[0].id }).where(eq(allowedTechnicianAccounts.id, accountId));
+      }
+      return { id: accountId, linked: true };
+    }),
+    setPassword: adminProcedure.input(z.object({ id: z.number().int().positive(), password: z.string().min(8, "كلمة السر يجب أن تتكون من 8 أحرف أو أرقام على الأقل.").max(128) })).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const passwordHash = await hashPin(input.password);
+      const updated = await db.update(allowedTechnicianAccounts).set({ passwordHash }).where(and(eq(allowedTechnicianAccounts.id, input.id), eq(allowedTechnicianAccounts.ownerId, ctx.user.id)));
+      if (!updated[0]?.affectedRows) throw new TRPCError({ code: "NOT_FOUND", message: "الحساب غير موجود." });
+      return { success: true };
     }),
     setActive: adminProcedure.input(z.object({ id: z.number().int().positive(), isActive: z.boolean() })).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();

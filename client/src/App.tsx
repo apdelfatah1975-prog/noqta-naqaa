@@ -18,6 +18,7 @@ import TechnicianPayroll from "./pages/TechnicianPayroll";
 import Settings from "./pages/Settings";
 import Visits from "./pages/Visits";
 import TechnicianPreview from "./pages/TechnicianPreview";
+import TechnicianLogin from "./pages/TechnicianLogin";
 import TechnicianLocations from "./pages/TechnicianLocations";
 import AllowedTechnicians from "./pages/AllowedTechnicians";
 import WorkOrders from "./pages/WorkOrders";
@@ -40,8 +41,8 @@ function AdminOnly({ children }: { children: ReactNode }) {
 }
 
 function TechnicianOnly({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth({ redirectOnUnauthenticated: true });
-  if (loading || !user) {
+  const { user, loading } = useAuth({ redirectOnUnauthenticated: false });
+  if (loading) {
     return (
       <section className="mx-auto flex min-h-screen max-w-xl items-center justify-center px-6 py-16 text-center" dir="rtl">
         <div className="rounded-3xl border border-teal-100 bg-white p-8 shadow-sm">
@@ -52,6 +53,7 @@ function TechnicianOnly({ children }: { children: ReactNode }) {
       </section>
     );
   }
+  if (!user) return <TechnicianLogin />;
   if (user.role !== "user") {
     return (
       <section className="mx-auto flex min-h-screen max-w-xl items-center justify-center px-6 py-16 text-center" dir="rtl">
@@ -76,6 +78,7 @@ function AdminAllowedTechnicians() { return <AdminOnly><AllowedTechnicians /></A
 function Router() {
   const [location] = useLocation();
   const pathname = typeof window !== "undefined" ? window.location.pathname : location;
+  if (pathname.replace(/\/$/, "") === "/technician-login") return <TechnicianLogin />;
   if (pathname.replace(/\/$/, "") === "/technician-preview") return <ProtectedTechnician />;
   if (pathname.replace(/\/$/, "") === "/work-orders") return <DashboardLayout><AdminOnly><WorkOrders /></AdminOnly></DashboardLayout>;
   if (pathname.replace(/\/$/, "") === "/technician-locations") return <DashboardLayout><AdminTechnicianLocations /></DashboardLayout>;

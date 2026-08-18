@@ -1,0 +1,1 @@
+ALTER TABLE `allowedTechnicianAccounts` ADD `passwordHash` varchar(255);
