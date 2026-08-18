@@ -225,6 +225,7 @@ export const cashTransactions = mysqlTable(
     sourceVisitId: int("sourceVisitId").references(() => visits.id, { onDelete: "set null" }),
     sourceInventoryMovementId: int("sourceInventoryMovementId").references(() => inventoryMovements.id, { onDelete: "set null" }),
     recipientName: varchar("recipientName", { length: 160 }),
+    paymentMethod: varchar("paymentMethod", { length: 40 }).default("نقدي").notNull(),
     notes: text("notes"),
     clientOperationId: varchar("clientOperationId", { length: 64 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),

@@ -138,6 +138,7 @@ const cashTransactionInput = z.object({
   category: z.string().trim().min(2, "أدخل تصنيف العملية").max(100),
   transactionDate: z.date(),
   recipientName: z.string().trim().max(160).optional().nullable(),
+  paymentMethod: z.enum(["نقدي", "تحويل بنكي", "بطاقة", "آجل"]).default("نقدي"),
   notes: z.string().trim().max(2000).optional().nullable(),
   clientOperationId: z.string().uuid().optional(),
 });
