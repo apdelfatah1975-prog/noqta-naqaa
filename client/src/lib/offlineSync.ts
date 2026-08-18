@@ -534,10 +534,21 @@ function isOfflineBackup(value: unknown): value is OfflineBackup {
   return candidate.format === "purepoint-offline-backup" && candidate.version === 1 && typeof candidate.exportedAt === "string" && !!candidate.storage && typeof candidate.storage === "object" && !Array.isArray(candidate.storage);
 }
 
+function preserveCurrentTrashWhenBackupDoesNotIncludeIt(entries: Array<[string, unknown]>) {
+  if (entries.some(([key]) => key === "purepoint-trash-bin") || !available()) return entries;
+  const raw = localStorage.getItem("purepoint-trash-bin");
+  if (raw === null) return entries;
+  try {
+    return [...entries, ["purepoint-trash-bin", JSON.parse(raw)] as [string, unknown]];
+  } catch {
+    return entries;
+  }
+}
+
 export function restoreOfflineBackup(value: unknown): OfflineRestoreResult {
   if (!available()) throw new Error("التخزين المحلي غير متاح على هذا الجهاز.");
   if (!isOfflineBackup(value)) throw new Error("ملف النسخة الاحتياطية غير صالح أو غير مدعوم.");
-  const entries = Object.entries(value.storage).filter(([key, storedValue]) => key.startsWith("purepoint-") && storedValue !== undefined);
+  const entries = preserveCurrentTrashWhenBackupDoesNotIncludeIt(Object.entries(value.storage).filter(([key, storedValue]) => key.startsWith("purepoint-") && storedValue !== undefined));
   if (entries.length === 0) throw new Error("النسخة الاحتياطية لا تحتوي على بيانات نقطة نقاء.");
   const currentKeys: string[] = [];
   for (let index = 0; index < localStorage.length; index += 1) {
@@ -565,13 +576,14 @@ export function restoreOfflineBackupFromExcel(data: ArrayBuffer): OfflineRestore
     const sheet = workbook.Sheets["بيانات محلية"];
     if (!sheet) throw new Error("ملف Excel لا يحتوي على ورقة البيانات المحلية المطلوبة.");
     const rows = XLSX.utils.sheet_to_json<{ "مفتاح البيانات"?: string; "القيمة"?: string }>(sheet);
-    const entries: Array<[string, unknown]> = [];
+    const parsedEntries: Array<[string, unknown]> = [];
     for (const row of rows) {
       const key = row["مفتاح البيانات"];
       const raw = row["القيمة"];
       if (!key || key === "لا توجد بيانات" || !key.startsWith("purepoint-") || raw === undefined) continue;
-      try { entries.push([key, JSON.parse(String(raw))]); } catch { entries.push([key, raw]); }
+      try { parsedEntries.push([key, JSON.parse(String(raw))]); } catch { parsedEntries.push([key, raw]); }
     }
+    const entries = preserveCurrentTrashWhenBackupDoesNotIncludeIt(parsedEntries);
     if (entries.length === 0) throw new Error("النسخة الاحتياطية لا تحتوي على بيانات نقطة نقاء قابلة للاستعادة.");
     const currentKeys: string[] = [];
     for (let index = 0; index < localStorage.length; index += 1) {

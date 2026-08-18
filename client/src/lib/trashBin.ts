@@ -35,7 +35,7 @@ export function getTrashItems(): TrashItem[] {
 }
 
 function saveTrashItems(items: TrashItem[]) {
-  if (canUseStorage()) localStorage.setItem(TRASH_BIN_KEY, JSON.stringify(items.slice(0, 100)));
+  if (canUseStorage()) localStorage.setItem(TRASH_BIN_KEY, JSON.stringify(items));
   notify();
 }
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getTrashItems, moveToTrash, permanentlyDeleteFromTrash, restoreFromTrash, TRASH_BIN_KEY } from "./trashBin";
+import { emptyTrash, getTrashItems, moveToTrash, permanentlyDeleteFromTrash, restoreFromTrash, TRASH_BIN_KEY } from "./trashBin";
 
 describe("سلة المحذوفات المحلية", () => {
   afterEach(() => localStorage.clear());
@@ -27,6 +27,21 @@ describe("سلة المحذوفات المحلية", () => {
   it("تحذف العنصر نهائيًا ولا تتركه في التخزين المحلي", () => {
     const item = moveToTrash({ entityType: "customer", entityLabel: "عميل تجريبي", payload: { id: 4 } });
     permanentlyDeleteFromTrash(item.id);
+    expect(getTrashItems()).toEqual([]);
+    expect(localStorage.getItem(TRASH_BIN_KEY)).toBe("[]");
+  });
+
+  it("تحافظ على أكثر من مئة عنصر دون إسقاط العناصر الأقدم", () => {
+    for (let index = 0; index < 125; index += 1) {
+      moveToTrash({ entityType: "customer", entityLabel: `عميل ${index}`, payload: { index } });
+    }
+    expect(getTrashItems()).toHaveLength(125);
+    expect(getTrashItems().at(-1)?.entityLabel).toBe("عميل 0");
+  });
+
+  it("تفرغ السلة بالكامل عند استدعاء العملية المحلية", () => {
+    moveToTrash({ entityType: "cash", entityLabel: "عملية تجريبية", payload: { id: 9 } });
+    emptyTrash();
     expect(getTrashItems()).toEqual([]);
     expect(localStorage.getItem(TRASH_BIN_KEY)).toBe("[]");
   });

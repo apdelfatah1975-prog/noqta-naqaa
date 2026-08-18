@@ -905,6 +905,10 @@ export const filterManagementRouter = router({
       await refreshOwnerBackup(ctx.user.id);
       return { success: true };
     }),
+    verifyPin: protectedProcedure.input(sensitivePinInput).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
+      return { success: true };
+    }),
     enableScheduledAlerts: protectedProcedure.input(notificationSettingsSaveInput).mutation(async ({ ctx, input }) => {
       await requirePinIfConfigured(ctx.user.id, input.pin);
       const db = await databaseOrThrow();
