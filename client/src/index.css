@@ -146,3 +146,13 @@
   button, [role="button"], a[href], select { letter-spacing: 0.008em; }
   .mobile-readable { font-size: 1rem !important; line-height: 1.75 !important; letter-spacing: 0.012em !important; }
 }
+
+
+@media (max-width: 767px) {
+  .compact-mobile-visit-table th:nth-child(3),
+  .compact-mobile-visit-table td:nth-child(3),
+  .compact-mobile-visit-table th:nth-child(5),
+  .compact-mobile-visit-table td:nth-child(5) {
+    display: none;
+  }
+}
