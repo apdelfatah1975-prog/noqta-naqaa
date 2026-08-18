@@ -26,6 +26,28 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+export const customerReviewStatusValues = ["pending", "approved", "rejected"] as const;
+
+export const customerReviews = mysqlTable(
+  "customerReviews",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    customerName: varchar("customerName", { length: 160 }).notNull(),
+    stars: int("stars").notNull(),
+    comment: text("comment").notNull(),
+    consentToPublish: boolean("consentToPublish").notNull(),
+    status: mysqlEnum("status", customerReviewStatusValues).default("pending").notNull(),
+    reviewedBy: int("reviewedBy").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [index("customer_reviews_status_created_idx").on(table.status, table.createdAt)],
+);
+
+export type CustomerReview = typeof customerReviews.$inferSelect;
+export type InsertCustomerReview = typeof customerReviews.$inferInsert;
+
 export const allowedTechnicianAccounts = mysqlTable(
   "allowedTechnicianAccounts",
   {

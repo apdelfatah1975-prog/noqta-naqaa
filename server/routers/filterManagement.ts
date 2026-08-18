@@ -6,6 +6,7 @@ import { and, asc, desc, eq, gte, inArray, lte, ne } from "drizzle-orm";
 import { z } from "zod";
 import {
   cashTransactions,
+  customerReviews,
   customers,
   inventoryItems,
   inventoryMovements,
@@ -35,7 +36,7 @@ import {
 import { getDb } from "../db";
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
 import { COOKIE_NAME } from "../../shared/const";
-import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { createOwnerBackup, refreshOwnerBackup } from "../backup";
 import { storageGet, storagePut } from "../storage";
 
@@ -407,6 +408,42 @@ async function requirePinIfConfigured(ownerId: number, pin?: string) {
 }
 
 export const filterManagementRouter = router({
+  reviews: router({
+    approved: publicProcedure.query(async () => {
+      const db = await databaseOrThrow();
+      return db.select({ id: customerReviews.id, customerName: customerReviews.customerName, stars: customerReviews.stars, comment: customerReviews.comment, createdAt: customerReviews.createdAt })
+        .from(customerReviews)
+        .where(eq(customerReviews.status, "approved"))
+        .orderBy(desc(customerReviews.createdAt))
+        .limit(24);
+    }),
+    submit: publicProcedure.input(z.object({
+      customerName: z.string().trim().min(2, "أدخل الاسم").max(160),
+      stars: z.number().int().min(1, "اختر تقييمًا").max(5),
+      comment: z.string().trim().min(8, "اكتب تعليقًا مختصرًا").max(1200),
+      consentToPublish: z.boolean().refine(value => value, "يجب الموافقة على نشر التقييم"),
+    })).mutation(async ({ input }) => {
+      const db = await databaseOrThrow();
+      const result = await db.insert(customerReviews).values(input);
+      return { id: Number(result[0].insertId), status: "pending" as const };
+    }),
+    pending: adminProcedure.query(async () => {
+      const db = await databaseOrThrow();
+      return db.select().from(customerReviews).where(eq(customerReviews.status, "pending")).orderBy(asc(customerReviews.createdAt));
+    }),
+    approve: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const result = await db.update(customerReviews).set({ status: "approved", reviewedBy: ctx.user.id, reviewedAt: new Date() }).where(and(eq(customerReviews.id, input.id), eq(customerReviews.status, "pending")));
+      if (result[0].affectedRows === 0) throw new TRPCError({ code: "NOT_FOUND", message: "التقييم غير موجود أو تمت مراجعته مسبقًا." });
+      return { success: true };
+    }),
+    reject: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const result = await db.update(customerReviews).set({ status: "rejected", reviewedBy: ctx.user.id, reviewedAt: new Date() }).where(and(eq(customerReviews.id, input.id), eq(customerReviews.status, "pending")));
+      if (result[0].affectedRows === 0) throw new TRPCError({ code: "NOT_FOUND", message: "التقييم غير موجود أو تمت مراجعته مسبقًا." });
+      return { success: true };
+    }),
+  }),
   dashboard: protectedProcedure.query(async ({ ctx }) => {
     const db = await databaseOrThrow();
     const ownerId = ctx.user.id;
