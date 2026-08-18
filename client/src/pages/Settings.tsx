@@ -200,12 +200,19 @@ export default function Settings() {
     }
   }
 
-  function permanentlyDeleteTrashItem(item: TrashItem) {
-    if (!window.confirm(`حذف ${item.entityLabel} نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
-    permanentlyDeleteFromTrash(item.id);
-    appendActivityLog("حذف نهائي", item.entityLabel);
-    setActivityLog(getActivityLog());
-    toast.success("تم الحذف النهائي");
+  async function permanentlyDeleteTrashItem(item: TrashItem) {
+    const pin = window.prompt("أدخل الرقم السري لحذف هذا العنصر نهائيًا:")?.trim();
+    if (!pin) return;
+    try {
+      await verifyPin.mutateAsync({ pin });
+      if (!window.confirm(`حذف ${item.entityLabel} نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
+      permanentlyDeleteFromTrash(item.id);
+      appendActivityLog("حذف نهائي", item.entityLabel);
+      setActivityLog(getActivityLog());
+      toast.success("تم التحقق والحذف النهائي");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر التحقق من الرقم السري؛ لم يُحذف العنصر.");
+    }
   }
 
   async function securelyEmptyTrash() {
