@@ -309,6 +309,21 @@ async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "al
     db.select().from(inventoryMovements).where(eq(inventoryMovements.ownerId, ownerId)),
   ]);
   const itemNames = new Map(purchaseItems.map(item => [item.id, item.name]));
+  const purchaseMovementById = new Map(purchaseMovements.map(movement => [movement.id, movement]));
+  const enrichedTransactions = filteredTransactions.map(transaction => {
+    const movement = transaction.sourceInventoryMovementId ? purchaseMovementById.get(transaction.sourceInventoryMovementId) : undefined;
+    if (!movement || movement.movementType !== "incoming") return transaction;
+    const itemName = itemNames.get(movement.inventoryItemId) ?? "صنف غير معروف";
+    return {
+      ...transaction,
+      purchaseDetails: {
+        itemName,
+        quantity: movement.quantity,
+        unitCost: movement.unitCost,
+        total: movement.quantity * movement.unitCost,
+      },
+    };
+  });
   const filteredPurchaseMovements = purchaseMovements
     .map(movement => ({ ...movement, itemName: itemNames.get(movement.inventoryItemId) ?? "صنف غير معروف" }))
     .filter(movement => !categoryFilter.itemName || movement.itemName === categoryFilter.itemName)
@@ -321,7 +336,7 @@ async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "al
   const availableCategories = Array.from(new Set(transactions.map(transaction => transaction.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ar"));
   const availableTechnicians = Array.from(new Set(displayTransactions.map(transaction => transaction.recipientName).filter((name): name is string => Boolean(name?.trim())))).sort((a, b) => a.localeCompare(b, "ar"));
   const availableItemNames = Array.from(new Set(itemNames.values())).sort((a, b) => a.localeCompare(b, "ar"));
-  return { transactions: filteredTransactions, ...summaries.SAR, summaries, breakdown, financialOverview, purchases, incomeFilter, categoryFilter, availableCategories, availableTechnicians, availablePartyTypes: ["technician", "customer", "entity"] as const, availableItemNames, search: search?.trim() ?? "" };
+  return { transactions: enrichedTransactions, ...summaries.SAR, summaries, breakdown, financialOverview, purchases, incomeFilter, categoryFilter, availableCategories, availableTechnicians, availablePartyTypes: ["technician", "customer", "entity"] as const, availableItemNames, search: search?.trim() ?? "" };
 }
 
 async function remindersWithCustomers(ownerId: number, onlyDue: boolean, withinDays?: number) {
