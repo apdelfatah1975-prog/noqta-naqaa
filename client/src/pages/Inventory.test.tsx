@@ -76,6 +76,21 @@ describe("تفاصيل المنصرف في المخزون", () => {
     expect(screen.getAllByText("متوفر").length).toBeGreaterThan(0);
   });
 
+  it("يفصل سعر الوحدة عن إجمالي التكلفة في حركة الوارد", () => {
+    mocks.summary.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        items: [{ id: 4, name: "فلتر جامبو", notes: null, openingQuantity: 1, currentBalance: 1, reorderLevel: 2 }],
+        movements: [{ id: 9, inventoryItemId: 4, inventoryItemName: "فلتر جامبو", movementType: "incoming", quantity: 1, unitCost: 80000, movementDate: new Date("2026-08-18T09:00:00.000Z"), technicianName: null, notes: null }],
+      },
+    });
+    render(<Inventory />);
+    expect(screen.getAllByText("سعر الوحدة").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("الإجمالي · 1 قطعة").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("٨٠٠").length).toBeGreaterThanOrEqual(2);
+  });
+
   it("يفتح زر صرف الصنف نموذج المنصرف مباشرة", () => {
     render(<Inventory />);
     fireEvent.click(screen.getAllByRole("button", { name: "صرف صنف" })[0]);
