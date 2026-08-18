@@ -127,7 +127,7 @@ describe("ترابط تعديل بيانات العميل", () => {
 
   it("يفتح بطاقة تسجيل الزيارة مباشرة من بطاقة العميل ويُبقي السجل مستقلًا", () => {
     render(<Customers />);
-    fireEvent.click(screen.getAllByRole("button", { name: "زيارة" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "زيارة" }));
     expect(screen.getByText("تسجيل زيارة جديدة")).toBeTruthy();
     expect(screen.getByText(/للعميل: عميل قديم/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "إلغاء" }));
@@ -140,7 +140,7 @@ describe("ترابط تعديل بيانات العميل", () => {
     const mutate = vi.fn();
     mocks.visitUseMutation.mockReturnValue({ mutate, isPending: false });
     render(<Customers />);
-    fireEvent.click(screen.getAllByRole("button", { name: "زيارة" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "زيارة" }));
     fireEvent.change(screen.getByLabelText("اسم الفني"), { target: { value: "أحمد" } });
     fireEvent.change(screen.getByLabelText("نتيجة الزيارة"), { target: { value: "تم تغيير الشمعات" } });
     expect(screen.getByLabelText("اسم الفني")).toBeTruthy();
@@ -175,8 +175,8 @@ describe("ترابط تعديل بيانات العميل", () => {
       isError: false,
     });
     render(<Customers />);
-    expect(screen.getAllByText("إجمالي المحصل")[0]).toBeTruthy();
-    expect(screen.getAllByText("١٬٢٥٠٫٠٠")[0]).toBeTruthy();
+    expect(screen.getByText("إجمالي المحصل")).toBeTruthy();
+    expect(screen.getByText("١٬٢٥٠٫٠٠")).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: "إجمالي المحصل" }).className).toContain("sticky");
     fireEvent.change(screen.getByLabelText("ترتيب العملاء"), { target: { value: "collected_desc" } });
     expect(mocks.list.mock.calls.at(-1)?.[0].sortBy).toBe("collected_desc");
@@ -190,7 +190,7 @@ describe("ترابط تعديل بيانات العميل", () => {
 
     render(<Customers />);
 
-    expect(screen.getAllByText("عميل محفوظ محليًا")[0]).toBeTruthy();
+    expect(screen.getByText("عميل محفوظ محليًا")).toBeTruthy();
     expect(screen.getByText(/تُعرض آخر قائمة عملاء محفوظة/)).toBeTruthy();
     localStorage.removeItem("purepoint-offline-customers");
   });
