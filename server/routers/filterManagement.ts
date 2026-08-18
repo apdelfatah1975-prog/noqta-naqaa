@@ -16,6 +16,7 @@ import {
   reminders,
   visits,
   users,
+  technicianLocations,
   workOrderProofs,
 } from "../../drizzle/schema";
 import { calculateCashBreakdown, calculateCashSummaries, calculateCompanyFinancialOverview, calculatePurchaseBreakdown, cashCurrencies, cashTransactionTypes, matchesCashTransactionSearch } from "../../shared/cashBusiness";
@@ -1108,6 +1109,25 @@ export const filterManagementRouter = router({
     list: protectedProcedure.query(async ({ ctx }) => {
       const db = await databaseOrThrow();
       return db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(eq(users.role, "user"));
+    }),
+    updateLocation: protectedProcedure.input(z.object({ latitude: z.string().regex(/^-?\d{1,3}(?:\.\d+)?$/), longitude: z.string().regex(/^-?\d{1,3}(?:\.\d+)?$/), accuracy: z.number().int().nonnegative().max(100000).optional(), sharingUntil: z.date().nullable().optional() })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role === "admin") throw new TRPCError({ code: "FORBIDDEN", message: "تحديث الموقع مخصص لحساب الفني." });
+      const db = await databaseOrThrow();
+      const assigned = await db.select({ ownerId: visits.ownerId }).from(visits).where(and(eq(visits.assignedTechnicianId, ctx.user.id), ne(visits.status, "completed"), ne(visits.status, "cancelled"))).limit(1);
+      const ownerId = assigned[0]?.ownerId;
+      if (!ownerId) throw new TRPCError({ code: "FORBIDDEN", message: "لا يوجد أمر عمل نشط يسمح بمشاركة الموقع." });
+      const now = new Date();
+      await db.insert(technicianLocations).values({ ownerId, technicianId: ctx.user.id, latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt: now, sharingUntil: input.sharingUntil ?? null }).onDuplicateKeyUpdate({ set: { latitude: input.latitude, longitude: input.longitude, accuracy: input.accuracy ?? null, recordedAt: now, sharingUntil: input.sharingUntil ?? null } });
+      return { success: true, recordedAt: now };
+    }),
+    latestLocations: adminProcedure.query(async ({ ctx }) => {
+      const db = await databaseOrThrow();
+      const [locations, techs] = await Promise.all([
+        db.select().from(technicianLocations).where(eq(technicianLocations.ownerId, ctx.user.id)),
+        db.select({ id: users.id, name: users.name }).from(users).where(eq(users.role, "user")),
+      ]);
+      const byTech = new Map(locations.map(location => [location.technicianId, location]));
+      return techs.map(tech => ({ technician: tech, location: byTech.get(tech.id) ?? null }));
     }),
   }),
 

@@ -18,6 +18,7 @@ import TechnicianPayroll from "./pages/TechnicianPayroll";
 import Settings from "./pages/Settings";
 import Visits from "./pages/Visits";
 import TechnicianPreview from "./pages/TechnicianPreview";
+import TechnicianLocations from "./pages/TechnicianLocations";
 import WorkOrders from "./pages/WorkOrders";
 
 function AdminOnly({ children }: { children: ReactNode }) {
@@ -68,12 +69,14 @@ function AdminInventory() { return <AdminOnly><Inventory /></AdminOnly>; }
 function AdminCash() { return <AdminOnly><Cash /></AdminOnly>; }
 function AdminReports() { return <AdminOnly><Reports /></AdminOnly>; }
 function AdminTechnicianPayroll() { return <AdminOnly><TechnicianPayroll /></AdminOnly>; }
+function AdminTechnicianLocations() { return <AdminOnly><TechnicianLocations /></AdminOnly>; }
 
 function Router() {
   const [location] = useLocation();
   const pathname = typeof window !== "undefined" ? window.location.pathname : location;
   if (pathname.replace(/\/$/, "") === "/technician-preview") return <ProtectedTechnician />;
   if (pathname.replace(/\/$/, "") === "/work-orders") return <DashboardLayout><AdminOnly><WorkOrders /></AdminOnly></DashboardLayout>;
+  if (pathname.replace(/\/$/, "") === "/technician-locations") return <DashboardLayout><AdminTechnicianLocations /></DashboardLayout>;
   return (
     <DashboardLayout>
       <Switch>
@@ -86,6 +89,7 @@ function Router() {
         <Route path="/cash" component={AdminCash} />
         <Route path="/reports" component={AdminReports} />
         <Route path="/technician-payroll" component={AdminTechnicianPayroll} />
+        <Route path="/technician-locations" component={AdminTechnicianLocations} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>
