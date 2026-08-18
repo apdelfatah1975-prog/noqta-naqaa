@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { parse as parseCookie } from "cookie";
-import { and, asc, desc, eq, gte, inArray, lte, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import {
   cashTransactions,
@@ -15,6 +15,7 @@ import {
   visitItems,
   reminders,
   visits,
+  users,
 } from "../../drizzle/schema";
 import { calculateCashBreakdown, calculateCashSummaries, calculateCompanyFinancialOverview, calculatePurchaseBreakdown, cashCurrencies, cashTransactionTypes, matchesCashTransactionSearch } from "../../shared/cashBusiness";
 import {
@@ -87,6 +88,25 @@ const visitInput = z.object({
   collectedAmount: z.number().int().nonnegative().optional().default(0),
   collectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
   clientOperationId: z.string().uuid().optional(),
+  items: z.array(visitItemInput).max(50).optional().default([]),
+});
+
+const workOrderStatusValues = ["assigned", "en_route", "arrived", "in_progress", "completed", "postponed", "cancelled"] as const;
+const workOrderCreateInput = z.object({
+  customerId: z.number().int().positive(),
+  visitType: z.enum(visitTypes),
+  visitDate: z.date(),
+  assignedTechnicianId: z.number().int().positive(),
+  notes: z.string().trim().max(2000).optional().nullable(),
+  clientOperationId: z.string().uuid().optional(),
+});
+const workOrderUpdateInput = z.object({
+  id: z.number().int().positive(),
+  status: z.enum(workOrderStatusValues),
+  visitResult: z.string().trim().max(2000).optional().nullable(),
+  notes: z.string().trim().max(2000).optional().nullable(),
+  collectedAmount: z.number().int().nonnegative().optional().default(0),
+  collectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
   items: z.array(visitItemInput).max(50).optional().default([]),
 });
 
@@ -1064,6 +1084,84 @@ export const filterManagementRouter = router({
       const db = await databaseOrThrow();
       await db.delete(cashTransactions).where(and(eq(cashTransactions.sourceInventoryMovementId, input.id), eq(cashTransactions.ownerId, ctx.user.id)));
       await db.delete(inventoryMovements).where(and(eq(inventoryMovements.id, input.id), eq(inventoryMovements.ownerId, ctx.user.id)));
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true };
+    }),
+  }),
+
+  technicians: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const db = await databaseOrThrow();
+      return db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(eq(users.role, "user"));
+    }),
+  }),
+
+  workOrders: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const db = await databaseOrThrow();
+      const condition = ctx.user.role === "admin"
+        ? eq(visits.ownerId, ctx.user.id)
+        : and(eq(visits.ownerId, ctx.user.id), eq(visits.assignedTechnicianId, ctx.user.id));
+      const [rows, customerRows, incomeRows] = await Promise.all([
+        db.select().from(visits).where(condition).orderBy(asc(visits.visitDate)),
+        db.select().from(customers).where(eq(customers.ownerId, ctx.user.id)),
+        db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.transactionType, "income"))),
+      ]);
+      const customerById = new Map(customerRows.map(customer => [customer.id, customer]));
+      const incomeByVisit = new Map(incomeRows.filter(row => row.sourceVisitId).map(row => [row.sourceVisitId!, row]));
+      return rows.map(row => ({
+        ...row,
+        customer: customerById.get(row.customerId) ? {
+          id: customerById.get(row.customerId)!.id,
+          name: customerById.get(row.customerId)!.name,
+          phone: customerById.get(row.customerId)!.phone,
+          address: customerById.get(row.customerId)!.address,
+          latitude: customerById.get(row.customerId)!.latitude,
+          longitude: customerById.get(row.customerId)!.longitude,
+          manualCode: customerById.get(row.customerId)!.manualCode,
+        } : null,
+        collectedAmount: incomeByVisit.get(row.id)?.amount ?? 0,
+      }));
+    }),
+    create: adminProcedure.input(workOrderCreateInput).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const customer = await getOwnedCustomer(ctx.user.id, input.customerId);
+      const technician = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, input.assignedTechnicianId)).limit(1);
+      if (!technician[0]) throw new TRPCError({ code: "NOT_FOUND", message: "الفني غير موجود." });
+      if (input.clientOperationId) {
+        const existing = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), eq(visits.clientOperationId, input.clientOperationId))).limit(1);
+        if (existing[0]) return { id: existing[0].id, alreadySynced: true };
+      }
+      const inserted = await db.insert(visits).values({ customerId: customer.id, ownerId: ctx.user.id, visitType: input.visitType, visitDate: input.visitDate, technicianName: technician[0].name, assignedTechnicianId: technician[0].id, status: "assigned", notes: input.notes ?? null, clientOperationId: input.clientOperationId });
+      await refreshOwnerBackup(ctx.user.id);
+      return { id: Number(inserted[0].insertId), alreadySynced: false };
+    }),
+    updateStatus: protectedProcedure.input(workOrderUpdateInput).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const rows = await db.select().from(visits).where(and(eq(visits.id, input.id), eq(visits.ownerId, ctx.user.id))).limit(1);
+      const visit = rows[0];
+      if (!visit) throw new TRPCError({ code: "NOT_FOUND", message: "أمر العمل غير موجود." });
+      const allowed = ctx.user.role === "admin" || visit.assignedTechnicianId === ctx.user.id;
+      if (!allowed) throw new TRPCError({ code: "FORBIDDEN", message: "لا تملك صلاحية تعديل أمر العمل هذا." });
+      const now = new Date();
+      await db.update(visits).set({ status: input.status, visitResult: input.visitResult ?? visit.visitResult, notes: input.notes ?? visit.notes, arrivedAt: input.status === "arrived" ? now : visit.arrivedAt, completedAt: input.status === "completed" ? now : visit.completedAt }).where(and(eq(visits.id, input.id), eq(visits.ownerId, ctx.user.id)));
+      if (input.status === "completed" && visit.status !== "completed") {
+        const inventoryRows = input.items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ctx.user.id), inArray(inventoryItems.id, input.items.map(item => item.inventoryItemId)))) : [];
+        const inventoryById = new Map(inventoryRows.map(item => [item.id, item]));
+        for (const requested of input.items) {
+          const item = inventoryById.get(requested.inventoryItemId);
+          if (!item) throw new TRPCError({ code: "NOT_FOUND", message: "أحد الأصناف غير موجود." });
+          const movements = await db.select().from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ctx.user.id), eq(inventoryMovements.inventoryItemId, item.id)));
+          const balance = calculateStockBalance(item.openingQuantity, movements);
+          if (requested.quantity > balance) throw new TRPCError({ code: "BAD_REQUEST", message: `الرصيد غير كافٍ من صنف ${item.name}؛ المتاح ${balance}.` });
+          await db.insert(visitItems).values({ ownerId: ctx.user.id, visitId: visit.id, inventoryItemId: item.id, itemNameSnapshot: item.name, unitSnapshot: item.unit, quantity: requested.quantity, source: requested.source });
+          await db.insert(inventoryMovements).values({ ownerId: ctx.user.id, inventoryItemId: item.id, movementType: "outgoing", quantity: requested.quantity, unitCost: item.defaultUnitCost, currency: "SAR", movementDate: now, technicianName: visit.technicianName, notes: `منصرف لأمر عمل العميل ${visit.customerId}` });
+        }
+        if (input.collectedAmount > 0) {
+          const category = visit.visitType === "installation" ? "تحصيل تركيب" : visit.visitType === "maintenance" ? "تحصيل صيانة" : visit.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
+          await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: input.collectedCurrency, amount: input.collectedAmount, category, transactionDate: now, sourceVisitId: visit.id, recipientName: visit.technicianName, notes: `تحصيل من أمر عمل العميل ${visit.customerId}` });
+        }
+      }
       await refreshOwnerBackup(ctx.user.id);
       return { success: true };
     }),

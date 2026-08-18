@@ -26,6 +26,7 @@ import { trpc } from "@/lib/trpc";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   BellRing,
+  ClipboardList,
   CalendarPlus,
   CircleDollarSign,
   FileBarChart,
@@ -50,6 +51,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "الرئيسية", path: "/" },
   { icon: UsersRound, label: "العملاء", path: "/customers" },
   { icon: CalendarPlus, label: "سجل الزيارات", path: "/visits" },
+  { icon: ClipboardList, label: "أوامر الفنيين", path: "/work-orders" },
   { icon: BellRing, label: "التذكيرات", path: "/reminders" },
   { icon: PackageSearch, label: "المخزن", path: "/inventory" },
   { icon: CircleDollarSign, label: "الخزينة والمصروفات", path: "/cash" },

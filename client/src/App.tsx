@@ -18,6 +18,7 @@ import TechnicianPayroll from "./pages/TechnicianPayroll";
 import Settings from "./pages/Settings";
 import Visits from "./pages/Visits";
 import TechnicianPreview from "./pages/TechnicianPreview";
+import WorkOrders from "./pages/WorkOrders";
 
 function AdminOnly({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -43,7 +44,8 @@ function AdminTechnicianPayroll() { return <AdminOnly><TechnicianPayroll /></Adm
 
 function Router() {
   const [location] = useLocation();
-  if (location === "/technician-preview") return <TechnicianPreview />;
+  if (location.replace(/\/$/, "") === "/technician-preview") return <TechnicianPreview />;
+  if (location.replace(/\/$/, "") === "/work-orders") return <DashboardLayout><AdminOnly><WorkOrders /></AdminOnly></DashboardLayout>;
   return (
     <DashboardLayout>
       <Switch>
