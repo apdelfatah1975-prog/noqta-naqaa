@@ -2,7 +2,7 @@ import { startLogin } from "@/const";
 import { clearOfflineState, getOfflineSession, rememberOfflineSession } from "@/lib/offlineSync";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -21,17 +21,6 @@ export function useAuth(options?: UseAuthOptions) {
     retry: false,
     refetchOnWindowFocus: false,
   });
-
-  const [authWaitExpired, setAuthWaitExpired] = useState(false);
-
-  useEffect(() => {
-    if (!meQuery.isLoading || meQuery.data) {
-      setAuthWaitExpired(false);
-      return;
-    }
-    const timeout = window.setTimeout(() => setAuthWaitExpired(true), 5000);
-    return () => window.clearTimeout(timeout);
-  }, [meQuery.isLoading, meQuery.data]);
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
@@ -83,7 +72,7 @@ export function useAuth(options?: UseAuthOptions) {
     const currentUser = meQuery.data ?? cachedUser;
     return {
       user: currentUser,
-      loading: (!currentUser && meQuery.isLoading && !networkUnavailable && !authWaitExpired) || logoutMutation.isPending,
+      loading: (!currentUser && meQuery.isLoading && !networkUnavailable) || logoutMutation.isPending,
       error: currentUser ? logoutMutation.error ?? null : meQuery.error ?? logoutMutation.error ?? null,
       isAuthenticated: Boolean(currentUser),
     };
@@ -93,7 +82,6 @@ export function useAuth(options?: UseAuthOptions) {
     meQuery.isLoading,
     logoutMutation.error,
     logoutMutation.isPending,
-    authWaitExpired,
   ]);
 
   useEffect(() => {

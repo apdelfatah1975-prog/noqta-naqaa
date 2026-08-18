@@ -58,6 +58,7 @@ const menuItems = [
   { icon: Settings, label: "الإعدادات", path: "/settings" },
 ];
 
+const mobileNavItems = menuItems.filter(item => ["/", "/customers", "/visits", "/reminders"].includes(item.path));
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { loading, user } = useAuth();
@@ -97,13 +98,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const utils = trpc.useUtils();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const visibleMenuItems = user?.role === "admin" ? menuItems : menuItems.filter(item => item.path !== "/inventory" && item.path !== "/cash" && item.path !== "/reports" && item.path !== "/technician-payroll");
-  const mobileMenuItems = menuItems;
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
-  const mobileNavRef = React.useRef<HTMLElement | null>(null);
-  const [canScrollMobileNav, setCanScrollMobileNav] = React.useState(false);
-  const [showMobileNavHint, setShowMobileNavHint] = React.useState(() => typeof window !== "undefined" && window.localStorage.getItem("purepoint-mobile-nav-hint-v2-seen") !== "1");
   const activeMenuItem = menuItems.find(item => item.path === location)
     ?? (location.startsWith("/customers/") ? menuItems[1] : undefined)
     ?? menuItems[0];
@@ -119,35 +116,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           : location === "/technician-payroll"
             ? { bar: "from-indigo-500 via-blue-500 to-cyan-500", label: "text-indigo-800", surface: "bg-indigo-50/95", glow: "shadow-[0_8px_28px_rgba(99,102,241,.20)]" }
             : { bar: "from-teal-500 via-cyan-500 to-sky-500", label: "text-teal-800", surface: "bg-teal-50/95", glow: "shadow-[0_8px_28px_rgba(20,184,166,.16)]" };
-
-  const updateMobileNavScrollHint = React.useCallback(() => {
-    const element = mobileNavRef.current;
-    if (!element) return;
-    const maxScroll = element.scrollWidth - element.clientWidth;
-    setCanScrollMobileNav(maxScroll > 8 && Math.abs(element.scrollLeft) < maxScroll - 8);
-  }, []);
-
-  React.useEffect(() => {
-    if (!isMobile) return;
-    const frame = window.requestAnimationFrame(() => {
-      updateMobileNavScrollHint();
-      if (mobileMenuItems.length <= 4) {
-        setShowMobileNavHint(false);
-      }
-    });
-    const element = mobileNavRef.current;
-    const handleResize = () => updateMobileNavScrollHint();
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [isMobile, mobileMenuItems.length, updateMobileNavScrollHint]);
-
-  const dismissMobileNavHint = () => {
-    window.localStorage.setItem("purepoint-mobile-nav-hint-v2-seen", "1");
-    setShowMobileNavHint(false);
-  };
 
   const refreshData = async () => {
     if (isRefreshing) return;
@@ -262,14 +230,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             ) : null}
           </div>
         </header>
-        <main className="mobile-portrait-main min-h-[calc(100vh-4rem)] min-w-0 overflow-x-hidden px-3 pb-24 pt-4 sm:px-6 sm:pb-24 sm:pt-6 lg:px-8 lg:pb-8 lg:pt-8">{children}</main>
+        <main className="min-h-[calc(100vh-4rem)] min-w-0 overflow-x-hidden px-3 pb-24 pt-4 sm:px-6 sm:pb-24 sm:pt-6 lg:px-8 lg:pb-8 lg:pt-8">{children}</main>
       </SidebarInset>
-      {isMobile ? <nav ref={mobileNavRef} onScroll={updateMobileNavScrollHint} aria-label="التنقل السريع" className="relative fixed inset-x-0 bottom-0 z-40 min-h-[5.25rem] overflow-x-auto border-t border-teal-950/10 bg-white/95 px-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(13,82,76,.10)] backdrop-blur-lg [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {showMobileNavHint ? <div className="pointer-events-auto absolute bottom-full left-3 right-3 mb-2 flex items-center justify-between gap-3 rounded-2xl bg-teal-900 px-4 py-3 text-right text-xs font-bold leading-5 text-white shadow-xl" role="status"><span>مرّر الشريط إلى اليسار لرؤية بقية الصفحات</span><button type="button" onClick={dismissMobileNavHint} className="shrink-0 rounded-lg px-2 py-1 text-teal-100 transition hover:bg-white/10" aria-label="إغلاق تلميح شريط التنقل">حسنًا</button></div> : null}
-        <div className="mx-auto flex h-full min-w-max items-stretch gap-1 px-1">
-          {mobileMenuItems.map(item => { const active = activeMenuItem.path === item.path; return <button key={item.path} type="button" onClick={() => setLocation(item.path)} className={`flex min-h-[4rem] w-[88px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[13px] font-bold leading-5 tracking-wide transition active:scale-95 ${active ? "bg-teal-50 text-teal-800" : "text-slate-500 hover:bg-slate-50 hover:text-teal-700"}`} aria-current={active ? "page" : undefined}><item.icon className="h-5 w-5 shrink-0" /><span className="whitespace-nowrap">{item.label}</span></button>; })}
+      {isMobile ? <nav aria-label="التنقل السريع" className="fixed inset-x-0 bottom-0 z-40 min-h-[5.25rem] border-t border-teal-950/10 bg-white/95 px-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(13,82,76,.10)] backdrop-blur-lg">
+        <div className="mx-auto grid h-full max-w-lg grid-cols-4 gap-0.5">
+          {mobileNavItems.map(item => { const active = activeMenuItem.path === item.path; return <button key={item.path} type="button" onClick={() => setLocation(item.path)} className={`flex min-h-[4rem] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 text-[13px] font-bold leading-5 tracking-wide transition active:scale-95 ${active ? "bg-teal-50 text-teal-800" : "text-slate-500 hover:bg-slate-50 hover:text-teal-700"}`} aria-current={active ? "page" : undefined}><item.icon className="h-5 w-5" /><span className="whitespace-nowrap">{item.label}</span></button>; })}
         </div>
-        {mobileMenuItems.length > 4 && canScrollMobileNav ? <div className="pointer-events-none absolute inset-y-0 left-0 flex w-16 items-center justify-start bg-gradient-to-r from-white via-white/80 to-transparent pl-2" aria-hidden="true"><span className="grid h-8 w-8 place-items-center rounded-full bg-teal-700/90 text-lg font-black text-white shadow-lg">←</span></div> : null}
       </nav> : null}
     </>
 
