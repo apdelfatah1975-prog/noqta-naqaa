@@ -1,4 +1,66 @@
 import * as XLSX from "xlsx";
+
+export type CustomerImportRow = {
+  rowNumber: number;
+  name: string;
+  phone: string;
+  manualCode?: string | null;
+  address?: string | null;
+  location?: string | null;
+  latitude?: string | null;
+  longitude?: string | null;
+  notes?: string | null;
+};
+
+export type CustomerImportIssue = { rowNumber: number; reason: string };
+
+function normalizeImportHeader(value: unknown) {
+  return String(value ?? "").trim().toLocaleLowerCase("ar-EG").replace(/[\u0640\s_\-]+/g, "");
+}
+
+function textCell(value: unknown) {
+  return value === undefined || value === null ? "" : String(value).trim();
+}
+
+export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerImportRow[]; issues: CustomerImportIssue[] }> {
+  const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) return { rows: [], issues: [{ rowNumber: 1, reason: "الملف لا يحتوي على ورقة بيانات" }] };
+  const sheet = workbook.Sheets[sheetName];
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
+  const header = (matrix[0] ?? []).map(normalizeImportHeader);
+  const aliases: Record<string, string[]> = {
+    name: ["اسم العميل", "الاسم", "name", "customername"].map(normalizeImportHeader),
+    phone: ["الهاتف", "رقم الهاتف", "الجوال", "الموبايل", "phone", "mobile"].map(normalizeImportHeader),
+    manualCode: ["كود العميل", "الكود", "رقم العميل", "code", "customercode"].map(normalizeImportHeader),
+    address: ["العنوان", "address"].map(normalizeImportHeader),
+    location: ["الموقع", "الموقع gps", "gps", "location"].map(normalizeImportHeader),
+    latitude: ["خط العرض", "latitude", "lat"].map(normalizeImportHeader),
+    longitude: ["خط الطول", "longitude", "lng", "lon"].map(normalizeImportHeader),
+    notes: ["ملاحظات", "الملاحظات", "notes"].map(normalizeImportHeader),
+  };
+  const indexOf = (key: string) => header.findIndex(item => aliases[key].includes(item));
+  const nameIndex = indexOf("name");
+  const phoneIndex = indexOf("phone");
+  const issues: CustomerImportIssue[] = [];
+  if (nameIndex < 0 || phoneIndex < 0) return { rows: [], issues: [{ rowNumber: 1, reason: "يجب أن يحتوي الملف على عمودي اسم العميل والهاتف" }] };
+  const rows: CustomerImportRow[] = [];
+  matrix.slice(1).forEach((cells, offset) => {
+    const rowNumber = offset + 2;
+    const name = textCell(cells[nameIndex]);
+    const phone = textCell(cells[phoneIndex]);
+    if (!name && !phone) return;
+    if (!name || !phone) { issues.push({ rowNumber, reason: !name ? "اسم العميل ناقص" : "رقم الهاتف ناقص" }); return; }
+    const value = (key: string) => { const index = indexOf(key); return index >= 0 ? textCell(cells[index]) : ""; };
+    rows.push({ rowNumber, name, phone, manualCode: value("manualCode") || null, address: value("address") || null, location: value("location") || null, latitude: value("latitude") || null, longitude: value("longitude") || null, notes: value("notes") || null });
+  });
+  return { rows, issues };
+}
+
+export function downloadCustomerImportTemplate() {
+  const rows = [{ "اسم العميل": "مثال: محمد أحمد", "الهاتف": "0500000000", "كود العميل": "", "العنوان": "الرياض", "الموقع GPS": "24.7136,46.6753", "خط العرض": "", "خط الطول": "", "ملاحظات": "" }];
+  downloadRowsAsExcel("قالب-استيراد-العملاء-نقطة-نقاء.xlsx", "العملاء", rows);
+}
 import { labelVisitType } from "@/lib/filterUi";
 
 export type CustomerExportRow = {

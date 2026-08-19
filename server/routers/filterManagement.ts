@@ -78,6 +78,18 @@ const customerCreateInput = customerInput.extend({
   })).max(50).optional().default([]),
 });
 
+const customerImportRowInput = z.object({
+  rowNumber: z.number().int().positive(),
+  name: z.string().trim().min(2, "اسم العميل مطلوب").max(160),
+  phone: z.string().trim().min(6, "رقم الهاتف غير صالح").max(32),
+  manualCode: z.string().trim().max(64).optional().nullable(),
+  address: z.string().trim().max(1000).optional().nullable(),
+  location: z.string().trim().max(100).optional().nullable(),
+  latitude: z.string().trim().max(32).optional().nullable(),
+  longitude: z.string().trim().max(32).optional().nullable(),
+  notes: z.string().trim().max(2000).optional().nullable(),
+});
+
 const workOrderProofInput = z.object({
   visitId: z.number().int().positive(),
   kind: z.enum(["photo", "signature"]),
@@ -738,6 +750,31 @@ export const filterManagementRouter = router({
       }
       await refreshOwnerBackup(ctx.user.id);
       return { id: customerId, alreadySynced: false, firstVisitCreated: true, reminderCreated: needsAutomaticReminder(firstVisitType) };
+    }),
+    importBulk: protectedProcedure.input(z.object({ rows: z.array(customerImportRowInput).min(1).max(1000) })).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const existingRows = await db.select({ id: customers.id, name: customers.name, phone: customers.phone, manualCode: customers.manualCode }).from(customers).where(eq(customers.ownerId, ctx.user.id));
+      const names = new Set(existingRows.map(row => normalizeCustomerName(row.name)));
+      const phones = new Set(existingRows.map(row => row.phone.trim()));
+      const codes = new Set(existingRows.map(row => row.manualCode?.trim()).filter(Boolean) as string[]);
+      const accepted: Array<typeof customers.$inferInsert> = [];
+      const rejected: Array<{ rowNumber: number; reason: string }> = [];
+      for (const row of input.rows) {
+        const name = row.name.trim().replace(/\\s+/g, " ");
+        const phone = row.phone.trim();
+        const manualCode = row.manualCode?.trim() || null;
+        const normalizedName = normalizeCustomerName(name);
+        if (names.has(normalizedName)) { rejected.push({ rowNumber: row.rowNumber, reason: "اسم العميل موجود بالفعل" }); continue; }
+        if (phones.has(phone)) { rejected.push({ rowNumber: row.rowNumber, reason: "رقم الهاتف موجود بالفعل" }); continue; }
+        if (manualCode && codes.has(manualCode)) { rejected.push({ rowNumber: row.rowNumber, reason: "كود العميل مستخدم بالفعل" }); continue; }
+        const location = row.location?.trim() || "";
+        const coordinates = location.match(/(-?\\d+(?:\\.\\d+)?)\\s*[,،]\\s*(-?\\d+(?:\\.\\d+)?)/);
+        accepted.push({ ownerId: ctx.user.id, name, phone, manualCode, address: row.address?.trim() || null, latitude: row.latitude?.trim() || coordinates?.[1] || null, longitude: row.longitude?.trim() || coordinates?.[2] || null, notes: row.notes?.trim() || null });
+        names.add(normalizedName); phones.add(phone); if (manualCode) codes.add(manualCode);
+      }
+      if (accepted.length) await db.insert(customers).values(accepted);
+      if (accepted.length) await refreshOwnerBackup(ctx.user.id);
+      return { added: accepted.length, rejected, total: input.rows.length };
     }),
     update: protectedProcedure.input(customerInput.extend({ id: z.number().int().positive(), pin: sensitivePinInput.shape.pin })).mutation(async ({ ctx, input }) => {
       await requirePin(ctx.user.id, input.pin);

@@ -7,9 +7,37 @@ import {
   visitExcelHeaders,
   visitRowsForExcel,
   withArabicHeaders,
+  parseCustomerExcel,
 } from "./excelExport";
 
 describe("Excel export rows", () => {
+  it("يقرأ ملف العملاء بعناوين عربية ويكشف الصفوف الناقصة", async () => {
+    const XLSX = await import("xlsx");
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ["اسم العميل", "الهاتف", "العنوان", "ملاحظات"],
+      ["عميل جديد", "0500000000", "الرياض", "مهم"],
+      ["عميل ناقص", "", "الرياض", ""],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "العملاء");
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+    const result = await parseCustomerExcel(new File([bytes], "customers.xlsx"));
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({ rowNumber: 2, name: "عميل جديد", phone: "0500000000", address: "الرياض", notes: "مهم" });
+    expect(result.issues).toEqual([{ rowNumber: 3, reason: "رقم الهاتف ناقص" }]);
+  });
+
+  it("يرفض ملف العملاء الذي يفتقد الأعمدة الأساسية", async () => {
+    const XLSX = await import("xlsx");
+    const worksheet = XLSX.utils.aoa_to_sheet([["العنوان"], ["الرياض"]]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "العملاء");
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+    const result = await parseCustomerExcel(new File([bytes], "invalid.xlsx"));
+    expect(result.rows).toHaveLength(0);
+    expect(result.issues[0]?.reason).toContain("اسم العميل والهاتف");
+  });
+
   it("يبني صفوف العملاء مع الكود وموعد المتابعة", () => {
     const rows = customerRowsForExcel([
       {

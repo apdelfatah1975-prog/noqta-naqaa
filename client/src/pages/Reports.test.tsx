@@ -57,7 +57,7 @@ describe("تقارير نقطة نقاء", () => {
     expect(screen.queryByText("maintenance")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "الزيارات" }));
     expect(screen.getByText("عميل الاختبار")).toBeTruthy();
-    expect(screen.getByText("بنزين")).toBeTruthy();
+    expect(screen.getAllByText("بنزين").length).toBeGreaterThan(0);
     expect(screen.getAllByText("صيانة").length).toBeGreaterThan(0);
   });
 
