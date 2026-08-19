@@ -52,6 +52,34 @@ describe("Excel export rows", () => {
     expect(result.rows[0]).toMatchObject({ rowNumber: 3, name: "عميل بعد العنوان", phone: "0500000002", address: "الرياض" });
   });
 
+  it("يختار ورقة العمل المطلوبة يدويًا في الملف متعدد الأوراق", async () => {
+    const XLSX = await import("xlsx");
+    const summarySheet = XLSX.utils.aoa_to_sheet([["ملخص"], ["لا توجد أعمدة استيراد"]]);
+    const customersSheet = XLSX.utils.aoa_to_sheet([["اسم العميل", "الهاتف"], ["عميل من الورقة المختارة", "0500000099"]]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, summarySheet, "ملخص");
+    XLSX.utils.book_append_sheet(workbook, customersSheet, "العملاء الفعليون");
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+    const file = new File([bytes], "multi-sheet.xlsx");
+    const result = await parseCustomerExcel(file, "العملاء الفعليون");
+    expect(result.sheetNames).toEqual(["ملخص", "العملاء الفعليون"]);
+    expect(result.selectedSheetName).toBe("العملاء الفعليون");
+    expect(result.issues).toEqual([]);
+    expect(result.rows[0]).toMatchObject({ name: "عميل من الورقة المختارة", phone: "0500000099" });
+  });
+
+  it("يعطي رسالة واضحة عند اختيار ورقة غير موجودة", async () => {
+    const XLSX = await import("xlsx");
+    const worksheet = XLSX.utils.aoa_to_sheet([["اسم العميل", "الهاتف"], ["عميل", "0500000003"]]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "العملاء");
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+    const result = await parseCustomerExcel(new File([bytes], "missing-sheet.xlsx"), "غير موجودة");
+    expect(result.sheetNames).toEqual(["العملاء"]);
+    expect(result.rows).toEqual([]);
+    expect(result.issues[0]?.reason).toContain("غير موجودة");
+  });
+
   it("يقرأ الزيارة التاريخية والفني والمبلغ ويحسِب موعد المتابعة", async () => {
     const XLSX = await import("xlsx");
     const worksheet = XLSX.utils.aoa_to_sheet([["اسم العميل", "الهاتف", "الموقع", "الفني", "تاريخ الزيارة", "نوع الزيارة", "المبلغ"], ["عميل خدمة", "0500000001", "رابط الخريطة", "أحمد", "2026-01-15", "صيانة", 250]]);

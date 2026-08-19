@@ -69,8 +69,10 @@ function textCell(value: unknown) {
   return value === undefined || value === null ? "" : String(value).trim();
 }
 
-export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerImportRow[]; issues: CustomerImportIssue[] }> {
+export async function parseCustomerExcel(file: File, requestedSheetName?: string): Promise<{ rows: CustomerImportRow[]; issues: CustomerImportIssue[]; sheetNames: string[]; selectedSheetName: string | null }> {
   const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+  const sheetNames = workbook.SheetNames;
+  const selectedSheet = requestedSheetName?.trim() || null;
   const aliases: Record<string, string[]> = {
     name: ["اسم العميل", "إسم العميل", "الاسم", "اسم", "name", "customername", "customer name"].map(normalizeImportHeader),
     phone: ["الهاتف", "رقم الهاتف", "رقم الجوال", "الجوال", "الموبايل", "رقم الموبايل", "phone", "mobile"].map(normalizeImportHeader),
@@ -91,6 +93,7 @@ export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerIm
   const scoreHeader = (cells: unknown[]) => ["name", "phone"].filter(key => cells.some(item => headerMatches(key, item))).length;
   const candidates: Array<{ sheetName: string; matrix: unknown[][]; headerRow: number; score: number }> = [];
   for (const sheetName of workbook.SheetNames) {
+    if (selectedSheet && sheetName !== selectedSheet) continue;
     const sheet = workbook.Sheets[sheetName];
     const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
     const limit = Math.min(matrix.length, 30);
@@ -104,7 +107,7 @@ export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerIm
   const selected = candidates.sort((a, b) => b.score - a.score)[0];
   if (!selected || selected.score < 2) {
     const detected = selected?.matrix[selected.headerRow >= 0 ? selected.headerRow : 0]?.filter(Boolean).map(textCell).join("، ");
-    return { rows: [], issues: [{ rowNumber: 1, reason: `لم يتم التعرف على عمودي اسم العميل والهاتف. العناوين المقروءة: ${detected || "لا توجد عناوين واضحة"}` }] };
+    return { sheetNames, selectedSheetName: selected?.sheetName ?? selectedSheet, rows: [], issues: [{ rowNumber: 1, reason: selectedSheet && !workbook.Sheets[selectedSheet] ? `ورقة العمل «${selectedSheet}» غير موجودة في الملف.` : `لم يتم التعرف على عمودي اسم العميل والهاتف. العناوين المقروءة: ${detected || "لا توجد عناوين واضحة"}` }] };
   }
   const { matrix, headerRow } = selected;
   const headerCells = matrix[headerRow] ?? [];
@@ -113,7 +116,7 @@ export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerIm
   const nameIndex = indexOf("name");
   const phoneIndex = indexOf("phone");
   const issues: CustomerImportIssue[] = [];
-  if (nameIndex < 0 || phoneIndex < 0) return { rows: [], issues: [{ rowNumber: headerRow + 1, reason: `لم يتم التعرف على عمودي اسم العميل والهاتف. العناوين المقروءة: ${headerCells.filter(Boolean).map(textCell).join("، ") || "لا توجد عناوين واضحة"}` }] };
+  if (nameIndex < 0 || phoneIndex < 0) return { sheetNames, selectedSheetName: selected.sheetName, rows: [], issues: [{ rowNumber: headerRow + 1, reason: `لم يتم التعرف على عمودي اسم العميل والهاتف في ورقة «${selected.sheetName}». العناوين المقروءة: ${headerCells.filter(Boolean).map(textCell).join("، ") || "لا توجد عناوين واضحة"}` }] };
   const rows: CustomerImportRow[] = [];
   matrix.slice(headerRow + 1).forEach((cells, offset) => {
     const rowNumber = headerRow + offset + 2;
@@ -137,7 +140,7 @@ export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerIm
     if (rawVisitType && !visitDate) issues.push({ rowNumber, reason: "تاريخ الزيارة غير صالح", data: sourceData });
     rows.push({ rowNumber, name, phone, manualCode: value("manualCode") || null, address: value("address") || null, location: value("location") || null, notes: value("notes") || null, technicianName: value("technicianName") || null, visitDate, visitType: visitType || null, collectedAmount: collectedAmount ?? null, nextVisitDate: nextFollowUpDate(visitDate, visitType) });
   });
-  return { rows, issues };
+  return { sheetNames, selectedSheetName: selected.sheetName, rows, issues };
 }
 
 export function downloadCustomerImportTemplate() {
