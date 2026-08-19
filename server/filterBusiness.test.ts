@@ -30,6 +30,16 @@ describe("منطق تطبيق فلاتر المياه", () => {
     });
   });
 
+  it("يتجاهل الزيارة غير المكتملة عند إكمال تاريخ المتابعة تلقائيًا", () => {
+    const summary = followUpSummaryFromVisits([
+      { visitType: "maintenance" as const, visitDate: new Date("2026-01-01T09:00:00.000Z"), status: "completed" },
+      { visitType: "installation" as const, visitDate: new Date("2026-03-01T09:00:00.000Z"), status: "cancelled" },
+    ], new Date("2026-05-01T09:00:00.000Z"));
+
+    expect(summary?.lastServiceVisitDate).toEqual(new Date("2026-01-01T09:00:00.000Z"));
+    expect(summary?.daysRemaining).toBe(0);
+  });
+
   it("يعرض التسلسل من ١ حتى ١٠٠٠ بالأرقام العربية الهندية دون بادئة", () => {
     expect([1, 2, 3, 1000].map(customerCode)).toEqual(["١", "٢", "٣", "١٠٠٠"]);
   });

@@ -28,7 +28,7 @@ export function customerCode(customerId: number) {
   return String(customerId).replace(/\d/g, digit => "٠١٢٣٤٥٦٧٨٩"[Number(digit)]);
 }
 
-export type FollowUpSourceVisit = { visitDate: Date; visitType: VisitType };
+export type FollowUpSourceVisit = { visitDate: Date; visitType: VisitType; status?: string | null };
 
 export function daysUntilFollowUp(followUp: Date, now = new Date()) {
   return Math.ceil((followUp.getTime() - now.getTime()) / 86_400_000);
@@ -36,7 +36,7 @@ export function daysUntilFollowUp(followUp: Date, now = new Date()) {
 
 export function followUpSummaryFromVisits<T extends FollowUpSourceVisit>(visits: T[], now = new Date()) {
   const lastServiceVisit = visits
-    .filter(visit => needsAutomaticReminder(visit.visitType))
+    .filter(visit => needsAutomaticReminder(visit.visitType) && (!visit.status || visit.status === "completed"))
     .sort((first, second) => second.visitDate.getTime() - first.visitDate.getTime())[0];
 
   if (!lastServiceVisit) return null;

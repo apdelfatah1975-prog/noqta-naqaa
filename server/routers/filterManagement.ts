@@ -617,7 +617,7 @@ export const filterManagementRouter = router({
   customers: router({
     list: protectedProcedure.input(z.object({
       search: z.string().trim().max(160).optional(),
-      followUpStatus: z.enum(["all", "overdue", "today", "upcoming", "regular", "none"]).default("all"),
+      followUpStatus: z.enum(["all", "overdue", "today", "within_5_days", "more_than_5_days", "upcoming", "regular", "none"]).default("all"),
       followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       visitDateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       visitDateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -667,6 +667,8 @@ export const filterManagementRouter = router({
             || (input.followUpStatus === "none" && !followUp)
             || (input.followUpStatus === "overdue" && Boolean(followUp && followUp.daysRemaining < 0))
             || (input.followUpStatus === "today" && Boolean(followUp && followUp.daysRemaining === 0))
+            || (input.followUpStatus === "within_5_days" && Boolean(followUp && followUp.daysRemaining > 0 && followUp.daysRemaining <= 5))
+            || (input.followUpStatus === "more_than_5_days" && Boolean(followUp && followUp.daysRemaining > 5))
             || (input.followUpStatus === "upcoming" && Boolean(followUp && followUp.daysRemaining <= 5))
             || (input.followUpStatus === "regular" && Boolean(followUp && followUp.daysRemaining > 5));
           const lastVisitDate = customer.lastVisitDate?.toISOString().slice(0, 10);
@@ -685,7 +687,7 @@ export const filterManagementRouter = router({
             return (input.sortBy === "next_asc" ? 1 : -1) * (leftDate - rightDate);
           }
           if (input.sortBy === "status") {
-            const statusRank = (customer: typeof left) => !customer.followUp ? 4 : customer.followUp.daysRemaining < 0 ? 1 : customer.followUp.daysRemaining === 0 ? 2 : 3;
+            const statusRank = (customer: typeof left) => !customer.followUp ? 5 : customer.followUp.daysRemaining < 0 ? 1 : customer.followUp.daysRemaining === 0 ? 2 : customer.followUp.daysRemaining <= 5 ? 3 : 4;
             return statusRank(left) - statusRank(right) || left.name.localeCompare(right.name, "ar-EG");
           }
           if (input.sortBy === "collected_desc" || input.sortBy === "collected_asc") {
