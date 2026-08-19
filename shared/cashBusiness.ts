@@ -187,7 +187,7 @@ export function calculateCompanyFinancialOverview(transactions: Array<CashTransa
     } else {
       otherExpenses += transaction.amount;
       if (category === "بنزين") gasolineExpenses += transaction.amount;
-      else if (category === "شراء بضاعة") inventoryPurchaseExpenses += transaction.amount;
+      else if (category === "شراء بضاعة" || category.startsWith("شراء مخزون -")) inventoryPurchaseExpenses += transaction.amount;
       else if (category === "مصروف عام") generalExpenses += transaction.amount;
       else if (category === "أخرى" || category === "غير مصنف") uncategorizedExpenses += transaction.amount;
     }
