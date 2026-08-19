@@ -790,8 +790,19 @@ export const filterManagementRouter = router({
         if (row.visitType && row.visitDate) {
           const operationId = `excel-import-${row.rowNumber}`.slice(0, 64);
           const existingVisit = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), eq(visits.clientOperationId, operationId))).limit(1);
-          const visitId = existingVisit[0]?.id ?? Number((await db.insert(visits).values({ ownerId: ctx.user.id, customerId, visitType: row.visitType, visitDate: row.visitDate, technicianName: row.technicianName?.trim() || null, status: "completed", notes: row.notes?.trim() || null, clientOperationId: operationId }))[0].insertId);
-          if (!existingVisit[0]) {
+          let visitId = existingVisit[0]?.id;
+          let visitWasCreated = false;
+          if (!visitId) {
+            try {
+              visitId = Number((await db.insert(visits).values({ ownerId: ctx.user.id, customerId, visitType: row.visitType, visitDate: row.visitDate, technicianName: row.technicianName?.trim() || null, status: "completed", notes: row.notes?.trim() || null, clientOperationId: operationId }))[0].insertId);
+              visitWasCreated = true;
+            } catch (error) {
+              const concurrentVisit = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), eq(visits.clientOperationId, operationId))).limit(1);
+              if (!concurrentVisit[0]) throw error;
+              visitId = concurrentVisit[0].id;
+            }
+          }
+          if (visitWasCreated) {
             visitsAdded += 1;
             if (needsAutomaticReminder(row.visitType)) await db.insert(reminders).values({ customerId, visitId, ownerId: ctx.user.id, reminderDate: followUpDate(row.visitDate) });
           }
