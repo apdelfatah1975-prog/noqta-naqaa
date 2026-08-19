@@ -88,6 +88,10 @@ const customerImportRowInput = z.object({
   latitude: z.string().trim().max(32).optional().nullable(),
   longitude: z.string().trim().max(32).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
+  technicianName: z.string().trim().max(160).optional().nullable(),
+  visitDate: z.coerce.date().optional().nullable(),
+  visitType: z.enum(visitTypes).optional().nullable(),
+  collectedAmount: z.number().nonnegative().max(999999999).optional().nullable(),
 });
 
 const workOrderProofInput = z.object({
@@ -760,8 +764,10 @@ export const filterManagementRouter = router({
       const names = new Set(existingRows.map(row => normalizeCustomerName(row.name)));
       const phones = new Set(existingRows.map(row => row.phone.trim()));
       const codes = new Set(existingRows.map(row => row.manualCode?.trim()).filter(Boolean) as string[]);
-      const accepted: Array<typeof customers.$inferInsert> = [];
       const rejected: Array<{ rowNumber: number; reason: string }> = [];
+      let added = 0;
+      let visitsAdded = 0;
+      let incomeAdded = 0;
       for (const row of input.rows) {
         const name = row.name.trim().replace(/\\s+/g, " ");
         const phone = row.phone.trim();
@@ -770,14 +776,29 @@ export const filterManagementRouter = router({
         if (names.has(normalizedName)) { rejected.push({ rowNumber: row.rowNumber, reason: "اسم العميل موجود بالفعل" }); continue; }
         if (phones.has(phone)) { rejected.push({ rowNumber: row.rowNumber, reason: "رقم الهاتف موجود بالفعل" }); continue; }
         if (manualCode && codes.has(manualCode)) { rejected.push({ rowNumber: row.rowNumber, reason: "كود العميل مستخدم بالفعل" }); continue; }
+        if (row.visitType && !row.visitDate) { rejected.push({ rowNumber: row.rowNumber, reason: "لا يمكن إنشاء الزيارة دون تاريخ" }); continue; }
         const location = row.location?.trim() || "";
         const coordinates = location.match(/(-?\\d+(?:\\.\\d+)?)\\s*[,،]\\s*(-?\\d+(?:\\.\\d+)?)/);
-        accepted.push({ ownerId: ctx.user.id, name, phone, manualCode, address: row.address?.trim() || null, latitude: row.latitude?.trim() || coordinates?.[1] || null, longitude: row.longitude?.trim() || coordinates?.[2] || null, notes: row.notes?.trim() || null });
+        const customerResult = await db.insert(customers).values({ ownerId: ctx.user.id, name, phone, manualCode, address: row.address?.trim() || null, latitude: coordinates?.[1] || null, longitude: coordinates?.[2] || null, notes: row.notes?.trim() || null });
+        const customerId = Number(customerResult[0].insertId);
+        added += 1;
         names.add(normalizedName); phones.add(phone); if (manualCode) codes.add(manualCode);
+        if (row.visitType && row.visitDate) {
+          const operationId = `excel-import-${row.rowNumber}`.slice(0, 64);
+          const visitResult = await db.insert(visits).values({ ownerId: ctx.user.id, customerId, visitType: row.visitType, visitDate: row.visitDate, technicianName: row.technicianName?.trim() || null, status: "completed", notes: row.notes?.trim() || null, clientOperationId: operationId });
+          const visitId = Number(visitResult[0].insertId);
+          visitsAdded += 1;
+          if (needsAutomaticReminder(row.visitType)) await db.insert(reminders).values({ customerId, visitId, ownerId: ctx.user.id, reminderDate: followUpDate(row.visitDate) });
+          const amountMinor = Math.round((row.collectedAmount || 0) * 100);
+          if (amountMinor > 0) {
+            const category = row.visitType === "installation" ? "تحصيل تركيب" : row.visitType === "maintenance" ? "تحصيل صيانة" : row.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
+            await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: "SAR", amount: amountMinor, category, transactionDate: row.visitDate, sourceVisitId: visitId, recipientName: row.technicianName?.trim() || null, clientOperationId: `${operationId}:income`.slice(0, 64), notes: `العميل: ${name} | إيراد مستورد من Excel` });
+            incomeAdded += 1;
+          }
+        }
       }
-      if (accepted.length) await db.insert(customers).values(accepted);
-      if (accepted.length) await refreshOwnerBackup(ctx.user.id);
-      return { added: accepted.length, rejected, total: input.rows.length };
+      if (added) await refreshOwnerBackup(ctx.user.id);
+      return { added, visitsAdded, incomeAdded, rejected, total: input.rows.length };
     }),
     update: protectedProcedure.input(customerInput.extend({ id: z.number().int().positive(), pin: sensitivePinInput.shape.pin })).mutation(async ({ ctx, input }) => {
       await requirePin(ctx.user.id, input.pin);

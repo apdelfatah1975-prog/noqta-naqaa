@@ -27,6 +27,18 @@ describe("Excel export rows", () => {
     expect(result.issues).toEqual([{ rowNumber: 3, reason: "رقم الهاتف ناقص" }]);
   });
 
+  it("يقرأ الزيارة التاريخية والفني والمبلغ ويحسِب موعد المتابعة", async () => {
+    const XLSX = await import("xlsx");
+    const worksheet = XLSX.utils.aoa_to_sheet([["اسم العميل", "الهاتف", "الموقع", "الفني", "تاريخ الزيارة", "نوع الزيارة", "المبلغ"], ["عميل خدمة", "0500000001", "رابط الخريطة", "أحمد", "2026-01-15", "صيانة", 250]]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "العملاء");
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+    const result = await parseCustomerExcel(new File([bytes], "historical.xlsx"));
+    expect(result.issues).toEqual([]);
+    expect(result.rows[0]).toMatchObject({ technicianName: "أحمد", visitType: "maintenance", collectedAmount: 250 });
+    expect(new Date(result.rows[0].nextVisitDate!).toISOString().slice(0, 10)).toBe("2026-05-15");
+  });
+
   it("يرفض ملف العملاء الذي يفتقد الأعمدة الأساسية", async () => {
     const XLSX = await import("xlsx");
     const worksheet = XLSX.utils.aoa_to_sheet([["العنوان"], ["الرياض"]]);
