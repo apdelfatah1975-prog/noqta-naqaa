@@ -24,9 +24,23 @@ describe("Excel export rows", () => {
     XLSX.utils.book_append_sheet(workbook, worksheet, "العملاء");
     const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
     const result = await parseCustomerExcel(new File([bytes], "customers.xlsx"));
-    expect(result.rows).toHaveLength(1);
+    expect(result.rows).toHaveLength(2);
     expect(result.rows[0]).toMatchObject({ rowNumber: 2, name: "عميل جديد", phone: "0500000000", address: "الرياض", notes: "مهم" });
-    expect(result.issues[0]).toMatchObject({ rowNumber: 3, reason: "رقم الهاتف ناقص", data: { "اسم العميل": "عميل ناقص", "الهاتف": "" } });
+    expect(result.rows[1]).toMatchObject({ rowNumber: 3, name: "عميل ناقص", phone: "بدون هاتف - صف 3" });
+    expect(result.issues[0]).toMatchObject({ rowNumber: 3, data: { "اسم العميل": "عميل ناقص", "الهاتف": "" } });
+    expect(result.issues[0]?.reason).toContain("رقم الهاتف ناقص");
+  });
+
+  it("لا يفقد الصف الذي ينقصه الاسم ويضع اسمًا مؤقتًا قابلًا للمراجعة", async () => {
+    const XLSX = await import("xlsx");
+    const worksheet = XLSX.utils.aoa_to_sheet([["اسم العميل", "الهاتف"], ["", "0500000011"]]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "العملاء");
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+    const result = await parseCustomerExcel(new File([bytes], "missing-name.xlsx"));
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({ name: "عميل بدون اسم - صف 2", phone: "0500000011" });
+    expect(result.issues[0]?.reason).toContain("اسم العميل ناقص");
   });
 
   it("يتعرف على صياغة إسم العميل مع الهمزة في ملف عربي فعلي", async () => {

@@ -765,6 +765,7 @@ export const filterManagementRouter = router({
       const phones = new Set(existingRows.map(row => row.phone.trim()));
       const codes = new Set(existingRows.map(row => row.manualCode?.trim()).filter(Boolean) as string[]);
       const customerByCode = new Map(existingRows.map(row => [row.manualCode?.trim(), row.id]).filter((entry): entry is [string, number] => Boolean(entry[0])));
+      const customerByPhone = new Map(existingRows.map(row => [row.phone.trim(), row.id]));
       const rejected: Array<{ rowNumber: number; reason: string }> = [];
       let added = 0;
       let visitsAdded = 0;
@@ -774,9 +775,8 @@ export const filterManagementRouter = router({
         const phone = row.phone.trim();
         const manualCode = row.manualCode?.trim() || null;
         const normalizedName = normalizeCustomerName(name);
-        const linkedCustomerId = manualCode ? customerByCode.get(manualCode) : undefined;
-        if (!linkedCustomerId && names.has(normalizedName)) { rejected.push({ rowNumber: row.rowNumber, reason: "اسم العميل موجود بالفعل — استخدم كود العميل لربط الزيارة" }); continue; }
-        if (!linkedCustomerId && phones.has(phone)) { rejected.push({ rowNumber: row.rowNumber, reason: "رقم الهاتف موجود بالفعل — استخدم كود العميل لربط الزيارة" }); continue; }
+        const linkedCustomerId = manualCode ? customerByCode.get(manualCode) : customerByPhone.get(phone);
+        if (!linkedCustomerId && names.has(normalizedName)) { rejected.push({ rowNumber: row.rowNumber, reason: "اسم العميل موجود بالفعل مع رقم مختلف — استخدم كود العميل أو راجع الصف قبل الاستيراد" }); continue; }
         if (manualCode && codes.has(manualCode) && !linkedCustomerId) { rejected.push({ rowNumber: row.rowNumber, reason: "كود العميل مستخدم بالفعل" }); continue; }
         if (row.visitType && !row.visitDate) { rejected.push({ rowNumber: row.rowNumber, reason: "لا يمكن إنشاء الزيارة دون تاريخ" }); continue; }
         const location = row.location?.trim() || "";
@@ -784,7 +784,7 @@ export const filterManagementRouter = router({
         const customerId = linkedCustomerId ?? Number((await db.insert(customers).values({ ownerId: ctx.user.id, name, phone, manualCode, address: row.address?.trim() || null, latitude: coordinates?.[1] || null, longitude: coordinates?.[2] || null, notes: row.notes?.trim() || null }))[0].insertId);
         if (!linkedCustomerId) {
           added += 1;
-          names.add(normalizedName); phones.add(phone); if (manualCode) codes.add(manualCode);
+          names.add(normalizedName); phones.add(phone); customerByPhone.set(phone, customerId); if (manualCode) codes.add(manualCode);
           if (manualCode) customerByCode.set(manualCode, customerId);
         }
         if (row.visitType && row.visitDate) {

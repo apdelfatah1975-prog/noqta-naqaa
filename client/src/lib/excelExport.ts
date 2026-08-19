@@ -188,7 +188,10 @@ export async function parseCustomerExcel(file: File, requestedSheetName?: string
     const phone = textCell(cells[phoneIndex]);
     if (!name && !phone) return;
     const sourceData = Object.fromEntries(headerCells.map((headerCell, index) => [textCell(headerCell) || `عمود ${index + 1}`, cells[index] ?? ""]));
-    if (!name || !phone) { issues.push({ rowNumber, reason: !name ? "اسم العميل ناقص" : "رقم الهاتف ناقص", data: sourceData }); return; }
+    const importName = name || `عميل بدون اسم - صف ${rowNumber}`;
+    const importPhone = phone || `بدون هاتف - صف ${rowNumber}`;
+    if (!name) issues.push({ rowNumber, reason: `اسم العميل ناقص؛ تم استخدام اسم مؤقت «${importName}» حتى لا تضيع الزيارة.`, data: sourceData });
+    if (!phone) issues.push({ rowNumber, reason: `رقم الهاتف ناقص؛ تم استخدام قيمة مؤقتة «${importPhone}» ويمكن تعديلها بعد الاستيراد.`, data: sourceData });
     const value = (key: string) => { const index = indexOf(key); return index >= 0 ? textCell(cells[index]) : ""; };
     const visitDateIndex = indexOf("visitDate");
     const visitTypeIndex = indexOf("visitType");
@@ -202,7 +205,7 @@ export async function parseCustomerExcel(file: File, requestedSheetName?: string
     if (rawVisitType && !visitType) issues.push({ rowNumber, reason: "نوع الزيارة غير معروف؛ استخدم تركيب فلتر أو صيانة أو تغيير شمعات أو متابعة أو أخرى", data: sourceData });
     if (rawAmount && (collectedAmount === null || !Number.isFinite(collectedAmount) || collectedAmount < 0)) issues.push({ rowNumber, reason: "المبلغ يجب أن يكون رقمًا موجبًا أو صفرًا", data: sourceData });
     if (rawVisitType && !visitDate) issues.push({ rowNumber, reason: "تاريخ الزيارة غير صالح", data: sourceData });
-    rows.push({ rowNumber, name, phone, manualCode: value("manualCode") || null, address: value("address") || null, location: value("location") || null, notes: value("notes") || null, technicianName: value("technicianName") || null, visitDate, visitType: visitType || null, collectedAmount: collectedAmount ?? null, nextVisitDate: nextFollowUpDate(visitDate, visitType) });
+    rows.push({ rowNumber, name: importName, phone: importPhone, manualCode: value("manualCode") || null, address: value("address") || null, location: value("location") || null, notes: value("notes") || null, technicianName: value("technicianName") || null, visitDate, visitType: visitType || null, collectedAmount: collectedAmount ?? null, nextVisitDate: nextFollowUpDate(visitDate, visitType) });
   });
   return { sheetNames, selectedSheetName: selected.sheetName, rows, issues };
 }
