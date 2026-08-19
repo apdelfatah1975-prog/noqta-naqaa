@@ -9,9 +9,11 @@ import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Boxes, Droplets, Filter, Pa
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { cacheOfflineInventory, getOfflineInventory, getOfflineSession, queueOfflineDelete, queueOfflineInventoryItem, queueOfflineInventoryMovement } from "@/lib/offlineSync";
+import { cacheOfflineCash, cacheOfflineInventory, getOfflineCash, getOfflineInventory, getOfflineSession, queueOfflineCash, queueOfflineDelete, queueOfflineInventoryItem, queueOfflineInventoryMovement } from "@/lib/offlineSync";
 import { moveToTrash } from "@/lib/trashBin";
 import { canRemoveInventoryCategory, getInventoryCategoryOptions, INVENTORY_CATEGORY_OPTIONS, INVENTORY_CATEGORY_STORAGE_KEY, readCustomInventoryCategories } from "@/lib/inventoryCategories";
+
+function shouldCreateOfflinePurchase(quantity: number, unitCost: number) { return quantity > 0 && unitCost > 0; }
 
 export default function Inventory() {
   const [location, navigate] = useLocation();
@@ -125,6 +127,47 @@ export default function Inventory() {
     onError: error => toast.error(error.message || "تعذر تسجيل الحركة. يرجى المحاولة مرة أخرى."),
   });
 
+  function recordOfflineInventoryPurchase(amount: number, itemName: string, quantity: number, movementDate: Date, notes?: string | null) {
+    if (!owner || amount <= 0) return;
+    queueOfflineCash(owner.id, {
+      transactionType: "expense",
+      currency: "SAR",
+      amount,
+      category: `شراء مخزون - ${itemName}`,
+      transactionDate: movementDate.toISOString(),
+      recipientName: "مشتريات",
+      notes: notes || `شراء ${quantity} من ${itemName}`,
+    });
+    const current = getOfflineCash<any>(owner.id);
+    if (!current) return;
+    const localTransaction = {
+      id: -Date.now(),
+      transactionType: "expense",
+      currency: "SAR",
+      amount,
+      category: `شراء مخزون - ${itemName}`,
+      transactionDate: movementDate.toISOString(),
+      recipientName: "مشتريات",
+      notes: notes || `شراء ${quantity} من ${itemName}`,
+      sourceVisitId: null,
+      sourceInventoryMovementId: null,
+      createdAt: new Date().toISOString(),
+    };
+    const currentSummary = current.summaries?.SAR ?? { incomeTotal: 0, expenseTotal: 0, balance: 0 };
+    const nextSummary = {
+      ...currentSummary,
+      expenseTotal: currentSummary.expenseTotal + amount,
+      balance: currentSummary.balance - amount,
+    };
+    cacheOfflineCash(owner.id, {
+      ...current,
+      transactions: [localTransaction, ...(current.transactions ?? [])],
+      expenseTotal: nextSummary.expenseTotal,
+      balance: nextSummary.balance,
+      summaries: { ...current.summaries, SAR: nextSummary },
+    });
+  }
+
   function submitItem(event: FormEvent) {
     event.preventDefault();
     const input = { name: itemName, category: itemCategory.trim() || "عام", unit: itemUnit.trim() || "قطعة", reorderLevel: Number(reorderLevel || 0), defaultUnitCost: Math.round(Number(defaultUnitCost || 0) * 100), openingQuantity: Number(openingQuantity || 0), notes: itemNotes || null };
@@ -137,11 +180,13 @@ export default function Inventory() {
         }
         const movementInput = { inventoryItemId: existingItem.id, movementType: "incoming" as const, quantity: input.openingQuantity, unitCost: input.defaultUnitCost, currency: "SAR" as const, movementDate: new Date(), technicianName: null, notes: input.notes || `إضافة وارد للصنف الموجود: ${input.name}` };
         queueOfflineInventoryMovement(owner.id, { ...movementInput, movementDate: movementInput.movementDate.toISOString() });
+        if (shouldCreateOfflinePurchase(input.openingQuantity, input.defaultUnitCost)) recordOfflineInventoryPurchase(input.openingQuantity * input.defaultUnitCost, existingItem.name, input.openingQuantity, movementInput.movementDate, input.notes);
         const current = data as any;
         cacheOfflineInventory(owner.id, { ...current, items: current.items.map((item: any) => item.id === existingItem.id ? { ...item, currentBalance: item.currentBalance + input.openingQuantity } : item), movements: [{ ...movementInput, id: -Date.now(), movementDate: movementInput.movementDate.toISOString(), inventoryItemName: existingItem.name }, ...(current.movements ?? [])] });
         toast.success("الصنف موجود؛ تم حفظ الوارد محليًا دون إنشاء بطاقة ثانية");
       } else {
         const pending = queueOfflineInventoryItem(owner.id, input);
+        if (shouldCreateOfflinePurchase(input.openingQuantity, input.defaultUnitCost)) recordOfflineInventoryPurchase(input.openingQuantity * input.defaultUnitCost, input.name, input.openingQuantity, new Date(), input.notes);
         const current = data as any;
         cacheOfflineInventory(owner.id, { ...current, items: [{ ...input, id: pending.localId, currentBalance: input.openingQuantity }, ...current.items], movements: current.movements ?? [] });
         toast.success("تم حفظ الصنف محليًا وستتم مزامنته عند عودة الإنترنت");
@@ -157,6 +202,7 @@ export default function Inventory() {
     const input = { inventoryItemId: movementItem.id, movementType, quantity: Number(quantity), unitCost: movementType === "incoming" ? Math.round(Number(unitCost || 0) * 100) : 0, currency: movementCurrency, movementDate: new Date(movementDate), technicianName: technicianName || null, notes: movementNotes || null };
     if (!navigator.onLine && owner) {
       queueOfflineInventoryMovement(owner.id, { ...input, movementDate: input.movementDate.toISOString() });
+      if (movementType === "incoming" && shouldCreateOfflinePurchase(input.quantity, input.unitCost)) recordOfflineInventoryPurchase(input.quantity * input.unitCost, movementItem.name, input.quantity, input.movementDate, input.notes);
       const current = data as any;
       const delta = movementType === "incoming" ? input.quantity : -input.quantity;
       cacheOfflineInventory(owner.id, { ...current, items: current.items.map((item: any) => item.id === movementItem.id ? { ...item, currentBalance: item.currentBalance + delta } : item), movements: [{ ...input, id: -Date.now(), movementDate: input.movementDate.toISOString(), inventoryItemName: movementItem.name }, ...(current.movements ?? [])] });
@@ -177,14 +223,6 @@ export default function Inventory() {
         </div>
       </div>
 
-      <section aria-labelledby="inventory-categories" className="soft-card border-amber-100 bg-amber-50/45 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div><h2 id="inventory-categories" className="font-extrabold text-amber-950">أنواع الأصناف</h2><p className="mt-1 text-xs leading-5 text-amber-900/70">أضف أنواعًا خاصة بشركتك. الحذف يزيل النوع من القائمة فقط، ولا يحذف الأصناف أو الحركات التاريخية.</p></div>
-          <div className="flex w-full gap-2 sm:max-w-md"><input className="field-input bg-white" value={newCategory} onChange={event => setNewCategory(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); addInventoryCategory(); } }} placeholder="مثال: فلاتر منزلية" aria-label="اسم نوع صنف جديد" /><Button type="button" onClick={addInventoryCategory} className="shrink-0 rounded-xl bg-amber-600 font-bold hover:bg-amber-700"><Plus className="ml-1 h-4 w-4" />إضافة نوع</Button></div>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">{categoryOptions.map(category => <span key={category} className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-amber-950 ring-1 ring-amber-200"><span>{category}</span>{!(INVENTORY_CATEGORY_OPTIONS as readonly string[]).includes(category) ? <button type="button" onClick={() => removeInventoryCategory(category)} className="rounded-full px-1 text-amber-700 hover:bg-rose-100 hover:text-rose-700" aria-label={`حذف نوع ${category}`}>×</button> : null}</span>)}</div>
-      </section>
-
       <section aria-labelledby="inventory-items-cards" className="rounded-2xl border border-teal-100 bg-teal-50/60 p-2.5 shadow-sm">
         <div className="mb-2 flex items-center justify-between gap-2 px-1">
           <h2 id="inventory-items-cards" className="text-sm font-extrabold text-teal-950">أصناف المخزن</h2>
@@ -193,7 +231,7 @@ export default function Inventory() {
         {data.items.length ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
           {data.items.map(item => <button key={item.id} type="button" onClick={() => focusInventoryItem(item.id)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); focusInventoryItem(item.id); } }} className="inventory-item-card flex min-w-0 items-start gap-2 rounded-xl border border-white bg-white px-2.5 py-2.5 text-right shadow-sm transition duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500" aria-label={`الصنف ${item.name}، رقم المخزون ${item.id}، الرصيد ${item.currentBalance}`}>
             <InventoryVisual compact category={item.category} name={item.name} customEmoji={item.customEmoji} imageUrl={item.imageUrl} />
-            <span className="min-w-0 flex-1"><span className="block whitespace-normal break-words text-[12px] font-extrabold leading-4 text-teal-950" title={item.name}>{item.name}</span><span className="mt-1 block text-xs font-bold text-slate-600">الرصيد: <b className={`text-sm ${balanceTextClass(item.currentBalance, item.reorderLevel)}`}>{item.currentBalance}</b></span></span>
+            <span className="min-w-0 flex-1"><span className="block whitespace-normal break-words text-[12px] font-extrabold leading-4 text-teal-950" title={item.name}>{item.name}</span><span className="mt-1 block truncate text-[10px] font-bold text-amber-700" title={item.category || "عام"}>{item.category || "عام"}</span><span className="mt-1 block text-xs font-bold text-slate-600">الرصيد: <b className={`text-sm ${balanceTextClass(item.currentBalance, item.reorderLevel)}`}>{item.currentBalance}</b></span></span>
           </button>)}
         </div> : <p className="px-2 py-3 text-center text-xs text-muted-foreground">ستظهر بطاقات الأصناف هنا بعد إضافة أول صنف.</p>}
       </section>
