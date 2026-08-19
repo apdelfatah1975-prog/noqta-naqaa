@@ -43,7 +43,7 @@ export function customerMapUrl(customer: { address?: string | null; latitude?: s
   return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : null;
 }
 
-export type WhatsAppReminderStage = "before" | "today";
+export type WhatsAppReminderStage = "before" | "today" | "overdue";
 
 export function normalizeEgyptianWhatsAppPhone(phone: string | null | undefined) {
   const digits = (phone ?? "").replace(/\D/g, "");
@@ -60,6 +60,7 @@ export function whatsappReminderStage(reminderDate: Date | string, now = new Dat
   const days = Math.round((startOfDue.getTime() - startOfToday.getTime()) / 86_400_000);
   if (days === 1) return "before";
   if (days === 0) return "today";
+  if (days < 0) return "overdue";
   return null;
 }
 
@@ -68,7 +69,10 @@ export function buildWhatsAppReminderMessage(customerName: string, reminderDate:
   if (stage === "before") {
     return `مرحبًا ${customerName}،\nنذكّركم بأن موعد الصيانة الدورية لفلتر المياه غدًا ${date}.\nيرجى الرد بالموافقة على الموعد أو التواصل معنا لتغييره.\nشركة نقطة نقاء`;
   }
-  return `مرحبًا ${customerName}،\nكان موعد الصيانة الدورية لفلتر المياه اليوم ${date}.\nنرجو تأكيد مناسبة الزيارة أو الرد لطلب تغيير الموعد.\nشركة نقطة نقاء`;
+  if (stage === "overdue") {
+    return `مرحبًا ${customerName}،\nنلاحظ أن موعد متابعة فلتر المياه كان بتاريخ ${date} ولم تتم المتابعة بعد.\nنرجو التواصل معنا لتنسيق موعد مناسب لكم.\nشركة نقطة نقاء`;
+  }
+  return `مرحبًا ${customerName}،\nموعد الصيانة الدورية لفلتر المياه هو اليوم ${date}.\nنرجو تأكيد مناسبة الزيارة أو الرد لطلب تغيير الموعد.\nشركة نقطة نقاء`;
 }
 
 export function buildWhatsAppNextVisitMessage(customerName: string, nextVisitDate: Date | string) {
