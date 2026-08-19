@@ -72,9 +72,26 @@ describe("calculateCompanyFinancialOverview", () => {
       technicianRequired: 50000,
       technicianRemaining: 20000,
       otherExpenses: 10000,
+      gasolineExpenses: 10000,
+      inventoryPurchaseExpenses: 0,
+      generalExpenses: 0,
+      uncategorizedExpenses: 0,
       companyNet: 85000,
       technicianPaymentsByName: [{ technician: "أحمد", requiredAmount: 50000, totalPaid: 30000, salaryPaidAmount: 30000, remainingAmount: 20000, status: "remaining", transactionCount: 2 }],
     });
+  });
+});
+
+describe("تفصيل تكاليف التشغيل", () => {
+  it("يفصل البنزين ومشتريات المخزن والمصروفات العامة دون تكرار", () => {
+    const result = calculateCompanyFinancialOverview([
+      { transactionType: "income", amount: 200000, category: "تحصيل صيانة" },
+      { transactionType: "expense", amount: 12000, category: "بنزين" },
+      { transactionType: "expense", amount: 35000, category: "شراء بضاعة" },
+      { transactionType: "expense", amount: 8000, category: "مصروف عام" },
+      { transactionType: "expense", amount: 5000, category: "أخرى" },
+    ]);
+    expect(result).toMatchObject({ gasolineExpenses: 12000, inventoryPurchaseExpenses: 35000, generalExpenses: 8000, uncategorizedExpenses: 5000, otherExpenses: 60000, companyNet: 140000 });
   });
 });
 

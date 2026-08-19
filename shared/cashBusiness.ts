@@ -71,6 +71,10 @@ export type CompanyFinancialOverview = {
   technicianRequired: number;
   technicianRemaining: number;
   otherExpenses: number;
+  gasolineExpenses: number;
+  inventoryPurchaseExpenses: number;
+  generalExpenses: number;
+  uncategorizedExpenses: number;
   companyNet: number;
   technicianPaymentsByName: TechnicianPaymentRow[];
 };
@@ -155,6 +159,10 @@ export function calculateCompanyFinancialOverview(transactions: Array<CashTransa
   let technicianPayments = 0;
   let technicianRequired = 0;
   let otherExpenses = 0;
+  let gasolineExpenses = 0;
+  let inventoryPurchaseExpenses = 0;
+  let generalExpenses = 0;
+  let uncategorizedExpenses = 0;
   const technicianMap = new Map<string, TechnicianPaymentRow>();
   for (const transaction of transactions) {
     const category = transaction.category?.trim() || "غير مصنف";
@@ -178,12 +186,17 @@ export function calculateCompanyFinancialOverview(transactions: Array<CashTransa
       technicianMap.set(technician, current);
     } else {
       otherExpenses += transaction.amount;
+      if (category === "بنزين") gasolineExpenses += transaction.amount;
+      else if (category === "شراء بضاعة") inventoryPurchaseExpenses += transaction.amount;
+      else if (category === "مصروف عام") generalExpenses += transaction.amount;
+      else if (category === "أخرى" || category === "غير مصنف") uncategorizedExpenses += transaction.amount;
     }
   }
   const totalIncome = serviceIncome + externalIncome;
   const technicianPaymentsByName = Array.from(technicianMap.values()).sort((a, b) => b.remainingAmount - a.remainingAmount || b.requiredAmount - a.requiredAmount || b.totalPaid - a.totalPaid);
   const technicianRemaining = technicianPaymentsByName.reduce((total, row) => total + row.remainingAmount, 0);
-  return { serviceIncome, externalIncome, totalIncome, technicianPayments, technicianRequired, technicianRemaining, otherExpenses, companyNet: totalIncome - technicianPayments - otherExpenses, technicianPaymentsByName };
+  const totalExpenses = technicianPayments + otherExpenses;
+  return { serviceIncome, externalIncome, totalIncome, technicianPayments, technicianRequired, technicianRemaining, otherExpenses, gasolineExpenses, inventoryPurchaseExpenses, generalExpenses, uncategorizedExpenses, companyNet: totalIncome - totalExpenses, technicianPaymentsByName };
 }
 
 export function currencyLabel(currency: CashCurrency | null | undefined) {
