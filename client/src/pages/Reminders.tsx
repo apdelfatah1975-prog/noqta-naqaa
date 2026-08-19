@@ -7,7 +7,6 @@ import { printArabicPdf } from "@/lib/pdfExport";
 import {
   buildWhatsAppReminderMessage,
   buildWhatsAppBulkReminderMessage,
-  buildWhatsAppShareUrl,
   buildWhatsAppUrl,
   COMPANY_WHATSAPP_DISPLAY_PHONE,
   customerMapUrl,
@@ -16,7 +15,7 @@ import {
   whatsappReminderStage,
   type WhatsAppReminderStage,
 } from "@/lib/filterUi";
-import { BellRing, Check, Download, MapPinned, MessageCircle, Phone, X } from "lucide-react";
+import { BellRing, Check, Copy, Download, MapPinned, MessageCircle, Phone, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -41,6 +40,7 @@ export default function Reminders() {
   const [, setLocation] = useLocation();
   const [whatsappState, setWhatsAppState] = useState<WhatsAppState>(readWhatsAppState);
   const [selectedReminderIds, setSelectedReminderIds] = useState<number[]>([]);
+  const [bulkMessage, setBulkMessage] = useState("");
   const [pinAction, setPinAction] = useState<{ id: number; status: "completed" | "dismissed" } | null>(null);
   const [deleteReminderId, setDeleteReminderId] = useState<number | null>(null);
     const updateStatus = trpc.filters.reminders.updateStatus.useMutation({
@@ -86,14 +86,19 @@ export default function Reminders() {
     setSelectedReminderIds(current => current.length === eligibleReminders.length ? [] : eligibleReminders.map(reminder => reminder.id));
   };
 
-  const shareBulkWhatsAppReminder = () => {
+  const shareBulkWhatsAppReminder = async () => {
     if (!selectedReminders.length) {
       toast.info("حدد عميلًا مستحقًا واحدًا على الأقل أولًا.");
       return;
     }
     const message = buildWhatsAppBulkReminderMessage(selectedReminders.map(reminder => ({ customerName: reminder.customer?.name, reminderDate: reminder.reminderDate })));
-    window.open(buildWhatsAppShareUrl(message), "_blank", "noopener,noreferrer");
-    toast.success("تم تجهيز الرسالة الجماعية؛ راجعها واختر المستلمين داخل واتساب.");
+    setBulkMessage(message);
+    try {
+      await navigator.clipboard.writeText(message);
+      toast.success("تم نسخ الرسالة الجماعية. استخدم زر واتساب بجانب كل عميل لإرسالها له.");
+    } catch {
+      toast.info("ظهرت الرسالة أسفل القائمة. حدّدها وانسخها ثم أرسلها لكل عميل.");
+    }
   };
 
   const sendWhatsAppReminder = (reminder: (typeof reminders)[number], stage: WhatsAppReminderStage) => {
@@ -119,7 +124,15 @@ export default function Reminders() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><h1 className="page-heading">التذكيرات والمتابعة</h1><p className="page-subheading">رسالة واتساب جاهزة قبل الموعد بيوم، ورسالة متابعة يوم الموعد إذا لم يصل رد.</p><p className="mt-2 text-xs font-bold text-emerald-800">رقم واتساب الشركة: <span dir="ltr">{COMPANY_WHATSAPP_DISPLAY_PHONE}</span> — حدد المستحقين أو اضغط زر واتساب لفتح الرسالة الجاهزة ثم اضغط إرسال.</p></div><div className="flex flex-wrap gap-2"><Button onClick={exportReminders} variant="outline" className="h-11 shrink-0 rounded-xl"><Download className="ml-2 h-4 w-4" />Excel</Button><Button onClick={exportRemindersPdf} variant="outline" className="h-11 shrink-0 rounded-xl"><Download className="ml-2 h-4 w-4" />PDF</Button></div></div>
       <NotificationSettingsCard />
       <section className="soft-card overflow-hidden">
-        <div className="flex flex-col gap-4 border-b border-teal-950/6 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-100 text-amber-700"><BellRing className="h-5 w-5" /></div><div><h2 className="font-extrabold">قائمة المتابعة</h2><p className="mt-1 text-xs text-muted-foreground">{isLoading ? "جارٍ التحميل…" : `${reminders.length} تذكير ظاهر — ${eligibleReminders.length} مستحق للرسائل`}</p></div></div><div className="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" size="sm" onClick={toggleAllEligible} disabled={!eligibleReminders.length} title={eligibleReminders.length ? "تحديد العملاء المستحقين للرسالة" : "لا يوجد عميل مستحق اليوم أو غدًا أو متأخر"} className="rounded-lg">{selectedReminders.length === eligibleReminders.length && eligibleReminders.length ? "إلغاء تحديد المستحقين" : "تحديد المستحقين"}</Button><Button type="button" size="sm" onClick={shareBulkWhatsAppReminder} disabled={!selectedReminders.length} title={selectedReminders.length ? "فتح رسالة واتساب للمستحقين المحددين" : "حدد مستحقًا واحدًا على الأقل أولًا"} className="rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"><MessageCircle className="ml-1 h-4 w-4" />رسالة جماعية ({selectedReminders.length})</Button></div></div>
+        <div className="flex flex-col gap-4 border-b border-teal-950/6 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-amber-100 text-amber-700"><BellRing className="h-5 w-5" /></div><div><h2 className="font-extrabold">قائمة المتابعة</h2><p className="mt-1 text-xs text-muted-foreground">{isLoading ? "جارٍ التحميل…" : `${reminders.length} تذكير ظاهر — ${eligibleReminders.length} مستحق للرسائل`}</p></div></div><div className="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" size="sm" onClick={toggleAllEligible} disabled={!eligibleReminders.length} title={eligibleReminders.length ? "تحديد العملاء المستحقين للرسالة" : "لا يوجد عميل مستحق اليوم أو غدًا أو متأخر"} className="rounded-lg">{selectedReminders.length === eligibleReminders.length && eligibleReminders.length ? "إلغاء تحديد المستحقين" : "تحديد المستحقين"}</Button><Button type="button" size="sm" onClick={shareBulkWhatsAppReminder} disabled={!selectedReminders.length} title={selectedReminders.length ? "فتح رسالة واتساب للمستحقين المحددين" : "حدد مستحقًا واحدًا على الأقل أولًا"} className="rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"><Copy className="ml-1 h-4 w-4" />نسخ رسالة المستحقين ({selectedReminders.length})</Button></div></div>
+        {bulkMessage ? <div className="mx-5 mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-extrabold text-emerald-950">الرسالة الجماعية جاهزة للنسخ</p>
+            <Button type="button" size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(bulkMessage).then(() => toast.success("تم نسخ الرسالة مرة أخرى")).catch(() => toast.info("حدد النص وانسخه يدويًا"))} className="rounded-lg border-emerald-300 text-emerald-800"><Copy className="ml-1 h-4 w-4" />نسخ مرة أخرى</Button>
+          </div>
+          <p className="mt-2 whitespace-pre-line text-sm leading-7 text-emerald-950">{bulkMessage}</p>
+          <p className="mt-2 text-xs font-bold text-emerald-800">لأن واتساب العادي لا يرسل رسالة واحدة لعدة أرقام عبر الرابط، استخدم زر «واتساب» بجانب كل مستحق لإرسال رسالة مخصصة له.</p>
+        </div> : null}
         <div className="divide-y divide-teal-950/6">
           {reminders.length ? reminders.map(reminder => {
             const mapUrl = reminder.customer ? customerMapUrl(reminder.customer) : null;
