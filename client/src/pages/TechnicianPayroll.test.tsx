@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateTechnicianCommission, monthBounds, updateTechnicianProfile, upsertTechnicianProfile } from "./TechnicianPayroll";
+import { buildTechnicianMonthlyReportRows, calculateTechnicianCommission, monthBounds, updateTechnicianProfile, upsertTechnicianProfile } from "./TechnicianPayroll";
 
 describe("TechnicianPayroll", () => {
   it("يحسب بداية ونهاية الشهر المحدد", () => {
@@ -25,5 +25,19 @@ describe("TechnicianPayroll", () => {
     expect(updateTechnicianProfile(payroll, "أحمد", "monthlySalary", 250000)).toEqual({ أحمد: { monthlySalary: 250000, installationPercent: 0, maintenancePercent: 0 } });
     expect(updateTechnicianProfile(payroll, "أحمد", "installationPercent", 150).أحمد.installationPercent).toBe(100);
     expect(updateTechnicianProfile(payroll, "أحمد", "maintenancePercent", -5).أحمد.maintenancePercent).toBe(0);
+  });
+
+  it("يجهز صفوف التقرير الشهري بالعربية مع النوع والملاحظات", () => {
+    const rows = buildTechnicianMonthlyReportRows({
+      technician: "أحمد",
+      required: 50000,
+      paid: 20000,
+      remaining: 30000,
+      status: "remaining",
+      transactions: [{ id: 1, transactionType: "expense", amount: 20000, category: "راتب فني", transactionDate: "2026-08-05", recipientName: "أحمد", notes: "دفعة شهر أغسطس" }],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ النوع: "مدفوع", التصنيف: "راتب فني", المبلغ: "٢٠٠" });
+    expect(rows[0].الملاحظات).toBe("دفعة شهر أغسطس");
   });
 });

@@ -42,6 +42,17 @@ export function calculateTechnicianCommission(amount: number, visitType: string,
   return Math.round(Math.max(0, amount) * Math.max(0, Math.min(100, percent)) / 100);
 }
 
+export function buildTechnicianMonthlyReportRows(row: PayrollRow) {
+  return row.transactions.map(item => ({
+    التاريخ: dateLabel(item.transactionDate),
+    النوع: item.category === dueCategory ? "مستحق" : "مدفوع",
+    التصنيف: item.category,
+    المبلغ: money(item.amount),
+    الملاحظات: item.notes || "—",
+  }));
+}
+
+
 export default function TechnicianPayroll() {
   const owner = getOfflineSession();
   const [month, setMonth] = useState(currentMonth);
@@ -139,12 +150,29 @@ export default function TechnicianPayroll() {
     ]);
     if (opened) toast.success("تم تجهيز PDF لكشف الرواتب"); else toast.error("تعذر فتح نافذة PDF؛ اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى");
   };
+  const exportTechnicianPdf = () => {
+    const row = selected[0];
+    if (technician === "all" || !row) {
+      toast.error("اختر فنيًا محددًا أولًا لإصدار كشفه الشهري");
+      return;
+    }
+    const summaryRows = [
+      { التاريخ: "ملخص الشهر", النوع: "إجمالي", التصنيف: "المستحق", المبلغ: money(row.required), الملاحظات: `الفترة: ${month}` },
+      { التاريخ: "ملخص الشهر", النوع: "إجمالي", التصنيف: "المدفوع", المبلغ: money(row.paid), الملاحظات: "الراتب والسلف والمصروفات المسجلة" },
+      { التاريخ: "ملخص الشهر", النوع: "إجمالي", التصنيف: "المتبقي", المبلغ: money(row.remaining), الملاحظات: row.status === "paid" ? "تمت التسوية" : "المبلغ المتبقي للفني" },
+    ];
+    const opened = printArabicPdf(`كشف شهري تفصيلي - ${row.technician} - ${month}`, [...summaryRows, ...buildTechnicianMonthlyReportRows(row)], [
+      { key: "التاريخ", label: "التاريخ" }, { key: "النوع", label: "النوع" }, { key: "التصنيف", label: "التصنيف" },
+      { key: "المبلغ", label: "المبلغ (ريال)" }, { key: "الملاحظات", label: "الملاحظات" },
+    ]);
+    if (opened) toast.success(`تم تجهيز كشف ${row.technician} الشهري`); else toast.error("تعذر فتح نافذة PDF؛ اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى");
+  };
   return <div dir="rtl" className="mx-auto max-w-7xl space-y-6 print:bg-white">
     <header className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-teal-950 via-teal-800 to-cyan-700 p-6 text-white shadow-xl shadow-teal-950/10 sm:p-8 print:hidden">
       <div className="absolute -left-12 -top-16 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
       <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl"><p className="mb-2 text-sm font-bold text-teal-100">الإدارة المالية · فريق العمل</p><h1 className="text-3xl font-black tracking-tight sm:text-4xl">إدارة الفنيين والرواتب</h1><p className="mt-3 text-sm leading-7 text-teal-50/90">تابع راتب كل فني وعمولاته وما تم دفعه والمتبقي له من شاشة واحدة، مع حفظ الإعدادات تلقائيًا على هذا الجهاز.</p></div>
-        <div className="flex flex-wrap gap-2"><Button variant="outline" className="h-11 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => query.refetch()}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button><Button variant="outline" className="h-11 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => window.print()}><Printer className="ml-2 h-4 w-4" />طباعة / PDF</Button><Button variant="outline" className="h-11 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={exportPdf}><Download className="ml-2 h-4 w-4" />PDF</Button><Button className="h-11 rounded-xl bg-white text-teal-900 hover:bg-teal-50" onClick={exportExcel}><Download className="ml-2 h-4 w-4" />تصدير Excel</Button></div>
+        <div className="flex flex-wrap gap-2"><Button variant="outline" className="h-11 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => query.refetch()}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button><Button variant="outline" className="h-11 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => window.print()}><Printer className="ml-2 h-4 w-4" />طباعة / PDF</Button><Button variant="outline" className="h-11 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={exportPdf}><Download className="ml-2 h-4 w-4" />PDF</Button><Button variant="outline" className="h-11 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-50" onClick={exportTechnicianPdf} disabled={technician === "all"}><FileText className="ml-2 h-4 w-4" />كشف فني PDF</Button><Button className="h-11 rounded-xl bg-white text-teal-900 hover:bg-teal-50" onClick={exportExcel}><Download className="ml-2 h-4 w-4" />تصدير Excel</Button></div>
       </div>
     </header>
     {!query.data ? <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 print:hidden"><span className="grid h-8 w-8 place-items-center rounded-full bg-amber-100">!</span><span>يُعرض الكشف من البيانات المحلية؛ يمكنك متابعة الرواتب والتصدير دون اتصال.</span></div> : null}
