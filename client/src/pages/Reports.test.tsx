@@ -14,6 +14,10 @@ vi.mock("xlsx", () => ({
   writeFile: vi.fn(),
 }));
 
+vi.mock("@/lib/pdfExport", () => ({
+  printArabicPdf: vi.fn(() => true),
+}));
+
 describe("تقارير نقطة نقاء", () => {
   afterEach(cleanup);
 
@@ -33,6 +37,13 @@ describe("تقارير نقطة نقاء", () => {
         visitsByTechnician: [{ label: "فني أحمد", total: 4 }],
         inventory: { incomingQuantity: 8, outgoingQuantity: 2, purchaseCost: 30000, items: [{ name: "شمعة", currentBalance: 6 }] },
         recentVisits: [{ date: new Date("2026-08-15T10:00:00"), customer: "عميل الاختبار", type: "maintenance", technician: "فني أحمد" }],
+        financial: {
+          serviceIncome: 125000, externalIncome: 0, totalIncome: 125000,
+          technicianPayments: 30000, technicianRequired: 35000, technicianRemaining: 5000,
+          otherExpenses: 10000, gasolineExpenses: 4000, inventoryPurchaseExpenses: 3000,
+          generalExpenses: 2000, uncategorizedExpenses: 1000, companyNet: 85000,
+          technicianPaymentsByName: [{ technician: "فني أحمد", status: "partial", requiredAmount: 35000, totalPaid: 30000, remainingAmount: 5000, transactionCount: 4 }],
+        },
       },
     });
   });
@@ -59,6 +70,14 @@ describe("تقارير نقطة نقاء", () => {
     expect(screen.getByText("الكميات التي دخلت المخزن خلال الفترة")).toBeTruthy();
     expect(screen.getByText("إجمالي تكلفة الأصناف المشتراة")).toBeTruthy();
     expect(screen.queryByText("تكلفة المشتريات")).toBeNull();
+  });
+
+  it("تعرض كشف PDF مستقلًا للفني من قسم المالية", () => {
+    render(<Reports />);
+    fireEvent.click(screen.getByRole("button", { name: "المالية" }));
+    expect(screen.getByText("فني أحمد")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /PDF الفني/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /PDF الفني/ }));
   });
 
   it("تغيّر مدخل الفترة يعيد طلب التقرير بالحد الجديد", () => {
