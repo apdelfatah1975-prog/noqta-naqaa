@@ -8,6 +8,7 @@ import {
   visitRowsForExcel,
   withArabicHeaders,
   parseCustomerExcel,
+  customerImportIssuesForExcel,
 } from "./excelExport";
 
 describe("Excel export rows", () => {
@@ -24,7 +25,7 @@ describe("Excel export rows", () => {
     const result = await parseCustomerExcel(new File([bytes], "customers.xlsx"));
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0]).toMatchObject({ rowNumber: 2, name: "عميل جديد", phone: "0500000000", address: "الرياض", notes: "مهم" });
-    expect(result.issues).toEqual([{ rowNumber: 3, reason: "رقم الهاتف ناقص" }]);
+    expect(result.issues[0]).toMatchObject({ rowNumber: 3, reason: "رقم الهاتف ناقص", data: { "اسم العميل": "عميل ناقص", "الهاتف": "" } });
   });
 
   it("يقرأ الزيارة التاريخية والفني والمبلغ ويحسِب موعد المتابعة", async () => {
@@ -70,6 +71,11 @@ describe("Excel export rows", () => {
     const rows = visitRowsForExcel([{ customer: { manualCode: "ع-1", name: "عميل", phone: "0500", address: "العنوان" }, visitType: "maintenance", visitDate: "2026-08-17T10:00:00.000Z", technicianName: "فني", collectedAmount: 12500, visitResult: "تمت الصيانة" }]);
     expect(rows[0]).toMatchObject({ customerCode: "ع-1", customerName: "عميل", visitType: "صيانة", technicianName: "فني", collectedAmount: 125, visitResult: "تمت الصيانة" });
     expect(withArabicHeaders(rows, visitExcelHeaders)[0]["نتيجة الزيارة"]).toBe("تمت الصيانة");
+  });
+
+  it("يبني تقرير أخطاء عربيًا مع رقم الصف والسبب والبيانات الأصلية", () => {
+    const rows = customerImportIssuesForExcel([{ rowNumber: 7, reason: "رقم الهاتف ناقص", data: { "اسم العميل": "عميل ناقص", "الهاتف": "" } }]);
+    expect(rows).toEqual([{ "رقم الصف": 7, "سبب الرفض": "رقم الهاتف ناقص", "اسم العميل": "عميل ناقص", "الهاتف": "" }]);
   });
 
   it("يبني صفوف التذكيرات باسم العميل وأيام التأخر", () => {

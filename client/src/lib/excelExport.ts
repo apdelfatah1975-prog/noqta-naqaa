@@ -44,7 +44,7 @@ function nextFollowUpDate(visitDate: string | null, visitType: CustomerImportRow
   return date.toISOString();
 }
 
-export type CustomerImportIssue = { rowNumber: number; reason: string };
+export type CustomerImportIssue = { rowNumber: number; reason: string; data?: Record<string, unknown> };
 
 function normalizeImportHeader(value: unknown) {
   return String(value ?? "").trim().toLocaleLowerCase("ar-EG").replace(/[\u0640\s_\-]+/g, "");
@@ -84,7 +84,8 @@ export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerIm
     const name = textCell(cells[nameIndex]);
     const phone = textCell(cells[phoneIndex]);
     if (!name && !phone) return;
-    if (!name || !phone) { issues.push({ rowNumber, reason: !name ? "اسم العميل ناقص" : "رقم الهاتف ناقص" }); return; }
+    const sourceData = Object.fromEntries((matrix[0] as unknown[]).map((headerCell, index) => [textCell(headerCell) || `عمود ${index + 1}`, cells[index] ?? ""]));
+    if (!name || !phone) { issues.push({ rowNumber, reason: !name ? "اسم العميل ناقص" : "رقم الهاتف ناقص", data: sourceData }); return; }
     const value = (key: string) => { const index = indexOf(key); return index >= 0 ? textCell(cells[index]) : ""; };
     const visitDate = parseDateCell(indexOf("visitDate") >= 0 ? cells[indexOf("visitDate")] : "");
     const rawVisitType = indexOf("visitType") >= 0 ? cells[indexOf("visitType")] : "";
@@ -92,9 +93,9 @@ export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerIm
     const rawAmount = indexOf("collectedAmount") >= 0 ? cells[indexOf("collectedAmount")] : "";
     const amountText = textCell(rawAmount).replace(/[,،\s]/g, "");
     const collectedAmount = amountText ? Number(amountText) : null;
-    if (rawVisitType && !visitType) issues.push({ rowNumber, reason: "نوع الزيارة غير معروف؛ استخدم تركيب فلتر أو صيانة أو تغيير شمعات أو متابعة أو أخرى" });
-    if (rawAmount && (collectedAmount === null || !Number.isFinite(collectedAmount) || collectedAmount < 0)) issues.push({ rowNumber, reason: "المبلغ يجب أن يكون رقمًا موجبًا أو صفرًا" });
-    if (rawVisitType && !visitDate) issues.push({ rowNumber, reason: "تاريخ الزيارة غير صالح" });
+    if (rawVisitType && !visitType) issues.push({ rowNumber, reason: "نوع الزيارة غير معروف؛ استخدم تركيب فلتر أو صيانة أو تغيير شمعات أو متابعة أو أخرى", data: sourceData });
+    if (rawAmount && (collectedAmount === null || !Number.isFinite(collectedAmount) || collectedAmount < 0)) issues.push({ rowNumber, reason: "المبلغ يجب أن يكون رقمًا موجبًا أو صفرًا", data: sourceData });
+    if (rawVisitType && !visitDate) issues.push({ rowNumber, reason: "تاريخ الزيارة غير صالح", data: sourceData });
     rows.push({ rowNumber, name, phone, manualCode: value("manualCode") || null, address: value("address") || null, location: value("location") || null, notes: value("notes") || null, technicianName: value("technicianName") || null, visitDate, visitType: visitType || null, collectedAmount: collectedAmount ?? null, nextVisitDate: nextFollowUpDate(visitDate, visitType) });
   });
   return { rows, issues };
@@ -180,6 +181,16 @@ export function reminderRowsForExcel(reminders: Array<any>): ReminderExportRow[]
     daysOverdue: reminder.daysOverdue || 0,
     status: reminder.status === "pending" ? "معلق" : reminder.status || "",
   }));
+}
+
+export function customerImportIssuesForExcel(issues: CustomerImportIssue[]): Array<Record<string, unknown>> {
+  return issues.map(issue => ({ "رقم الصف": issue.rowNumber, "سبب الرفض": issue.reason, ...(issue.data ?? {}) }));
+}
+
+export function downloadCustomerImportIssues(issues: CustomerImportIssue[]) {
+  if (!issues.length) return false;
+  downloadRowsAsExcel("أخطاء-استيراد-العملاء-نقطة-نقاء.xlsx", "أخطاء الاستيراد", customerImportIssuesForExcel(issues));
+  return true;
 }
 
 export function downloadRowsAsExcel(filename: string, sheetName: string, rows: Array<Record<string, unknown>>) {
