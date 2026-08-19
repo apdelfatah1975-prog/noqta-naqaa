@@ -770,6 +770,7 @@ export const filterManagementRouter = router({
       const customerByPhone = new Map(existingRows.map(row => [row.phone.trim(), row.id]));
       const rejected: Array<{ rowNumber: number; reason: string }> = [];
       let added = 0;
+      let linked = 0;
       let visitsAdded = 0;
       let incomeAdded = 0;
       for (const row of input.rows) {
@@ -784,6 +785,7 @@ export const filterManagementRouter = router({
         const location = row.location?.trim() || "";
         const coordinates = location.match(/(-?\\d+(?:\\.\\d+)?)\\s*[,،]\\s*(-?\\d+(?:\\.\\d+)?)/);
         const customerId = linkedCustomerId ?? Number((await db.insert(customers).values({ ownerId: ctx.user.id, name, phone, manualCode, address: row.address?.trim() || null, latitude: coordinates?.[1] || null, longitude: coordinates?.[2] || null, notes: row.notes?.trim() || null }))[0].insertId);
+        if (linkedCustomerId) linked += 1;
         if (!linkedCustomerId) {
           added += 1;
           names.add(normalizedName); phones.add(phone); customerByPhone.set(phone, customerId); if (manualCode) codes.add(manualCode);
@@ -821,7 +823,7 @@ export const filterManagementRouter = router({
         }
       }
       if (added) await refreshOwnerBackup(ctx.user.id);
-      return { added, visitsAdded, incomeAdded, rejected, total: input.rows.length };
+      return { added, linked, visitsAdded, incomeAdded, rejected, total: input.rows.length, processed: added + linked + rejected.length };
     }),
     update: protectedProcedure.input(customerInput.extend({ id: z.number().int().positive(), pin: sensitivePinInput.shape.pin })).mutation(async ({ ctx, input }) => {
       await requirePin(ctx.user.id, input.pin);

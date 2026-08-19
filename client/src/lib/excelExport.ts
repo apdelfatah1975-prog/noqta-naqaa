@@ -362,3 +362,50 @@ export const reminderExcelHeaders: Record<keyof ReminderExportRow, string> = {
 export function withArabicHeaders<T extends Record<string, unknown>>(rows: T[], headers: Record<keyof T, string>): Array<Record<string, unknown>> {
   return rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [headers[key as keyof T], value])));
 }
+
+
+export function parseCustomerClipboard(text: string): { rows: CustomerImportRow[]; issues: CustomerImportIssue[] } {
+  const lines = text.replace(/\r/g, "").split("\n").filter(line => line.trim());
+  const matrix = lines.map(line => line.split("\t").map(cell => cell.trim()));
+  if (!matrix.length) return { rows: [], issues: [{ rowNumber: 1, reason: "لم يتم لصق أي بيانات." }] };
+  const aliases: Record<string, string[]> = {
+    name: ["اسم العميل", "إسم العميل", "الاسم", "اسم", "name", "customer name"].map(normalizeImportHeader),
+    phone: ["الهاتف", "رقم الهاتف", "رقم الجوال", "الجوال", "الموبايل", "رقم الموبايل", "phone", "mobile"].map(normalizeImportHeader),
+    manualCode: ["كود العميل", "الكود", "رقم العميل", "code", "customer code"].map(normalizeImportHeader),
+    address: ["العنوان", "address"].map(normalizeImportHeader),
+    location: ["الموقع", "الموقع gps", "gps", "location"].map(normalizeImportHeader),
+    notes: ["ملاحظات", "الملاحظات", "notes"].map(normalizeImportHeader),
+    technicianName: ["الفني", "اسم الفني", "الفني المنفذ", "technician"].map(normalizeImportHeader),
+    visitDate: ["تاريخ الزيارة", "تاريخ ووقت الزيارة", "visit date"].map(normalizeImportHeader),
+    visitType: ["نوع الزيارة", "الخدمة", "نوع الخدمة", "visit type"].map(normalizeImportHeader),
+    collectedAmount: ["المبلغ", "المبلغ المحصل", "المبلغ المدفوع", "amount"].map(normalizeImportHeader),
+  };
+  const matches = (key: string, value: unknown) => { const normalized = normalizeImportHeader(value); return aliases[key].some(alias => normalized === alias || normalized.includes(alias) || alias.includes(normalized)); };
+  const header = matrix[0];
+  const indexOf = (key: string) => header.findIndex(cell => matches(key, cell));
+  const nameIndex = indexOf("name");
+  const phoneIndex = indexOf("phone");
+  if (nameIndex < 0 || phoneIndex < 0) return { rows: [], issues: [{ rowNumber: 1, reason: "يجب أن تكون أول خلية منسوخة هي صف العناوين، وأن يحتوي على اسم العميل والهاتف." }] };
+  const value = (cells: string[], key: string) => { const index = indexOf(key); return index >= 0 ? textCell(cells[index]) : ""; };
+  const rows: CustomerImportRow[] = [];
+  const issues: CustomerImportIssue[] = [];
+  matrix.slice(1).forEach((cells, offset) => {
+    const rowNumber = offset + 2;
+    const name = textCell(cells[nameIndex]);
+    const phone = textCell(cells[phoneIndex]);
+    if (!name && !phone) return;
+    const importName = name || `عميل بدون اسم - صف ${rowNumber}`;
+    const importPhone = phone || `بدون هاتف - صف ${rowNumber}`;
+    if (!name) issues.push({ rowNumber, reason: `اسم العميل ناقص؛ تم استخدام اسم مؤقت «${importName}».` });
+    if (!phone) issues.push({ rowNumber, reason: `رقم الهاتف ناقص؛ تم استخدام قيمة مؤقتة «${importPhone}».` });
+    const visitType = parseVisitType(value(cells, "visitType"));
+    const visitDate = parseDateCell(value(cells, "visitDate"));
+    const amountText = value(cells, "collectedAmount").replace(/[,،\s]/g, "");
+    const collectedAmount = amountText ? Number(amountText) : null;
+    if (value(cells, "visitType") && !visitType) issues.push({ rowNumber, reason: "نوع الزيارة غير معروف." });
+    if (value(cells, "visitType") && !visitDate) issues.push({ rowNumber, reason: "تاريخ الزيارة غير صالح." });
+    if (amountText && (collectedAmount === null || !Number.isFinite(collectedAmount) || collectedAmount < 0)) issues.push({ rowNumber, reason: "المبلغ يجب أن يكون رقمًا موجبًا أو صفرًا." });
+    rows.push({ rowNumber, name: importName, phone: importPhone, manualCode: value(cells, "manualCode") || null, address: value(cells, "address") || null, location: value(cells, "location") || null, notes: value(cells, "notes") || null, technicianName: value(cells, "technicianName") || null, visitDate, visitType: visitType || null, collectedAmount: collectedAmount ?? null, nextVisitDate: nextFollowUpDate(visitDate, visitType) });
+  });
+  return { rows, issues };
+}
