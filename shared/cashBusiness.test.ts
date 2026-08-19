@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateCashBreakdown, calculateCashSummaries, calculateCashSummary, calculateCompanyFinancialOverview, matchesCashTransactionSearch, primaryCashCurrency } from "./cashBusiness";
+import { calculateCashBreakdown, calculateCashSummaries, calculateCashSummary, calculateCashSummaryThroughDate, calculateCompanyFinancialOverview, matchesCashTransactionSearch, primaryCashCurrency } from "./cashBusiness";
 
 describe("matchesCashTransactionSearch", () => {
   it("يبحث باسم العميل أو الملاحظات مع تجاهل حالة الأحرف والمسافات", () => {
@@ -37,6 +37,16 @@ describe("calculateCashSummaries", () => {
     ])).toEqual({
       SAR: { incomeTotal: 1400, expenseTotal: 350, balance: 1050 },
     });
+  });
+});
+
+describe("calculateCashSummaryThroughDate", () => {
+  it("يحسب الرصيد التراكمي حتى نهاية اليوم المحدد دون حركات الأيام اللاحقة", () => {
+    expect(calculateCashSummaryThroughDate([
+      { transactionType: "income", amount: 15230, transactionDate: "2026-08-10T10:00:00.000Z" },
+      { transactionType: "expense", amount: 4437, transactionDate: "2026-08-10T12:00:00.000Z" },
+      { transactionType: "income", amount: 9000, transactionDate: "2026-08-11T09:00:00.000Z" },
+    ], "2026-08-10")).toEqual({ incomeTotal: 15230, expenseTotal: 4437, balance: 10793 });
   });
 });
 

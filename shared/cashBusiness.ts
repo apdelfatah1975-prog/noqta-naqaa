@@ -49,6 +49,20 @@ export function calculateCashSummaries(transactions: CashTransactionForSummary[]
   } satisfies Record<CashCurrency, CashSummary>;
 }
 
+export function calculateCashSummaryThroughDate(
+  transactions: Array<CashTransactionForSummary & { transactionDate?: Date | string | null }>,
+  endDate?: string,
+) {
+  if (!endDate) return calculateCashSummary(transactions);
+  return calculateCashSummary(
+    transactions.filter(transaction => {
+      if (!transaction.transactionDate) return false;
+      const date = new Date(transaction.transactionDate);
+      return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) <= endDate;
+    }),
+  );
+}
+
 export type CashBreakdownRow = { category: string; total: number };
 export type CashTechnicianRow = { technician: string; total: number };
 export type PurchaseBreakdownRow = { itemName: string; quantity: number; total: number; averageUnitCost: number };

@@ -67,6 +67,9 @@ export default function Cash() {
     incomeTotal: 0,
     expenseTotal: 0,
     balance: 0,
+    historicalBalance: 0,
+    historicalIncomeTotal: 0,
+    historicalExpenseTotal: 0,
     incomeFilter: "all",
     categoryFilter: {},
     availableCategories: [],
@@ -149,7 +152,7 @@ export default function Cash() {
   const summaryCards = (Object.entries(summaries) as Array<[Currency, typeof summaries.SAR]>).flatMap(([cardCurrency, summary]) => [
     { label: "إجمالي الإيرادات", amount: summary.incomeTotal, currency: cardCurrency, icon: ArrowDownRight, tone: "bg-teal-50 text-teal-800" },
     { label: "إجمالي المصروفات", amount: summary.expenseTotal, currency: cardCurrency, icon: ArrowUpLeft, tone: "bg-amber-50 text-amber-800" },
-    { label: "رصيد الخزينة", amount: summary.balance, currency: cardCurrency, icon: WalletCards, tone: "bg-slate-950 text-white" },
+    { label: dateFilterMode === "day" && endDate ? "الرصيد حتى نهاية اليوم" : "رصيد الخزينة", amount: dateFilterMode === "day" && endDate ? (data.historicalBalance ?? summary.balance) : summary.balance, currency: cardCurrency, icon: WalletCards, tone: "bg-slate-950 text-white" },
   ]);
 
   return <div className="mx-auto max-w-7xl space-y-6">

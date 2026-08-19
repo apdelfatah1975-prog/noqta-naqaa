@@ -20,7 +20,7 @@ import {
   technicianLocations,
   workOrderProofs,
 } from "../../drizzle/schema";
-import { calculateCashBreakdown, calculateCashSummaries, calculateCompanyFinancialOverview, calculatePurchaseBreakdown, cashCurrencies, cashTransactionTypes, matchesCashTransactionSearch } from "../../shared/cashBusiness";
+import { calculateCashBreakdown, calculateCashSummaries, calculateCashSummaryThroughDate, calculateCompanyFinancialOverview, calculatePurchaseBreakdown, cashCurrencies, cashTransactionTypes, matchesCashTransactionSearch } from "../../shared/cashBusiness";
 import {
   DEFAULT_ALERT_HOUR,
   DEFAULT_ALERT_LEAD_DAYS,
@@ -348,13 +348,16 @@ async function cashSummary(ownerId: number, incomeFilter: CashIncomeFilter = "al
     .filter(movement => matchesCashDateFilter(new Date(movement.movementDate), dateFilter))
     .filter(movement => matchesCashTransactionSearch({ category: movement.itemName, notes: movement.notes, recipientName: movement.technicianName }, search));
   const summaries = calculateCashSummaries(filteredTransactions);
+  // الرصيد التاريخي لا يعتمد على البحث أو تصفية التصنيف؛ بل على كل حركات الخزنة حتى نهاية اليوم،
+  // حتى يبقى «الرصيد الفعلي» صحيحًا حتى عند عرض جزء من الحركات فقط.
+  const historicalSummary = { SAR: calculateCashSummaryThroughDate(displayTransactions, dateFilter?.endDate) };
   const breakdown = calculateCashBreakdown(filteredTransactions);
   const financialOverview = calculateCompanyFinancialOverview(filteredTransactions);
   const purchases = calculatePurchaseBreakdown(filteredPurchaseMovements);
   const availableCategories = Array.from(new Set(transactions.map(transaction => transaction.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ar"));
   const availableTechnicians = Array.from(new Set(displayTransactions.map(transaction => transaction.recipientName).filter((name): name is string => Boolean(name?.trim())))).sort((a, b) => a.localeCompare(b, "ar"));
   const availableItemNames = Array.from(new Set(itemNames.values())).sort((a, b) => a.localeCompare(b, "ar"));
-  return { transactions: filteredTransactions, ...summaries.SAR, summaries, breakdown, financialOverview, purchases, incomeFilter, categoryFilter, availableCategories, availableTechnicians, availablePartyTypes: ["technician", "customer", "entity"] as const, availableItemNames, search: search?.trim() ?? "" };
+  return { transactions: filteredTransactions, ...summaries.SAR, summaries, historicalBalance: historicalSummary.SAR.balance, historicalIncomeTotal: historicalSummary.SAR.incomeTotal, historicalExpenseTotal: historicalSummary.SAR.expenseTotal, breakdown, financialOverview, purchases, incomeFilter, categoryFilter, availableCategories, availableTechnicians, availablePartyTypes: ["technician", "customer", "entity"] as const, availableItemNames, search: search?.trim() ?? "" };
 }
 
 async function remindersWithCustomers(ownerId: number, onlyDue: boolean, withinDays?: number) {
