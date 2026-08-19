@@ -764,6 +764,7 @@ export const filterManagementRouter = router({
       const names = new Set(existingRows.map(row => normalizeCustomerName(row.name)));
       const phones = new Set(existingRows.map(row => row.phone.trim()));
       const codes = new Set(existingRows.map(row => row.manualCode?.trim()).filter(Boolean) as string[]);
+      const customerByCode = new Map(existingRows.map(row => [row.manualCode?.trim(), row.id]).filter((entry): entry is [string, number] => Boolean(entry[0])));
       const rejected: Array<{ rowNumber: number; reason: string }> = [];
       let added = 0;
       let visitsAdded = 0;
@@ -773,16 +774,19 @@ export const filterManagementRouter = router({
         const phone = row.phone.trim();
         const manualCode = row.manualCode?.trim() || null;
         const normalizedName = normalizeCustomerName(name);
-        if (names.has(normalizedName)) { rejected.push({ rowNumber: row.rowNumber, reason: "اسم العميل موجود بالفعل" }); continue; }
-        if (phones.has(phone)) { rejected.push({ rowNumber: row.rowNumber, reason: "رقم الهاتف موجود بالفعل" }); continue; }
-        if (manualCode && codes.has(manualCode)) { rejected.push({ rowNumber: row.rowNumber, reason: "كود العميل مستخدم بالفعل" }); continue; }
+        const linkedCustomerId = manualCode ? customerByCode.get(manualCode) : undefined;
+        if (!linkedCustomerId && names.has(normalizedName)) { rejected.push({ rowNumber: row.rowNumber, reason: "اسم العميل موجود بالفعل — استخدم كود العميل لربط الزيارة" }); continue; }
+        if (!linkedCustomerId && phones.has(phone)) { rejected.push({ rowNumber: row.rowNumber, reason: "رقم الهاتف موجود بالفعل — استخدم كود العميل لربط الزيارة" }); continue; }
+        if (manualCode && codes.has(manualCode) && !linkedCustomerId) { rejected.push({ rowNumber: row.rowNumber, reason: "كود العميل مستخدم بالفعل" }); continue; }
         if (row.visitType && !row.visitDate) { rejected.push({ rowNumber: row.rowNumber, reason: "لا يمكن إنشاء الزيارة دون تاريخ" }); continue; }
         const location = row.location?.trim() || "";
         const coordinates = location.match(/(-?\\d+(?:\\.\\d+)?)\\s*[,،]\\s*(-?\\d+(?:\\.\\d+)?)/);
-        const customerResult = await db.insert(customers).values({ ownerId: ctx.user.id, name, phone, manualCode, address: row.address?.trim() || null, latitude: coordinates?.[1] || null, longitude: coordinates?.[2] || null, notes: row.notes?.trim() || null });
-        const customerId = Number(customerResult[0].insertId);
-        added += 1;
-        names.add(normalizedName); phones.add(phone); if (manualCode) codes.add(manualCode);
+        const customerId = linkedCustomerId ?? Number((await db.insert(customers).values({ ownerId: ctx.user.id, name, phone, manualCode, address: row.address?.trim() || null, latitude: coordinates?.[1] || null, longitude: coordinates?.[2] || null, notes: row.notes?.trim() || null }))[0].insertId);
+        if (!linkedCustomerId) {
+          added += 1;
+          names.add(normalizedName); phones.add(phone); if (manualCode) codes.add(manualCode);
+          if (manualCode) customerByCode.set(manualCode, customerId);
+        }
         if (row.visitType && row.visitDate) {
           const operationId = `excel-import-${row.rowNumber}`.slice(0, 64);
           const visitResult = await db.insert(visits).values({ ownerId: ctx.user.id, customerId, visitType: row.visitType, visitDate: row.visitDate, technicianName: row.technicianName?.trim() || null, status: "completed", notes: row.notes?.trim() || null, clientOperationId: operationId });
