@@ -80,5 +80,14 @@ export function buildWhatsAppUrl(phone: string | null | undefined, message: stri
   return normalized ? `https://wa.me/${normalized}?text=${encodeURIComponent(message)}` : null;
 }
 
+export function buildWhatsAppBulkReminderMessage(reminders: Array<{ customerName?: string | null; reminderDate: Date | string }>) {
+  const rows = reminders.map((reminder, index) => `${index + 1}. ${reminder.customerName?.trim() || "عميلنا الكريم"} — ${formatDate(reminder.reminderDate)}`);
+  return `مرحبًا، هذه قائمة العملاء المستحقين لمتابعة فلاتر المياه اليوم أو غدًا:\n${rows.join("\\n")}\n\nيرجى التواصل مع كل عميل لتأكيد الموعد أو تغييره.\nشركة نقطة نقاء`;
+}
+
+export function buildWhatsAppShareUrl(message: string) {
+  return `https://wa.me/?text=${encodeURIComponent(message)}`;
+}
+
 export const COMPANY_WHATSAPP_PHONE = "201008797774";
 export const COMPANY_WHATSAPP_DISPLAY_PHONE = "01008797774";
