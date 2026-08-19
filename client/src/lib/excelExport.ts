@@ -194,10 +194,25 @@ export function downloadCustomerImportIssues(issues: CustomerImportIssue[]) {
 }
 
 export function downloadRowsAsExcel(filename: string, sheetName: string, rows: Array<Record<string, unknown>>) {
-  const worksheet = XLSX.utils.json_to_sheet(rows);
+  if (typeof document === "undefined" || typeof URL === "undefined") return false;
+  const worksheet = XLSX.utils.json_to_sheet(rows.length ? rows : [{ "لا توجد بيانات": "" }]);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-  XLSX.writeFile(workbook, filename);
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName.slice(0, 31) || "البيانات");
+  const bytes = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = filename.endsWith(".xlsx") ? filename : `${filename}.xlsx`;
+  link.rel = "noopener";
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  window.setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(href);
+  }, 1000);
+  return true;
 }
 
 export const customerExcelHeaders: Record<keyof CustomerExportRow, string> = {
