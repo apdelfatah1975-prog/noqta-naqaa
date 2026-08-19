@@ -843,6 +843,21 @@ export const filterManagementRouter = router({
       await refreshOwnerBackup(ctx.user.id);
       return { success: true };
     }),
+    deleteAll: protectedProcedure.input(sensitivePinInput.extend({ confirmation: z.literal("حذف جميع العملاء") })).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
+      const db = await databaseOrThrow();
+      const ownedCustomers = await db.select({ id: customers.id }).from(customers).where(eq(customers.ownerId, ctx.user.id));
+      const customerIds = ownedCustomers.map(customer => customer.id);
+      if (!customerIds.length) return { success: true, deletedCustomers: 0, deletedVisits: 0, deletedReminders: 0 };
+      const ownedVisits = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), inArray(visits.customerId, customerIds)));
+      const visitIds = ownedVisits.map(visit => visit.id);
+      const ownedReminders = visitIds.length ? await db.select({ id: reminders.id }).from(reminders).where(and(eq(reminders.ownerId, ctx.user.id), inArray(reminders.visitId, visitIds))) : [];
+      if (ownedReminders.length) await db.delete(reminders).where(and(eq(reminders.ownerId, ctx.user.id), inArray(reminders.id, ownedReminders.map(reminder => reminder.id))));
+      if (visitIds.length) await db.delete(visits).where(and(eq(visits.ownerId, ctx.user.id), inArray(visits.id, visitIds)));
+      await db.delete(customers).where(and(eq(customers.ownerId, ctx.user.id), inArray(customers.id, customerIds)));
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true, deletedCustomers: customerIds.length, deletedVisits: visitIds.length, deletedReminders: ownedReminders.length };
+    }),
     delete: protectedProcedure.input(sensitivePinInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       await requirePin(ctx.user.id, input.pin);
       const db = await databaseOrThrow();
