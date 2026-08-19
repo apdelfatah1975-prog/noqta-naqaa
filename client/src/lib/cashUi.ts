@@ -3,7 +3,7 @@ export type CashAdvancedFilterState = {
   partyType: "all" | "technician" | "customer" | "entity";
   technician: string;
   itemName: string;
-  dateMode: "all" | "month" | "range";
+  dateMode: "all" | "month" | "day" | "range";
 };
 
 export function countActiveCashFilters(filters: CashAdvancedFilterState) {

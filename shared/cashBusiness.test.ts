@@ -95,6 +95,18 @@ describe("تفصيل تكاليف التشغيل", () => {
   });
 });
 
+describe("الدفعة الموحدة وسلفة الفني", () => {
+  it("تدخلان معًا في مدفوعات الفني وتؤثران في المتبقي مرة واحدة", () => {
+    const result = calculateCompanyFinancialOverview([
+      { transactionType: "expense", amount: 100000, category: "مستحق فني", recipientName: "سعيد" },
+      { transactionType: "expense", amount: 25000, category: "دفعة راتب فني", recipientName: "سعيد" },
+      { transactionType: "expense", amount: 15000, category: "سلفة فني", recipientName: "سعيد" },
+    ]);
+    expect(result.technicianPaymentsByName[0]).toMatchObject({ technician: "سعيد", requiredAmount: 100000, totalPaid: 40000, salaryPaidAmount: 40000, remainingAmount: 60000, status: "remaining", transactionCount: 3 });
+    expect(result.technicianPayments).toBe(40000);
+  });
+});
+
 describe("حالة راتب الفني", () => {
   it("يعرض مدفوعًا عندما يساوي المدفوع أو يتجاوز المستحق", () => {
     const result = calculateCompanyFinancialOverview([
@@ -113,6 +125,6 @@ describe("بطاقة إجمالي مدفوعات الفني", () => {
       { transactionType: "expense", amount: 30000, category: "راتب فني", recipientName: "أحمد" },
       { transactionType: "expense", amount: 20000, category: "سلفة فني", recipientName: "أحمد" },
     ]);
-    expect(result.technicianPaymentsByName[0]).toMatchObject({ technician: "أحمد", requiredAmount: 100000, totalPaid: 50000, salaryPaidAmount: 30000, remainingAmount: 50000, status: "remaining" });
+    expect(result.technicianPaymentsByName[0]).toMatchObject({ technician: "أحمد", requiredAmount: 100000, totalPaid: 50000, salaryPaidAmount: 50000, remainingAmount: 50000, status: "remaining" });
   });
 });

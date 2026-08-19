@@ -80,7 +80,7 @@ export type CompanyFinancialOverview = {
 };
 
 export const externalIncomeCategory = "نقدية خارج إيرادات العمل";
-export const technicianPaymentCategories = ["راتب فني", "مستحق فني", "سلفة فني", "مصروف فني"] as const;
+export const technicianPaymentCategories = ["راتب فني", "دفعة راتب فني", "مستحق فني", "سلفة فني", "مصروف فني"] as const;
 export type CashBreakdown = Record<CashCurrency, { income: CashBreakdownRow[]; expense: CashBreakdownRow[]; analytics: CashAnalytics }>;
 
 function addToRows(rows: CashBreakdownRow[], category: string, amount: number) {
@@ -182,7 +182,7 @@ export function calculateCompanyFinancialOverview(transactions: Array<CashTransa
       current.remainingAmount = Math.max(current.requiredAmount - current.totalPaid, 0);
       current.status = current.remainingAmount > 0 ? "remaining" : "paid";
       current.transactionCount += 1;
-      if (category === "راتب فني") current.salaryPaidAmount += transaction.amount;
+      if (category === "راتب فني" || category === "دفعة راتب فني" || category === "سلفة فني") current.salaryPaidAmount += transaction.amount;
       technicianMap.set(technician, current);
     } else {
       otherExpenses += transaction.amount;

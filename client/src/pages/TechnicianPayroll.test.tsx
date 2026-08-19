@@ -27,6 +27,18 @@ describe("TechnicianPayroll", () => {
     expect(updateTechnicianProfile(payroll, "أحمد", "maintenancePercent", -5).أحمد.maintenancePercent).toBe(0);
   });
 
+  it("يعتبر الدفعة الموحدة للفني مدفوعًا من حساب الراتب", () => {
+    const rows = buildTechnicianMonthlyReportRows({
+      technician: "أحمد",
+      required: 50000,
+      paid: 20000,
+      remaining: 30000,
+      status: "remaining",
+      transactions: [{ id: 2, transactionType: "expense", amount: 20000, category: "دفعة راتب فني", transactionDate: "2026-08-05", recipientName: "أحمد", notes: "مبلغ مستلم" }],
+    });
+    expect(rows[0]).toMatchObject({ النوع: "مدفوع", التصنيف: "دفعة راتب فني", المبلغ: "٢٠٠" });
+  });
+
   it("يجهز صفوف التقرير الشهري بالعربية مع النوع والملاحظات", () => {
     const rows = buildTechnicianMonthlyReportRows({
       technician: "أحمد",
