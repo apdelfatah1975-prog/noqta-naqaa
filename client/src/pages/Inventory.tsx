@@ -9,7 +9,7 @@ import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Boxes, Droplets, Filter, Pa
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { cacheOfflineCash, cacheOfflineInventory, getOfflineCash, getOfflineInventory, getOfflineSession, queueOfflineCash, queueOfflineDelete, queueOfflineInventoryItem, queueOfflineInventoryMovement } from "@/lib/offlineSync";
+import { cacheOfflineCash, cacheOfflineInventory, getOfflineCash, getOfflineInventory, getOfflineSession, queueOfflineDelete, queueOfflineInventoryItem, queueOfflineInventoryMovement } from "@/lib/offlineSync";
 import { moveToTrash } from "@/lib/trashBin";
 import { canRemoveInventoryCategory, getInventoryCategoryOptions, INVENTORY_CATEGORY_OPTIONS, INVENTORY_CATEGORY_STORAGE_KEY, readCustomInventoryCategories } from "@/lib/inventoryCategories";
 
@@ -129,15 +129,8 @@ export default function Inventory() {
 
   function recordOfflineInventoryPurchase(amount: number, itemName: string, quantity: number, movementDate: Date, notes?: string | null) {
     if (!owner || amount <= 0) return;
-    queueOfflineCash(owner.id, {
-      transactionType: "expense",
-      currency: "SAR",
-      amount,
-      category: `شراء مخزون - ${itemName}`,
-      transactionDate: movementDate.toISOString(),
-      recipientName: "مشتريات",
-      notes: notes || `شراء ${quantity} من ${itemName}`,
-    });
+    // لا نضيف العملية إلى طابور الخزنة هنا؛ مزامنة حركة الوارد على الخادم
+    // تنشئ مصروف الشراء المرتبط بها تلقائيًا. نحدّث النسخة المحلية للعرض الفوري فقط.
     const current = getOfflineCash<any>(owner.id);
     if (!current) return;
     const localTransaction = {
