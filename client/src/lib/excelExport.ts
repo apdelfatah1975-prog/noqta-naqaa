@@ -62,11 +62,6 @@ function textCell(value: unknown) {
 
 export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerImportRow[]; issues: CustomerImportIssue[] }> {
   const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
-  const sheetName = workbook.SheetNames[0];
-  if (!sheetName) return { rows: [], issues: [{ rowNumber: 1, reason: "الملف لا يحتوي على ورقة بيانات" }] };
-  const sheet = workbook.Sheets[sheetName];
-  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
-  const header = (matrix[0] ?? []).map(normalizeImportHeader);
   const aliases: Record<string, string[]> = {
     name: ["اسم العميل", "الاسم", "name", "customername"].map(normalizeImportHeader),
     phone: ["الهاتف", "رقم الهاتف", "الجوال", "الموبايل", "phone", "mobile"].map(normalizeImportHeader),
@@ -79,24 +74,48 @@ export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerIm
     visitType: ["نوع الزيارة", "الخدمة", "نوع الخدمة", "visit type", "visittype"].map(normalizeImportHeader),
     collectedAmount: ["المبلغ", "المبلغ المحصل", "المبلغ المدفوع", "amount", "collectedamount"].map(normalizeImportHeader),
   };
+  const scoreHeader = (cells: unknown[]) => {
+    const normalized = cells.map(normalizeImportHeader);
+    return ["name", "phone"].filter(key => normalized.some(item => aliases[key].includes(item))).length;
+  };
+  const candidates: Array<{ sheetName: string; matrix: unknown[][]; headerRow: number; score: number }> = [];
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
+    const limit = Math.min(matrix.length, 30);
+    let best = { headerRow: -1, score: 0 };
+    for (let rowIndex = 0; rowIndex < limit; rowIndex += 1) {
+      const score = scoreHeader(matrix[rowIndex] ?? []);
+      if (score > best.score) best = { headerRow: rowIndex, score };
+    }
+    if (best.headerRow >= 0) candidates.push({ sheetName, matrix, ...best });
+  }
+  const selected = candidates.sort((a, b) => b.score - a.score)[0];
+  if (!selected || selected.score < 2) return { rows: [], issues: [{ rowNumber: 1, reason: "يجب أن يحتوي الملف على عمودي اسم العميل والهاتف" }] };
+  const { matrix, headerRow } = selected;
+  const headerCells = matrix[headerRow] ?? [];
+  const header = headerCells.map(normalizeImportHeader);
   const indexOf = (key: string) => header.findIndex(item => aliases[key].includes(item));
   const nameIndex = indexOf("name");
   const phoneIndex = indexOf("phone");
   const issues: CustomerImportIssue[] = [];
-  if (nameIndex < 0 || phoneIndex < 0) return { rows: [], issues: [{ rowNumber: 1, reason: "يجب أن يحتوي الملف على عمودي اسم العميل والهاتف" }] };
+  if (nameIndex < 0 || phoneIndex < 0) return { rows: [], issues: [{ rowNumber: headerRow + 1, reason: "يجب أن يحتوي الملف على عمودي اسم العميل والهاتف" }] };
   const rows: CustomerImportRow[] = [];
-  matrix.slice(1).forEach((cells, offset) => {
-    const rowNumber = offset + 2;
+  matrix.slice(headerRow + 1).forEach((cells, offset) => {
+    const rowNumber = headerRow + offset + 2;
     const name = textCell(cells[nameIndex]);
     const phone = textCell(cells[phoneIndex]);
     if (!name && !phone) return;
-    const sourceData = Object.fromEntries((matrix[0] as unknown[]).map((headerCell, index) => [textCell(headerCell) || `عمود ${index + 1}`, cells[index] ?? ""]));
+    const sourceData = Object.fromEntries(headerCells.map((headerCell, index) => [textCell(headerCell) || `عمود ${index + 1}`, cells[index] ?? ""]));
     if (!name || !phone) { issues.push({ rowNumber, reason: !name ? "اسم العميل ناقص" : "رقم الهاتف ناقص", data: sourceData }); return; }
     const value = (key: string) => { const index = indexOf(key); return index >= 0 ? textCell(cells[index]) : ""; };
-    const visitDate = parseDateCell(indexOf("visitDate") >= 0 ? cells[indexOf("visitDate")] : "");
-    const rawVisitType = indexOf("visitType") >= 0 ? cells[indexOf("visitType")] : "";
+    const visitDateIndex = indexOf("visitDate");
+    const visitTypeIndex = indexOf("visitType");
+    const amountIndex = indexOf("collectedAmount");
+    const visitDate = parseDateCell(visitDateIndex >= 0 ? cells[visitDateIndex] : "");
+    const rawVisitType = visitTypeIndex >= 0 ? cells[visitTypeIndex] : "";
     const visitType = parseVisitType(rawVisitType);
-    const rawAmount = indexOf("collectedAmount") >= 0 ? cells[indexOf("collectedAmount")] : "";
+    const rawAmount = amountIndex >= 0 ? cells[amountIndex] : "";
     const amountText = textCell(rawAmount).replace(/[,،\s]/g, "");
     const collectedAmount = amountText ? Number(amountText) : null;
     if (rawVisitType && !visitType) issues.push({ rowNumber, reason: "نوع الزيارة غير معروف؛ استخدم تركيب فلتر أو صيانة أو تغيير شمعات أو متابعة أو أخرى", data: sourceData });
