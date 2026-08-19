@@ -7,10 +7,42 @@ export type CustomerImportRow = {
   manualCode?: string | null;
   address?: string | null;
   location?: string | null;
-  latitude?: string | null;
-  longitude?: string | null;
   notes?: string | null;
+  technicianName?: string | null;
+  visitDate?: string | null;
+  visitType?: "installation" | "maintenance" | "cartridge_change" | "follow_up" | "other" | null;
+  collectedAmount?: number | null;
+  nextVisitDate?: string | null;
 };
+
+const visitTypeAliases: Record<NonNullable<CustomerImportRow["visitType"]>, string[]> = {
+  installation: ["تركيب فلتر", "تركيب", "installation", "install"],
+  maintenance: ["صيانة", "maintenance", "maintain"],
+  cartridge_change: ["تغيير شمعات", "تغيير الشمعات", "شمعات", "cartridge change", "cartridge_change"],
+  follow_up: ["متابعة", "follow up", "follow_up"],
+  other: ["أخرى", "اخرى", "أخرى", "other"],
+};
+
+function parseVisitType(value: unknown): CustomerImportRow["visitType"] {
+  const normalized = normalizeImportHeader(value);
+  if (!normalized) return null;
+  return (Object.entries(visitTypeAliases).find(([, aliases]) => aliases.some(alias => normalizeImportHeader(alias) === normalized))?.[0] as CustomerImportRow["visitType"]) || null;
+}
+
+function parseDateCell(value: unknown): string | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+  const text = textCell(value);
+  if (!text) return null;
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function nextFollowUpDate(visitDate: string | null, visitType: CustomerImportRow["visitType"]): string | null {
+  if (!visitDate || (visitType !== "installation" && visitType !== "maintenance")) return null;
+  const date = new Date(visitDate);
+  date.setUTCDate(date.getUTCDate() + 120);
+  return date.toISOString();
+}
 
 export type CustomerImportIssue = { rowNumber: number; reason: string };
 
@@ -35,9 +67,11 @@ export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerIm
     manualCode: ["كود العميل", "الكود", "رقم العميل", "code", "customercode"].map(normalizeImportHeader),
     address: ["العنوان", "address"].map(normalizeImportHeader),
     location: ["الموقع", "الموقع gps", "gps", "location"].map(normalizeImportHeader),
-    latitude: ["خط العرض", "latitude", "lat"].map(normalizeImportHeader),
-    longitude: ["خط الطول", "longitude", "lng", "lon"].map(normalizeImportHeader),
     notes: ["ملاحظات", "الملاحظات", "notes"].map(normalizeImportHeader),
+    technicianName: ["الفني", "اسم الفني", "الفني المنفذ", "technician", "technicianname"].map(normalizeImportHeader),
+    visitDate: ["تاريخ الزيارة", "تاريخ ووقت الزيارة", "visit date", "visitdate"].map(normalizeImportHeader),
+    visitType: ["نوع الزيارة", "الخدمة", "نوع الخدمة", "visit type", "visittype"].map(normalizeImportHeader),
+    collectedAmount: ["المبلغ", "المبلغ المحصل", "المبلغ المدفوع", "amount", "collectedamount"].map(normalizeImportHeader),
   };
   const indexOf = (key: string) => header.findIndex(item => aliases[key].includes(item));
   const nameIndex = indexOf("name");
@@ -52,13 +86,22 @@ export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerIm
     if (!name && !phone) return;
     if (!name || !phone) { issues.push({ rowNumber, reason: !name ? "اسم العميل ناقص" : "رقم الهاتف ناقص" }); return; }
     const value = (key: string) => { const index = indexOf(key); return index >= 0 ? textCell(cells[index]) : ""; };
-    rows.push({ rowNumber, name, phone, manualCode: value("manualCode") || null, address: value("address") || null, location: value("location") || null, latitude: value("latitude") || null, longitude: value("longitude") || null, notes: value("notes") || null });
+    const visitDate = parseDateCell(indexOf("visitDate") >= 0 ? cells[indexOf("visitDate")] : "");
+    const rawVisitType = indexOf("visitType") >= 0 ? cells[indexOf("visitType")] : "";
+    const visitType = parseVisitType(rawVisitType);
+    const rawAmount = indexOf("collectedAmount") >= 0 ? cells[indexOf("collectedAmount")] : "";
+    const amountText = textCell(rawAmount).replace(/[,،\s]/g, "");
+    const collectedAmount = amountText ? Number(amountText) : null;
+    if (rawVisitType && !visitType) issues.push({ rowNumber, reason: "نوع الزيارة غير معروف؛ استخدم تركيب فلتر أو صيانة أو تغيير شمعات أو متابعة أو أخرى" });
+    if (rawAmount && (collectedAmount === null || !Number.isFinite(collectedAmount) || collectedAmount < 0)) issues.push({ rowNumber, reason: "المبلغ يجب أن يكون رقمًا موجبًا أو صفرًا" });
+    if (rawVisitType && !visitDate) issues.push({ rowNumber, reason: "تاريخ الزيارة غير صالح" });
+    rows.push({ rowNumber, name, phone, manualCode: value("manualCode") || null, address: value("address") || null, location: value("location") || null, notes: value("notes") || null, technicianName: value("technicianName") || null, visitDate, visitType: visitType || null, collectedAmount: collectedAmount ?? null, nextVisitDate: nextFollowUpDate(visitDate, visitType) });
   });
   return { rows, issues };
 }
 
 export function downloadCustomerImportTemplate() {
-  const rows = [{ "اسم العميل": "مثال: محمد أحمد", "الهاتف": "0500000000", "كود العميل": "", "العنوان": "الرياض", "الموقع GPS": "24.7136,46.6753", "خط العرض": "", "خط الطول": "", "ملاحظات": "" }];
+  const rows = [{ "اسم العميل": "مثال: محمد أحمد", "الهاتف": "0500000000", "كود العميل": "", "العنوان": "الرياض", "الموقع": "رابط Google Maps أو وصف الموقع", "ملاحظات": "", "الفني": "", "تاريخ الزيارة": "2026-01-15", "نوع الزيارة": "صيانة", "المبلغ": 0 }];
   downloadRowsAsExcel("قالب-استيراد-العملاء-نقطة-نقاء.xlsx", "العملاء", rows);
 }
 import { labelVisitType } from "@/lib/filterUi";
