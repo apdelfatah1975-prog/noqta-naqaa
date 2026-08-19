@@ -789,15 +789,21 @@ export const filterManagementRouter = router({
         }
         if (row.visitType && row.visitDate) {
           const operationId = `excel-import-${row.rowNumber}`.slice(0, 64);
-          const visitResult = await db.insert(visits).values({ ownerId: ctx.user.id, customerId, visitType: row.visitType, visitDate: row.visitDate, technicianName: row.technicianName?.trim() || null, status: "completed", notes: row.notes?.trim() || null, clientOperationId: operationId });
-          const visitId = Number(visitResult[0].insertId);
-          visitsAdded += 1;
-          if (needsAutomaticReminder(row.visitType)) await db.insert(reminders).values({ customerId, visitId, ownerId: ctx.user.id, reminderDate: followUpDate(row.visitDate) });
-          const amountMinor = Math.round((row.collectedAmount || 0) * 100);
-          if (amountMinor > 0) {
-            const category = row.visitType === "installation" ? "تحصيل تركيب" : row.visitType === "maintenance" ? "تحصيل صيانة" : row.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-            await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: "SAR", amount: amountMinor, category, transactionDate: row.visitDate, sourceVisitId: visitId, recipientName: row.technicianName?.trim() || null, clientOperationId: `${operationId}:income`.slice(0, 64), notes: `العميل: ${name} | إيراد مستورد من Excel` });
-            incomeAdded += 1;
+          const existingVisit = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), eq(visits.clientOperationId, operationId))).limit(1);
+          const visitId = existingVisit[0]?.id ?? Number((await db.insert(visits).values({ ownerId: ctx.user.id, customerId, visitType: row.visitType, visitDate: row.visitDate, technicianName: row.technicianName?.trim() || null, status: "completed", notes: row.notes?.trim() || null, clientOperationId: operationId }))[0].insertId);
+          if (!existingVisit[0]) {
+            visitsAdded += 1;
+            if (needsAutomaticReminder(row.visitType)) await db.insert(reminders).values({ customerId, visitId, ownerId: ctx.user.id, reminderDate: followUpDate(row.visitDate) });
+          }
+          const amount = Math.round(row.collectedAmount || 0);
+          const incomeOperationId = `${operationId}:income`.slice(0, 64);
+          if (amount > 0) {
+            const existingIncome = await db.select({ id: cashTransactions.id }).from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.clientOperationId, incomeOperationId))).limit(1);
+            if (!existingIncome[0]) {
+              const category = row.visitType === "installation" ? "تحصيل تركيب" : row.visitType === "maintenance" ? "تحصيل صيانة" : row.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
+              await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: "SAR", amount, category, transactionDate: row.visitDate, sourceVisitId: visitId, recipientName: row.technicianName?.trim() || null, clientOperationId: incomeOperationId, notes: `العميل: ${name} | إيراد مستورد من Excel` });
+              incomeAdded += 1;
+            }
           }
         }
       }
