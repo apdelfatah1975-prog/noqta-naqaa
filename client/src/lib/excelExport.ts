@@ -47,7 +47,13 @@ function nextFollowUpDate(visitDate: string | null, visitType: CustomerImportRow
 export type CustomerImportIssue = { rowNumber: number; reason: string; data?: Record<string, unknown> };
 
 function normalizeImportHeader(value: unknown) {
-  return String(value ?? "").trim().toLocaleLowerCase("ar-EG").replace(/[\u0640\s_\-]+/g, "");
+  return String(value ?? "")
+    .normalize("NFKC")
+    .toLocaleLowerCase("ar-EG")
+    .replace(/[\u064B-\u065F\u0670]/g, "")
+    .replace(/[إأآٱ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/[\u0640\s_\-:/\\]+/g, "");
 }
 
 function textCell(value: unknown) {

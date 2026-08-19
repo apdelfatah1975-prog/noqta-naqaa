@@ -28,6 +28,17 @@ describe("Excel export rows", () => {
     expect(result.issues[0]).toMatchObject({ rowNumber: 3, reason: "رقم الهاتف ناقص", data: { "اسم العميل": "عميل ناقص", "الهاتف": "" } });
   });
 
+  it("يتعرف على صياغة إسم العميل مع الهمزة في ملف عربي فعلي", async () => {
+    const XLSX = await import("xlsx");
+    const worksheet = XLSX.utils.aoa_to_sheet([["كود \nالعميل", "إسم العميل", "الهاتف"], ["1", "محمد", "0500000000"]]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "العملاء");
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
+    const result = await parseCustomerExcel(new File([bytes], "arabic-headers.xlsx"));
+    expect(result.issues).toEqual([]);
+    expect(result.rows[0]).toMatchObject({ name: "محمد", phone: "0500000000", manualCode: "1" });
+  });
+
   it("يقرأ الزيارة التاريخية والفني والمبلغ ويحسِب موعد المتابعة", async () => {
     const XLSX = await import("xlsx");
     const worksheet = XLSX.utils.aoa_to_sheet([["اسم العميل", "الهاتف", "الموقع", "الفني", "تاريخ الزيارة", "نوع الزيارة", "المبلغ"], ["عميل خدمة", "0500000001", "رابط الخريطة", "أحمد", "2026-01-15", "صيانة", 250]]);
