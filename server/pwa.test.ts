@@ -41,14 +41,16 @@ describe("عامل خدمة التطبيق القابل للتثبيت", () => {
     expect(source).toContain('if (requestUrl.pathname.startsWith("/api/")) return;');
   });
 
-  it("يعيد استجابة الشبكة الجديدة أولًا لمسار التطبيق", async () => {
+  it("يعيد النسخة المخزنة فورًا لمسار التطبيق ويحاول تحديثها في الخلفية", async () => {
     const networkResponse = { ok: true, clone: () => networkResponse };
+    const cachedRoot = { cached: true };
     const fetchImplementation = vi.fn(async () => networkResponse);
-    const { fetchHandler, caches } = loadServiceWorker(fetchImplementation, { cached: true }, { offline: true });
+    const { fetchHandler, caches } = loadServiceWorker(fetchImplementation, cachedRoot, { offline: true });
 
-    await expect(executeNavigation(fetchHandler)).resolves.toBe(networkResponse);
+    await expect(executeNavigation(fetchHandler)).resolves.toBe(cachedRoot);
+    await Promise.resolve();
     expect(fetchImplementation).toHaveBeenCalledOnce();
-    expect(caches.match).not.toHaveBeenCalled();
+    expect(caches.match).toHaveBeenCalledWith("/");
   });
 
   it("يعرض صفحة عدم الاتصال عند فشل الشبكة وعدم وجود نسخة من المسار", async () => {

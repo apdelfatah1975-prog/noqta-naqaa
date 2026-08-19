@@ -21,7 +21,7 @@ if (!import.meta.env.PROD && "serviceWorker" in navigator) {
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js?version=13").then(registration => {
+    void navigator.serviceWorker.register("/sw.js?version=14").then(registration => {
       const update = () => void registration.update();
       if ("requestIdleCallback" in window) {
         window.requestIdleCallback(update, { timeout: 3000 });
@@ -32,7 +32,23 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
   });
 }
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Read cached data immediately and avoid retry delays while offline.
+      networkMode: "offlineFirst",
+      staleTime: 30_000,
+      gcTime: 24 * 60 * 60 * 1000,
+      retry: (failureCount) => typeof navigator !== "undefined" && navigator.onLine && failureCount < 1,
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      networkMode: "offlineFirst",
+      retry: false,
+    },
+  },
+});
+
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;

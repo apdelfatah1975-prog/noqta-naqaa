@@ -2,6 +2,7 @@ import { NotificationSettingsCard } from "@/components/NotificationSettingsCard"
 import { PinVerificationDialog } from "@/components/PinVerificationDialog";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
+import { cacheOfflineReminders, getOfflineReminders } from "@/lib/offlineSync";
 import { reminderExcelHeaders, reminderRowsForExcel, downloadRowsAsExcel, withArabicHeaders } from "@/lib/excelExport";
 import { printArabicPdf } from "@/lib/pdfExport";
 import {
@@ -16,7 +17,7 @@ import {
   type WhatsAppReminderStage,
 } from "@/lib/filterUi";
 import { BellRing, Check, Copy, Download, MapPinned, MessageCircle, Phone, X } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -36,6 +37,16 @@ function readWhatsAppState(): WhatsAppState {
 export default function Reminders() {
   const { data: dueReminders, isLoading: dueLoading, isError: dueError } = trpc.filters.reminders.due.useQuery();
   const { data: alertReminders, isLoading: alertsLoading, isError: alertsError } = trpc.filters.reminders.alerts.useQuery();
+  type OfflineReminderCache = { due: NonNullable<typeof dueReminders> | null; alerts: NonNullable<typeof alertReminders> | null };
+  const [offlineReminders, setOfflineReminders] = useState<OfflineReminderCache>(() => getOfflineReminders<OfflineReminderCache>() ?? { due: null, alerts: null });
+  useEffect(() => {
+    if (!dueReminders && !alertReminders) return;
+    const next = { due: dueReminders ?? offlineReminders.due, alerts: alertReminders ?? offlineReminders.alerts };
+    setOfflineReminders(next);
+    cacheOfflineReminders(next);
+  }, [dueReminders, alertReminders]);
+  const visibleDueReminders = dueReminders ?? offlineReminders.due ?? [];
+  const visibleAlertReminders = alertReminders ?? offlineReminders.alerts ?? [];
   const utils = trpc.useUtils();
   const [, setLocation] = useLocation();
   const [whatsappState, setWhatsAppState] = useState<WhatsAppState>(readWhatsAppState);
@@ -58,9 +69,9 @@ export default function Reminders() {
 
   const reminders = useMemo(() => {
     const map = new Map<number, NonNullable<typeof dueReminders>[number]>();
-    [...(dueReminders ?? []), ...(alertReminders ?? [])].forEach(reminder => map.set(reminder.id, reminder));
+    [...visibleDueReminders, ...visibleAlertReminders].forEach(reminder => map.set(reminder.id, reminder));
     return Array.from(map.values()).sort((a, b) => new Date(a.reminderDate).getTime() - new Date(b.reminderDate).getTime());
-  }, [alertReminders, dueReminders]);
+  }, [visibleDueReminders, visibleAlertReminders]);
 
   const isLoading = dueLoading || alertsLoading;
   const isError = dueError || alertsError;

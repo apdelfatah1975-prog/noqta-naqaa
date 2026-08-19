@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cacheOfflineCustomers,
+  cacheOfflineReminders,
+  getOfflineReminders,
+  cacheOfflineWorkOrders,
+  getOfflineWorkOrders,
   cacheOfflineReport,
   createOfflineBackup,
   clearOfflineState,
@@ -30,6 +34,17 @@ describe("التخزين المحلي للمزامنة", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.stubGlobal("crypto", { randomUUID: () => "26c4b0f0-e34e-4a89-8d6f-4dbdfd34403e" });
+  });
+
+  it("يحفظ ويسترجع التذكيرات وأوامر العمل من التخزين المحلي", () => {
+    const reminders = { due: [{ id: 1, reminderDate: "2026-08-20" }], alerts: [] };
+    const workOrders = { orders: [{ id: 2, status: "assigned" }], customers: [{ id: 8, name: "عميل محلي" }], technicians: [{ id: 3, name: "فني" }] };
+
+    cacheOfflineReminders(reminders);
+    cacheOfflineWorkOrders(workOrders);
+
+    expect(getOfflineReminders()).toEqual(reminders);
+    expect(getOfflineWorkOrders()).toEqual(workOrders);
   });
 
   it("يحفظ جلسة الجهاز والعملاء بعد أول اتصال", () => {

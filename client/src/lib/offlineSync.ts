@@ -15,6 +15,8 @@ const CASH_QUEUE_PREFIX = "purepoint-pending-cash";
 const INVENTORY_QUEUE_PREFIX = "purepoint-pending-inventory";
 const REPORT_KEY_PREFIX = "purepoint-offline-report";
 const SERVICE_CATALOG_KEY = "purepoint-offline-service-catalog";
+const REMINDERS_KEY = "purepoint-offline-reminders";
+const WORK_ORDERS_KEY = "purepoint-offline-work-orders";
 
 export type OfflineCustomer = {
   id: number;
@@ -225,6 +227,22 @@ export function cacheOfflineServiceCatalog(catalog: OfflineServiceCatalog) {
 
 export function getOfflineServiceCatalog() {
   return readJson<OfflineServiceCatalog | null>(SERVICE_CATALOG_KEY, null);
+}
+
+export function cacheOfflineReminders<T>(value: T) {
+  writeJson(REMINDERS_KEY, value);
+}
+
+export function getOfflineReminders<T>() {
+  return readJson<T | null>(REMINDERS_KEY, null);
+}
+
+export function cacheOfflineWorkOrders<T>(value: T) {
+  writeJson(WORK_ORDERS_KEY, value);
+}
+
+export function getOfflineWorkOrders<T>() {
+  return readJson<T | null>(WORK_ORDERS_KEY, null);
 }
 
 export function cacheOfflineVisits(visits: OfflineVisit[]) {

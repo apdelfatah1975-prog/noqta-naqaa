@@ -1,4 +1,4 @@
-const CACHE_NAME = "purepoint-shell-v13";
+const CACHE_NAME = "purepoint-shell-v14";
 const APP_SHELL = ["/", "/offline.html", "/manifest.webmanifest", "/app-icon.svg"];
 
 self.addEventListener("install", event => {
@@ -30,20 +30,22 @@ self.addEventListener("fetch", event => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          const copy = response.clone();
-          void caches.open(CACHE_NAME).then(cache => {
-            void cache.put(event.request, copy);
-            if (requestUrl.pathname !== "/") {
-              void cache.put("/", response.clone());
-            }
-          });
+      caches.match("/").then(cachedShell => {
+        const refresh = fetch(event.request).then(response => {
+          if (response.ok) {
+            const copy = response.clone();
+            void caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+            void caches.open(CACHE_NAME).then(cache => cache.put("/", response.clone()));
+          }
           return response;
-        })
-        .catch(async () => {
-          return (await caches.match(requestUrl.pathname)) || (await caches.match("/")) || (await caches.match("/offline.html"));
-        }),
+        }).catch(async () => (
+          (await caches.match(requestUrl.pathname)) ||
+          cachedShell ||
+          (await caches.match("/offline.html"))
+        ));
+        // فتح فوري من الكاش، مع تحديث النسخة في الخلفية عند توفر الشبكة.
+        return cachedShell || refresh;
+      }),
     );
     return;
   }
@@ -52,14 +54,14 @@ self.addEventListener("fetch", event => {
   // React app to boot after the device loses connectivity.
   event.respondWith(
     caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
+      const refresh = fetch(event.request).then(response => {
         if (response.ok) {
           const copy = response.clone();
           void caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
         }
         return response;
       });
+      return cached || refresh;
     }),
   );
 });
