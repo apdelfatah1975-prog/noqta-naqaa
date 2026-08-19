@@ -1,4 +1,6 @@
 import * as XLSX from "xlsx";
+import { getDocument } from "pdfjs-dist";
+
 
 export type CustomerImportRow = {
   rowNumber: number;
@@ -67,6 +69,68 @@ function normalizeImportHeader(value: unknown) {
 
 function textCell(value: unknown) {
   return value === undefined || value === null ? "" : String(value).trim();
+}
+
+export async function parseCustomerPdf(file: File): Promise<{ rows: CustomerImportRow[]; issues: CustomerImportIssue[] }> {
+  const pdf = await getDocument({ data: await file.arrayBuffer(), useWorkerFetch: false, isEvalSupported: false }).promise;
+  const lines: Array<{ y: number; cells: Array<{ x: number; text: string }> }> = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const grouped = new Map<number, Array<{ x: number; text: string }>>();
+    for (const item of content.items) {
+      if (!("str" in item) || !item.str.trim()) continue;
+      const transform = "transform" in item ? item.transform : [1, 0, 0, 1, 0, 0];
+      const y = Math.round(Number(transform[5]) / 2) * 2;
+      const x = Number(transform[4]) || 0;
+      const row = grouped.get(y) ?? [];
+      row.push({ x, text: item.str.trim() });
+      grouped.set(y, row);
+    }
+    Array.from(grouped.entries()).forEach(([y, cells]) => lines.push({ y: (pageNumber * 1_000_000) + y, cells: cells.sort((a: { x: number }, b: { x: number }) => a.x - b.x) }));
+  }
+  lines.sort((a, b) => b.y - a.y);
+  const matrix = lines.map(line => line.cells.map(cell => cell.text));
+  const aliases: Record<string, string[]> = {
+    name: ["اسم العميل", "إسم العميل", "الاسم", "اسم", "name", "customer name"].map(normalizeImportHeader),
+    phone: ["الهاتف", "رقم الهاتف", "رقم الجوال", "الجوال", "الموبايل", "phone", "mobile"].map(normalizeImportHeader),
+    manualCode: ["كود العميل", "الكود", "رقم العميل", "code", "customer code"].map(normalizeImportHeader),
+    address: ["العنوان", "address"].map(normalizeImportHeader),
+    technicianName: ["الفني", "اسم الفني", "technician"].map(normalizeImportHeader),
+    visitDate: ["تاريخ الزيارة", "تاريخ ووقت الزيارة", "visit date"].map(normalizeImportHeader),
+    visitType: ["نوع الزيارة", "الخدمة", "نوع الخدمة", "visit type"].map(normalizeImportHeader),
+    collectedAmount: ["المبلغ", "المبلغ المحصل", "المبلغ المدفوع", "amount"].map(normalizeImportHeader),
+  };
+  const matches = (key: string, value: unknown) => { const normalized = normalizeImportHeader(value); return normalized.length > 0 && aliases[key].some(alias => normalized === alias || normalized.includes(alias) || alias.includes(normalized)); };
+  const headerIndex = matrix.findIndex(row => ["name", "phone"].filter(key => row.some(cell => matches(key, cell))).length === 2);
+  if (headerIndex < 0) {
+    return { rows: [], issues: [{ rowNumber: 1, reason: matrix.length ? "تعذر التعرف على صف عناوين اسم العميل والهاتف في PDF. إذا كان الملف مصورًا، حوّله إلى Excel أو PDF نصي قابل للتحديد." : "ملف PDF لا يحتوي على نص قابل للاستخراج؛ يبدو أنه صورة أو مسح ضوئي." }] };
+  }
+  const headerCells = matrix[headerIndex];
+  const header = headerCells.map(normalizeImportHeader);
+  const indexOf = (key: string) => header.findIndex(cell => matches(key, cell));
+  const nameIndex = indexOf("name");
+  const phoneIndex = indexOf("phone");
+  const issues: CustomerImportIssue[] = [];
+  const rows: CustomerImportRow[] = [];
+  matrix.slice(headerIndex + 1).forEach((cells, offset) => {
+    const rowNumber = headerIndex + offset + 2;
+    const name = textCell(cells[nameIndex]);
+    const phone = textCell(cells[phoneIndex]);
+    if (!name && !phone) return;
+    const sourceData = Object.fromEntries(headerCells.map((cell, index) => [cell || `عمود ${index + 1}`, cells[index] ?? ""]));
+    if (!name || !phone) { issues.push({ rowNumber, reason: !name ? "اسم العميل ناقص" : "رقم الهاتف ناقص", data: sourceData }); return; }
+    const value = (key: string) => { const index = indexOf(key); return index >= 0 ? textCell(cells[index]) : ""; };
+    const visitDate = parseDateCell(value("visitDate"));
+    const visitType = parseVisitType(value("visitType"));
+    const amountText = value("collectedAmount").replace(/[,،\s]/g, "");
+    const collectedAmount = amountText ? Number(amountText) : null;
+    if (value("visitType") && !visitType) issues.push({ rowNumber, reason: "نوع الزيارة غير معروف", data: sourceData });
+    if (value("visitType") && !visitDate) issues.push({ rowNumber, reason: "تاريخ الزيارة غير صالح", data: sourceData });
+    if (amountText && (collectedAmount === null || !Number.isFinite(collectedAmount) || collectedAmount < 0)) issues.push({ rowNumber, reason: "المبلغ يجب أن يكون رقمًا موجبًا أو صفرًا", data: sourceData });
+    rows.push({ rowNumber, name, phone, manualCode: value("manualCode") || null, address: value("address") || null, technicianName: value("technicianName") || null, visitDate, visitType: visitType || null, collectedAmount: collectedAmount ?? null, nextVisitDate: nextFollowUpDate(visitDate, visitType) });
+  });
+  return { rows, issues };
 }
 
 export async function parseCustomerExcel(file: File, requestedSheetName?: string): Promise<{ rows: CustomerImportRow[]; issues: CustomerImportIssue[]; sheetNames: string[]; selectedSheetName: string | null }> {

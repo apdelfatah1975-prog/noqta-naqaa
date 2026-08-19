@@ -8,6 +8,7 @@ import {
   visitRowsForExcel,
   withArabicHeaders,
   parseCustomerExcel,
+  parseCustomerPdf,
   customerImportIssuesForExcel,
 } from "./excelExport";
 
@@ -101,6 +102,27 @@ describe("Excel export rows", () => {
     const result = await parseCustomerExcel(new File([bytes], "invalid.xlsx"));
     expect(result.rows).toHaveLength(0);
     expect(result.issues[0]?.reason).toContain("اسم العميل والهاتف");
+  });
+
+  it("يقرأ جدول PDF النصي ويحوّله إلى صف عميل", async () => {
+    const { jsPDF } = await import("jspdf");
+    const pdf = new jsPDF();
+    pdf.text("Name", 30, 30);
+    pdf.text("Phone", 110, 30);
+    pdf.text("Ali", 30, 45);
+    pdf.text("0500000000", 110, 45);
+    const bytes = pdf.output("arraybuffer");
+    const result = await parseCustomerPdf(new File([bytes], "customers.pdf", { type: "application/pdf" }));
+    expect(result.issues).toEqual([]);
+    expect(result.rows[0]).toMatchObject({ name: "Ali", phone: "0500000000" });
+  });
+
+  it("يعطي رسالة واضحة عند PDF لا يحتوي على نص قابل للاستخراج", async () => {
+    const { jsPDF } = await import("jspdf");
+    const bytes = new jsPDF().output("arraybuffer");
+    const result = await parseCustomerPdf(new File([bytes], "scanned.pdf", { type: "application/pdf" }));
+    expect(result.rows).toEqual([]);
+    expect(result.issues[0]?.reason).toContain("PDF");
   });
 
   it("يبني صفوف العملاء مع الكود وموعد المتابعة", () => {

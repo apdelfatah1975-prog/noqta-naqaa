@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   visitUseMutation: vi.fn(),
   updateUseMutation: vi.fn(),
   deleteUseMutation: vi.fn(),
+  deleteAllUseMutation: vi.fn(),
   importBulkUseMutation: vi.fn(),
   listInvalidate: vi.fn(),
   getInvalidate: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock("@/lib/trpc", () => ({
         create: { useMutation: mocks.createUseMutation },
         update: { useMutation: mocks.updateUseMutation },
         delete: { useMutation: mocks.deleteUseMutation },
+        deleteAll: { useMutation: mocks.deleteAllUseMutation },
         importBulk: { useMutation: mocks.importBulkUseMutation },
       },
       visits: { create: { useMutation: mocks.visitUseMutation } },
@@ -64,6 +66,7 @@ describe("ترابط تعديل بيانات العميل", () => {
       return { mutate: vi.fn(), isPending: false };
     });
     mocks.deleteUseMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    mocks.deleteAllUseMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
     mocks.importBulkUseMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
     mocks.updateUseMutation.mockImplementation((options: { onSuccess?: () => void }) => {
       mocks.updateOptions = options;

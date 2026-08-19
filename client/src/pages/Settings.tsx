@@ -81,16 +81,21 @@ export default function Settings() {
     if (!inventoryQuery.data?.items) return;
     setAppearanceDrafts(current => {
       const next = { ...current };
+      let changed = false;
       for (const item of inventoryQuery.data.items) {
-        if (!next[item.id]) next[item.id] = { emoji: item.customEmoji ?? "" };
+        if (!next[item.id]) {
+          next[item.id] = { emoji: item.customEmoji ?? "" };
+          changed = true;
+        }
       }
-      return next;
+      return changed ? next : current;
     });
   }, [inventoryQuery.data?.items]);
 
   useEffect(() => {
+    let scrollTimer: number | undefined;
     if (new URLSearchParams(window.location.search).get("section") === "trash") {
-      window.setTimeout(() => trashSectionRef.current?.scrollIntoView({ behavior: "auto", block: "start" }), 80);
+      scrollTimer = window.setTimeout(() => trashSectionRef.current?.scrollIntoView({ behavior: "auto", block: "start" }), 80);
     }
     const onChange = (event: Event) => setSettings((event as CustomEvent<AppSettings>).detail);
     const onLogChange = () => setActivityLog(getActivityLog());
@@ -98,7 +103,12 @@ export default function Settings() {
     window.addEventListener("purepoint-activity-log-changed", onLogChange);
     window.addEventListener("purepoint-trash-bin-changed", onTrashChange);
     window.addEventListener("purepoint-settings-changed", onChange);
-    return () => { window.removeEventListener("purepoint-settings-changed", onChange); window.removeEventListener("purepoint-activity-log-changed", onLogChange); window.removeEventListener("purepoint-trash-bin-changed", onTrashChange); };
+    return () => {
+      if (scrollTimer !== undefined) window.clearTimeout(scrollTimer);
+      window.removeEventListener("purepoint-settings-changed", onChange);
+      window.removeEventListener("purepoint-activity-log-changed", onLogChange);
+      window.removeEventListener("purepoint-trash-bin-changed", onTrashChange);
+    };
   }, []);
 
   function updateAppearanceDraft(itemId: number, patch: Partial<ItemAppearanceDraft>) {
