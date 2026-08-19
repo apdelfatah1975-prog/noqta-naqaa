@@ -37,6 +37,7 @@ import {
   visitTypes,
 } from "../../shared/filterBusiness";
 import { getDb, upsertUser } from "../db";
+import { calculateInventoryPurchaseAmount, shouldCreateInventoryPurchase } from "../inventoryPurchase";
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
 import { COOKIE_NAME } from "../../shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
@@ -1070,12 +1071,12 @@ export const filterManagementRouter = router({
           clientOperationId: input.clientOperationId,
         });
         const movementId = Number(movementResult[0].insertId);
-        if (input.defaultUnitCost > 0) {
+        if (shouldCreateInventoryPurchase(input.openingQuantity, input.defaultUnitCost)) {
           await db.insert(cashTransactions).values({
             ownerId: ctx.user.id,
             transactionType: "expense",
             currency: "SAR",
-            amount: input.openingQuantity * input.defaultUnitCost,
+            amount: calculateInventoryPurchaseAmount(input.openingQuantity, input.defaultUnitCost),
             category: `شراء مخزون - ${duplicate[0].name}`,
             transactionDate: movementDate,
             sourceInventoryMovementId: movementId,
@@ -1087,10 +1088,42 @@ export const filterManagementRouter = router({
         return { id: duplicate[0].id, movementId, merged: true, duplicate: true };
       }
 
-      const result = await db.insert(inventoryItems).values({ ...input, name: normalizedName, ownerId: ctx.user.id });
+      // الصنف الجديد يبدأ برصيد افتتاحي صفري، وتُسجل الكمية المدخلة كحركة وارد
+      // حتى يكون لها تاريخ واضح وتُربط بتكلفة شراء واحدة في الخزينة.
+      const { openingQuantity, defaultUnitCost, clientOperationId, ...itemData } = input;
+      const result = await db.insert(inventoryItems).values({ ...itemData, name: normalizedName, openingQuantity: 0, defaultUnitCost, clientOperationId, ownerId: ctx.user.id });
       const itemId = Number(result[0].insertId);
+      let movementId: number | null = null;
+      if (openingQuantity > 0) {
+        const movementDate = new Date();
+        const movementResult = await db.insert(inventoryMovements).values({
+          ownerId: ctx.user.id,
+          inventoryItemId: itemId,
+          movementType: "incoming",
+          quantity: openingQuantity,
+          unitCost: defaultUnitCost,
+          currency: "SAR",
+          movementDate,
+          notes: input.notes || `الرصيد الافتتاحي للصنف: ${normalizedName}`,
+          clientOperationId,
+        });
+        movementId = Number(movementResult[0].insertId);
+        if (shouldCreateInventoryPurchase(openingQuantity, defaultUnitCost)) {
+          await db.insert(cashTransactions).values({
+            ownerId: ctx.user.id,
+            transactionType: "expense",
+            currency: "SAR",
+            amount: calculateInventoryPurchaseAmount(openingQuantity, defaultUnitCost),
+            category: `شراء مخزون - ${normalizedName}`,
+            transactionDate: movementDate,
+            sourceInventoryMovementId: movementId,
+            recipientName: "مشتريات",
+            notes: input.notes || `شراء ${openingQuantity} من ${normalizedName}`,
+          });
+        }
+      }
       await refreshOwnerBackup(ctx.user.id);
-      return { id: itemId, merged: false, duplicate: false };
+      return { id: itemId, movementId, merged: false, duplicate: false };
     }),
     updateAppearance: adminProcedure.input(inventoryAppearanceInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
@@ -1136,8 +1169,8 @@ export const filterManagementRouter = router({
       }
       const movementResult = await db.insert(inventoryMovements).values({ ...input, ownerId: ctx.user.id });
       const movementId = Number(movementResult[0].insertId);
-      if (input.movementType === "incoming" && input.unitCost > 0) {
-        const purchaseAmount = input.quantity * input.unitCost;
+      if (input.movementType === "incoming" && shouldCreateInventoryPurchase(input.quantity, input.unitCost)) {
+        const purchaseAmount = calculateInventoryPurchaseAmount(input.quantity, input.unitCost);
         const existingPurchase = await db.select({ id: cashTransactions.id }).from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.sourceInventoryMovementId, movementId))).limit(1);
         if (!existingPurchase[0]) {
           await db.insert(cashTransactions).values({
