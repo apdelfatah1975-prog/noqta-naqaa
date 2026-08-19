@@ -170,6 +170,7 @@ export function calculateCompanyFinancialOverview(transactions: Array<CashTransa
   const technicianCategories = new Set<string>(technicianPaymentCategories);
   let serviceIncome = 0;
   let externalIncome = 0;
+  let totalIncome = 0;
   let technicianPayments = 0;
   let technicianRequired = 0;
   let otherExpenses = 0;
@@ -181,6 +182,7 @@ export function calculateCompanyFinancialOverview(transactions: Array<CashTransa
   for (const transaction of transactions) {
     const category = transaction.category?.trim() || "غير مصنف";
     if (transaction.transactionType === "income") {
+      totalIncome += transaction.amount;
       if (category === externalIncomeCategory) externalIncome += transaction.amount;
       else if (serviceCategories.has(category)) serviceIncome += transaction.amount;
     } else if (technicianCategories.has(category) || Boolean(transaction.recipientName?.trim() && category.includes("فني"))) {
@@ -206,7 +208,6 @@ export function calculateCompanyFinancialOverview(transactions: Array<CashTransa
       else if (category === "أخرى" || category === "غير مصنف") uncategorizedExpenses += transaction.amount;
     }
   }
-  const totalIncome = serviceIncome + externalIncome;
   const technicianPaymentsByName = Array.from(technicianMap.values()).sort((a, b) => b.remainingAmount - a.remainingAmount || b.requiredAmount - a.requiredAmount || b.totalPaid - a.totalPaid);
   const technicianRemaining = technicianPaymentsByName.reduce((total, row) => total + row.remainingAmount, 0);
   const totalExpenses = technicianPayments + otherExpenses;

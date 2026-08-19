@@ -138,3 +138,26 @@ describe("بطاقة إجمالي مدفوعات الفني", () => {
     expect(result.technicianPaymentsByName[0]).toMatchObject({ technician: "أحمد", requiredAmount: 100000, totalPaid: 50000, salaryPaidAmount: 50000, remainingAmount: 50000, status: "remaining" });
   });
 });
+
+describe("مطابقة التقرير مع الخزنة", () => {
+  it("يحسب كل الإيرادات والمصروفات المسجلة ويطابق الرصيد الفعلي", () => {
+    const result = calculateCompanyFinancialOverview([
+      { transactionType: "income", amount: 15230, category: "تحصيل صيانة" },
+      { transactionType: "expense", amount: 4437, category: "مصروف غير مصنف" },
+      { transactionType: "income", amount: 0, category: "إيراد إضافي" },
+    ]);
+    expect(result.totalIncome).toBe(15230);
+    expect(result.otherExpenses).toBe(4437);
+    expect(result.companyNet).toBe(10793);
+  });
+
+  it("لا يسقط الإيراد ذي التصنيف الجديد من إجمالي التقرير", () => {
+    const result = calculateCompanyFinancialOverview([
+      { transactionType: "income", amount: 15000, category: "تحصيل تركيب" },
+      { transactionType: "income", amount: 230, category: "إيراد جديد" },
+      { transactionType: "expense", amount: 4437, category: "أخرى" },
+    ]);
+    expect(result.totalIncome).toBe(15230);
+    expect(result.companyNet).toBe(10793);
+  });
+});
