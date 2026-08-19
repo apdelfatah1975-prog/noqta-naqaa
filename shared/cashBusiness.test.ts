@@ -87,3 +87,15 @@ describe("حالة راتب الفني", () => {
     expect(result.technicianPaymentsByName[0]).toMatchObject({ technician: "محمود", requiredAmount: 40000, totalPaid: 40000, salaryPaidAmount: 40000, remainingAmount: 0, status: "paid" });
   });
 });
+
+
+describe("بطاقة إجمالي مدفوعات الفني", () => {
+  it("تجمع الراتب والسلفة في المدفوع والمتبقي", () => {
+    const result = calculateCompanyFinancialOverview([
+      { transactionType: "expense", amount: 100000, category: "مستحق فني", recipientName: "أحمد" },
+      { transactionType: "expense", amount: 30000, category: "راتب فني", recipientName: "أحمد" },
+      { transactionType: "expense", amount: 20000, category: "سلفة فني", recipientName: "أحمد" },
+    ]);
+    expect(result.technicianPaymentsByName[0]).toMatchObject({ technician: "أحمد", requiredAmount: 100000, totalPaid: 50000, salaryPaidAmount: 30000, remainingAmount: 50000, status: "remaining" });
+  });
+});
