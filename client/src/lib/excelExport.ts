@@ -26,7 +26,16 @@ const visitTypeAliases: Record<NonNullable<CustomerImportRow["visitType"]>, stri
 function parseVisitType(value: unknown): CustomerImportRow["visitType"] {
   const normalized = normalizeImportHeader(value);
   if (!normalized) return null;
-  return (Object.entries(visitTypeAliases).find(([, aliases]) => aliases.some(alias => normalizeImportHeader(alias) === normalized))?.[0] as CustomerImportRow["visitType"]) || null;
+  const exact = Object.entries(visitTypeAliases).find(([, aliases]) => aliases.some(alias => normalizeImportHeader(alias) === normalized))?.[0] as CustomerImportRow["visitType"] | undefined;
+  if (exact) return exact;
+
+  // بعض الملفات تستخدم وصف التنفيذ الكامل بدل نوع الزيارة المختصر.
+  // نعطي إشارات تغيير الشمعات أولوية على التركيب عند اجتماع النوعين.
+  if (/(تغيير|شمع|مراحل|شمعة)/.test(normalized)) return "cartridge_change";
+  if (/(متابع|تذكير)/.test(normalized)) return "follow_up";
+  if (/(صيان|اصلاح)/.test(normalized)) return "maintenance";
+  if (/(تركيب|جهاز|فلتر|براده|ستاند)/.test(normalized)) return "installation";
+  return null;
 }
 
 function parseDateCell(value: unknown): string | null {
@@ -63,8 +72,8 @@ function textCell(value: unknown) {
 export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerImportRow[]; issues: CustomerImportIssue[] }> {
   const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
   const aliases: Record<string, string[]> = {
-    name: ["اسم العميل", "الاسم", "name", "customername"].map(normalizeImportHeader),
-    phone: ["الهاتف", "رقم الهاتف", "الجوال", "الموبايل", "phone", "mobile"].map(normalizeImportHeader),
+    name: ["اسم العميل", "إسم العميل", "الاسم", "اسم", "name", "customername", "customer name"].map(normalizeImportHeader),
+    phone: ["الهاتف", "رقم الهاتف", "رقم الجوال", "الجوال", "الموبايل", "رقم الموبايل", "phone", "mobile"].map(normalizeImportHeader),
     manualCode: ["كود العميل", "الكود", "رقم العميل", "code", "customercode"].map(normalizeImportHeader),
     address: ["العنوان", "address"].map(normalizeImportHeader),
     location: ["الموقع", "الموقع gps", "gps", "location"].map(normalizeImportHeader),
@@ -74,10 +83,12 @@ export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerIm
     visitType: ["نوع الزيارة", "الخدمة", "نوع الخدمة", "visit type", "visittype"].map(normalizeImportHeader),
     collectedAmount: ["المبلغ", "المبلغ المحصل", "المبلغ المدفوع", "amount", "collectedamount"].map(normalizeImportHeader),
   };
-  const scoreHeader = (cells: unknown[]) => {
-    const normalized = cells.map(normalizeImportHeader);
-    return ["name", "phone"].filter(key => normalized.some(item => aliases[key].includes(item))).length;
+  const headerMatches = (key: string, item: unknown) => {
+    const normalizedItem = normalizeImportHeader(item);
+    if (!normalizedItem) return false;
+    return aliases[key].some(alias => normalizedItem === alias || normalizedItem.includes(alias) || alias.includes(normalizedItem));
   };
+  const scoreHeader = (cells: unknown[]) => ["name", "phone"].filter(key => cells.some(item => headerMatches(key, item))).length;
   const candidates: Array<{ sheetName: string; matrix: unknown[][]; headerRow: number; score: number }> = [];
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName];
@@ -91,15 +102,18 @@ export async function parseCustomerExcel(file: File): Promise<{ rows: CustomerIm
     if (best.headerRow >= 0) candidates.push({ sheetName, matrix, ...best });
   }
   const selected = candidates.sort((a, b) => b.score - a.score)[0];
-  if (!selected || selected.score < 2) return { rows: [], issues: [{ rowNumber: 1, reason: "يجب أن يحتوي الملف على عمودي اسم العميل والهاتف" }] };
+  if (!selected || selected.score < 2) {
+    const detected = selected?.matrix[selected.headerRow >= 0 ? selected.headerRow : 0]?.filter(Boolean).map(textCell).join("، ");
+    return { rows: [], issues: [{ rowNumber: 1, reason: `لم يتم التعرف على عمودي اسم العميل والهاتف. العناوين المقروءة: ${detected || "لا توجد عناوين واضحة"}` }] };
+  }
   const { matrix, headerRow } = selected;
   const headerCells = matrix[headerRow] ?? [];
   const header = headerCells.map(normalizeImportHeader);
-  const indexOf = (key: string) => header.findIndex(item => aliases[key].includes(item));
+  const indexOf = (key: string) => header.findIndex(item => headerMatches(key, item));
   const nameIndex = indexOf("name");
   const phoneIndex = indexOf("phone");
   const issues: CustomerImportIssue[] = [];
-  if (nameIndex < 0 || phoneIndex < 0) return { rows: [], issues: [{ rowNumber: headerRow + 1, reason: "يجب أن يحتوي الملف على عمودي اسم العميل والهاتف" }] };
+  if (nameIndex < 0 || phoneIndex < 0) return { rows: [], issues: [{ rowNumber: headerRow + 1, reason: `لم يتم التعرف على عمودي اسم العميل والهاتف. العناوين المقروءة: ${headerCells.filter(Boolean).map(textCell).join("، ") || "لا توجد عناوين واضحة"}` }] };
   const rows: CustomerImportRow[] = [];
   matrix.slice(headerRow + 1).forEach((cells, offset) => {
     const rowNumber = headerRow + offset + 2;
