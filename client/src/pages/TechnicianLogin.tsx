@@ -63,7 +63,7 @@ export default function TechnicianLogin() {
             <div className="space-y-2"><Label htmlFor="technician-login-password">كلمة السر</Label><div className="relative"><KeyRound className="pointer-events-none absolute right-3 top-3 h-5 w-5 text-slate-400" /><Input id="technician-login-password" className="pr-10" type="password" dir="ltr" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="أدخل كلمة السر" autoComplete="current-password" required minLength={8} /></div></div>
             <Button type="submit" disabled={login.isPending} className="h-12 w-full bg-sky-700 text-base font-bold hover:bg-sky-800">{login.isPending ? "جارٍ التحقق..." : "دخول إلى أوامر العمل"}</Button>
           </form>
-          <button type="button" className="mt-5 flex w-full items-center justify-center gap-2 text-sm font-semibold text-slate-500 transition-colors hover:text-sky-700" onClick={() => navigate("/")}><ArrowLeft className="h-4 w-4" />العودة إلى الصفحة الرئيسية</button>
+          <p className="mt-5 text-center text-xs font-semibold leading-6 text-slate-500">هذه الواجهة مخصصة للفني وأوامر العمل فقط.</p>
         </CardContent>
       </Card>
     </main>

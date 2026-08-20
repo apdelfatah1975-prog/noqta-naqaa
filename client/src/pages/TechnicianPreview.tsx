@@ -30,7 +30,7 @@ const MAX_COLLECTION_AMOUNT = 100000;
 
 export default function TechnicianPreview() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [filter, setFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [result, setResult] = useState("");
@@ -118,7 +118,7 @@ export default function TechnicianPreview() {
     <main dir="rtl" className="mx-auto min-h-screen max-w-xl space-y-4 bg-slate-50 px-3 pb-6 pt-3">
       <section className="overflow-hidden rounded-[1.75rem] bg-[linear-gradient(135deg,#075e59,#0f766e)] p-5 text-white shadow-lg">
         <div className="flex items-center justify-between gap-3">
-          <button type="button" onClick={() => setLocation("/")} className="grid h-10 w-10 place-items-center rounded-xl bg-white/15" aria-label="العودة"><ArrowLeft className="h-5 w-5" /></button>
+          <button type="button" onClick={() => { void logout(); setLocation("/technician-login"); }} className="grid h-10 w-10 place-items-center rounded-xl bg-white/15" aria-label="تسجيل الخروج"><ArrowLeft className="h-5 w-5" /></button>
           <div className="text-left"><p className="text-xs font-bold text-teal-100">حساب الفني</p><h1 className="mt-1 text-2xl font-black">أوامري فقط</h1></div>
           <Wrench className="h-7 w-7 text-teal-100" />
         </div>
