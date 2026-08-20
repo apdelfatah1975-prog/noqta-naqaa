@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, KeyRound, ShieldCheck, UserRound } from "lucide-react";
 import { InstallAppButton } from "@/components/InstallAppButton";
 import { useLocation } from "wouter";
@@ -11,6 +11,18 @@ import { trpc } from "@/lib/trpc";
 
 export default function TechnicianLogin() {
   const [, navigate] = useLocation();
+
+  useEffect(() => {
+    const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    const previousHref = manifest?.getAttribute("href") ?? "/manifest.webmanifest";
+    const previousTitle = document.title;
+    if (manifest) manifest.href = "/technician-manifest.webmanifest";
+    document.title = "دخول الفني | نقطة نقاء";
+    return () => {
+      if (manifest) manifest.href = previousHref;
+      document.title = previousTitle;
+    };
+  }, []);
   const utils = trpc.useUtils();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

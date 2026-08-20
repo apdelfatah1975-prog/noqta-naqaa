@@ -3,6 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "./_core/hooks/useAuth";
 import type { ReactNode } from "react";
 import { Route, Switch, useLocation } from "wouter";
+import { useEffect } from "react";
 import DashboardLayout from "./components/DashboardLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -42,6 +43,21 @@ function AdminOnly({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function TechnicianPwaHead() {
+  useEffect(() => {
+    const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    const previousHref = manifest?.getAttribute("href") ?? "/manifest.webmanifest";
+    const previousTitle = document.title;
+    if (manifest) manifest.href = "/technician-manifest.webmanifest";
+    document.title = "أوامر الفني | نقطة نقاء";
+    return () => {
+      if (manifest) manifest.href = previousHref;
+      document.title = previousTitle;
+    };
+  }, []);
+  return null;
+}
+
 function TechnicianOnly({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth({ redirectOnUnauthenticated: false });
   if (loading) {
@@ -66,7 +82,7 @@ function TechnicianOnly({ children }: { children: ReactNode }) {
       </section>
     );
   }
-  return <>{children}</>;
+  return <><TechnicianPwaHead />{children}</>;
 }
 
 function ProtectedTechnician() { return <TechnicianOnly><TechnicianPreview /></TechnicianOnly>; }

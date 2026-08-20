@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTechnicianMonthlyReportRows, calculateTechnicianCommission, monthBounds, updateTechnicianProfile, upsertTechnicianProfile } from "./TechnicianPayroll";
+import { buildTechnicianMonthlyReportRows, calculateSalesAgentCommission, calculateTechnicianCommission, formatPayrollMoney, monthBounds, updateTechnicianProfile, upsertTechnicianProfile } from "./TechnicianPayroll";
 
 describe("TechnicianPayroll", () => {
   it("يحسب بداية ونهاية الشهر المحدد", () => {
@@ -12,6 +12,12 @@ describe("TechnicianPayroll", () => {
     expect(calculateTechnicianCommission(10000, "maintenance", 10, 5)).toBe(500);
     expect(calculateTechnicianCommission(10000, "follow_up", 10, 5)).toBe(0);
     expect(calculateTechnicianCommission(10000, "installation", 0, 5)).toBe(0);
+  });
+
+  it("يحسب عمولة متابع العملاء حسب الفلتر أو المجموعة ويعرض الريال بلا كسور", () => {
+    expect(calculateSalesAgentCommission(7, { commissionMode: "per_filter", commissionValue: 15, filtersPerGroup: 10 })).toBe(105);
+    expect(calculateSalesAgentCommission(27, { commissionMode: "per_group", commissionValue: 500, filtersPerGroup: 10 })).toBe(1000);
+    expect(formatPayrollMoney(25000)).toBe("٢٥٠");
   });
 
   it("يضيف فنيًا جديدًا بإعدادات صفرية ويمنع التكرار", () => {

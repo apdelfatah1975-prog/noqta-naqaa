@@ -1,20 +1,23 @@
-const CACHE_NAME = "purepoint-shell-v14";
-const APP_SHELL = ["/", "/offline.html", "/manifest.webmanifest", "/app-icon.svg"];
+const CACHE_NAME = "purepoint-shell-v15";
+const APP_SHELL = ["/",
+
+  "/technician-preview",
+  "/offline.html",
+  "/manifest.webmanifest",
+  "/technician-manifest.webmanifest",
+  "/app-icon.svg",
+];
 
 self.addEventListener("install", event => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)),
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
 });
 
 self.addEventListener("activate", event => {
   event.waitUntil(
     Promise.all([
       clients.claim(),
-      caches
-        .keys()
-        .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))),
+      caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))),
     ]),
   );
 });
@@ -24,40 +27,35 @@ self.addEventListener("fetch", event => {
 
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin) return;
-
-  // API calls must reach the application so its local offline fallbacks can run.
   if (requestUrl.pathname.startsWith("/api/")) return;
 
   if (event.request.mode === "navigate") {
-    event.respondWith(
-      caches.match("/").then(cachedShell => {
-        const refresh = fetch(event.request).then(response => {
-          if (response.ok) {
-            const copy = response.clone();
-            void caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
-            void caches.open(CACHE_NAME).then(cache => cache.put("/", response.clone()));
-          }
-          return response;
-        }).catch(async () => (
-          (await caches.match(requestUrl.pathname)) ||
-          cachedShell ||
-          (await caches.match("/offline.html"))
-        ));
-        // فتح فوري من الكاش، مع تحديث النسخة في الخلفية عند توفر الشبكة.
-        return cachedShell || refresh;
-      }),
-    );
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      const cachedRoute = requestUrl.pathname === "/" ? undefined : await cache.match(event.request);
+      const cachedGlobalPath = await caches.match(requestUrl.pathname);
+      const cachedPath = await cache.match(requestUrl.pathname);
+      const cachedShell = cachedPath || cachedRoute || (requestUrl.pathname === "/" ? undefined : cachedGlobalPath);
+
+      const refresh = fetch(event.request).then(response => {
+        if (response.ok) {
+          void cache.put(event.request, response.clone());
+          if (requestUrl.pathname === "/") void cache.put("/", response.clone());
+        }
+        return response;
+      }).catch(() => cachedShell || caches.match("/offline.html"));
+
+      // افتح المسار المطلوب سريعًا، ولا تستخدم غلاف المدير إلا كحل احتياطي نهائي.
+      return cachedShell || refresh;
+    })());
     return;
   }
 
-  // Cache-first for the built application assets. This is what allows the
-  // React app to boot after the device loses connectivity.
   event.respondWith(
     caches.match(event.request).then(cached => {
       const refresh = fetch(event.request).then(response => {
         if (response.ok) {
-          const copy = response.clone();
-          void caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+          void caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
         }
         return response;
       });
