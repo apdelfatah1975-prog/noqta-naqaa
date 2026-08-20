@@ -17,7 +17,7 @@ describe("TechnicianPayroll", () => {
   it("يحسب عمولة متابع العملاء حسب الفلتر أو المجموعة ويعرض الريال بلا كسور", () => {
     expect(calculateSalesAgentCommission(7, { commissionMode: "per_filter", commissionValue: 15, filtersPerGroup: 10 })).toBe(105);
     expect(calculateSalesAgentCommission(27, { commissionMode: "per_group", commissionValue: 500, filtersPerGroup: 10 })).toBe(1000);
-    expect(formatPayrollMoney(25000)).toBe("٢٥٠");
+    expect(formatPayrollMoney(250)).toBe("٢٥٠");
   });
 
   it("يضيف فنيًا جديدًا بإعدادات صفرية ويمنع التكرار", () => {
@@ -36,11 +36,11 @@ describe("TechnicianPayroll", () => {
   it("يعتبر الدفعة الموحدة للفني مدفوعًا من حساب الراتب", () => {
     const rows = buildTechnicianMonthlyReportRows({
       technician: "أحمد",
-      required: 50000,
-      paid: 20000,
-      remaining: 30000,
+      required: 500,
+      paid: 200,
+      remaining: 300,
       status: "remaining",
-      transactions: [{ id: 2, transactionType: "expense", amount: 20000, category: "دفعة راتب فني", transactionDate: "2026-08-05", recipientName: "أحمد", notes: "مبلغ مستلم" }],
+      transactions: [{ id: 2, transactionType: "expense", amount: 200, category: "دفعة راتب فني", transactionDate: "2026-08-05", recipientName: "أحمد", notes: "مبلغ مستلم" }],
     });
     expect(rows[0]).toMatchObject({ النوع: "مدفوع", التصنيف: "دفعة راتب فني", المبلغ: "٢٠٠" });
   });
@@ -48,11 +48,11 @@ describe("TechnicianPayroll", () => {
   it("يجهز صفوف التقرير الشهري بالعربية مع النوع والملاحظات", () => {
     const rows = buildTechnicianMonthlyReportRows({
       technician: "أحمد",
-      required: 50000,
-      paid: 20000,
-      remaining: 30000,
+      required: 500,
+      paid: 200,
+      remaining: 300,
       status: "remaining",
-      transactions: [{ id: 1, transactionType: "expense", amount: 20000, category: "راتب فني", transactionDate: "2026-08-05", recipientName: "أحمد", notes: "دفعة شهر أغسطس" }],
+      transactions: [{ id: 1, transactionType: "expense", amount: 200, category: "راتب فني", transactionDate: "2026-08-05", recipientName: "أحمد", notes: "دفعة شهر أغسطس" }],
     });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ النوع: "مدفوع", التصنيف: "راتب فني", المبلغ: "٢٠٠" });

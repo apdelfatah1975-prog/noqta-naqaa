@@ -47,7 +47,7 @@ export const defaultAppSettings: AppSettings = {
   remindersEnabled: true,
   reminderSoundEnabled: true,
   reminderKeepVisibleNextDay: true,
-  currencyLabel: "ر.س",
+  currencyLabel: "",
   dateFormat: "arabic",
   useArabicDigits: true,
   dashboardShowUpcoming: true,
@@ -97,9 +97,10 @@ export function resetAppSettings(): AppSettings {
   return next;
 }
 
-export function formatAppMoney(amountInHalalas: number, settings = getAppSettings()) {
+export function formatAppMoney(amount: number, settings = getAppSettings()) {
   void settings;
-  return new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 2 }).format(amountInHalalas / 100);
+  const safeAmount = Number.isFinite(Number(amount)) ? Number(amount) : 0;
+  return new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(safeAmount);
 }
 
 export function formatAppDate(value: string | Date, settings = getAppSettings()) {

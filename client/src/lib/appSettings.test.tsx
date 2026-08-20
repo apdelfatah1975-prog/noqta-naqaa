@@ -6,7 +6,7 @@ describe("إعدادات التطبيق المحلية", () => {
 
   it("تحفظ التغييرات وتدمجها مع القيم الافتراضية", () => {
     saveAppSettings({ companyName: "شركة اختبار", followUpDays: 90, dashboardShowCash: false });
-    expect(getAppSettings()).toMatchObject({ companyName: "شركة اختبار", followUpDays: 90, dashboardShowCash: false, currencyLabel: "ر.س" });
+    expect(getAppSettings()).toMatchObject({ companyName: "شركة اختبار", followUpDays: 90, dashboardShowCash: false, currencyLabel: "" });
   });
 
   it("تعيد الإعدادات الافتراضية دون حذف بيانات التطبيق الأخرى", () => {
@@ -17,8 +17,8 @@ describe("إعدادات التطبيق المحلية", () => {
   });
 
   it("تعرض المبلغ كرقم فقط دون رمز عملة", () => {
-    const formatted = formatAppMoney(12550, { ...defaultAppSettings, currencyLabel: "ر.س" });
-    expect(formatted).toContain("١٢٥٫٥");
+    const formatted = formatAppMoney(250, { ...defaultAppSettings, currencyLabel: "" });
+    expect(formatted).toContain("٢٥٠");
     expect(formatted).not.toContain("ر.س");
     expect(formatted).not.toContain("ريال");
   });

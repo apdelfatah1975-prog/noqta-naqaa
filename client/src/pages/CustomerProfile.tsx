@@ -99,7 +99,7 @@ export default function CustomerProfile() {
 
   function submitVisit(event: FormEvent) {
     event.preventDefault();
-    const collectedAmount = Math.round((Number.parseFloat(visitCollectedAmount) || 0) * 100);
+    const collectedAmount = Math.round(Number.parseFloat(visitCollectedAmount) || 0);
     const payload = { customerId, visitType, visitDate: new Date(visitDate), technicianName: visitTechnicianName || null, visitResult: visitResult || null, collectedAmount, collectedCurrency: "SAR" as const, notes: notes || null, items: visitItems.filter(item => item.quantity > 0) };
     if (payload.items.length > 0 && !window.confirm(buildPartsConfirmation(payload.items, catalogItems))) return;
     if (isOffline) {

@@ -111,9 +111,9 @@ describe("تفاصيل المنصرف في المخزون", () => {
     const numberInputs = dialog.getAllByRole("spinbutton");
     fireEvent.change(numberInputs[0], { target: { value: "10" } });
     fireEvent.change(numberInputs[1], { target: { value: "50" } });
-    expect(dialog.getByText("إجمالي الخصم المتوقع: 500.00")).toBeTruthy();
+    expect(dialog.getByText("إجمالي الخصم المتوقع: ٥٠٠")).toBeTruthy();
     fireEvent.click(dialog.getByRole("button", { name: "حفظ الحركة" }));
-    expect(mocks.movementMutate).toHaveBeenCalledWith(expect.objectContaining({ quantity: 10, unitCost: 5000 }));
+    expect(mocks.movementMutate).toHaveBeenCalledWith(expect.objectContaining({ quantity: 10, unitCost: 50 }));
   });
 
   it("ينقل بطاقة الصنف إلى صفها ويظلله بالبرتقالي", async () => {

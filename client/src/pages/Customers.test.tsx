@@ -157,7 +157,7 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(screen.queryByText(/ريال سعودي|ر\.س/)).toBeNull();
     fireEvent.change(screen.getByLabelText("المبلغ المحصل"), { target: { value: "250" } });
     fireEvent.click(screen.getByRole("button", { name: "حفظ الزيارة" }));
-    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ customerId: 12, technicianName: "أحمد", visitResult: "تم تغيير الشمعات", collectedAmount: 25000, collectedCurrency: "SAR" }));
+    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ customerId: 12, technicianName: "أحمد", visitResult: "تم تغيير الشمعات", collectedAmount: 250 }));
   });
 
   it("يحدّث ملخص المخزن بعد نجاح تسجيل الزيارة", () => {
@@ -178,14 +178,14 @@ describe("ترابط تعديل بيانات العميل", () => {
   it("يعرض إجمالي المحصل ويتيح ترتيب الأعلى تحصيلًا مع رأس جدول مثبت", () => {
     mocks.list.mockReturnValue({
       data: [
-        { id: 12, name: "عميل قديم", phone: "01000000000", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000012", totalCollectedAmount: 125000, collectedAmount: 25000, followUp: null },
+        { id: 12, name: "عميل قديم", phone: "01000000000", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000012", totalCollectedAmount: 1250, collectedAmount: 250, followUp: null },
       ],
       isLoading: false,
       isError: false,
     });
     render(<Customers />);
     expect(screen.getAllByText("إجمالي المحصل")[0]).toBeTruthy();
-    expect(screen.getAllByText("١٬٢٥٠٫٠٠")[0]).toBeTruthy();
+    expect(screen.getAllByText("١٬٢٥٠")[0]).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: "إجمالي المحصل" }).className).toContain("sticky");
     fireEvent.change(screen.getByLabelText("ترتيب العملاء"), { target: { value: "collected_desc" } });
     expect(mocks.list.mock.calls.at(-1)?.[0].sortBy).toBe("collected_desc");
@@ -228,7 +228,7 @@ describe("ترابط تعديل بيانات العميل", () => {
     fireEvent.submit(screen.getByText("حفظ البيانات").closest("form")!);
     fireEvent.change(screen.getByPlaceholderText("••••"), { target: { value: "1234" } });
     fireEvent.click(screen.getByRole("button", { name: "تأكيد" }));
-    expect(updateMutation).toHaveBeenCalledWith(expect.objectContaining({ serviceDate: expect.any(Date), collectedAmount: 27500 }));
+    expect(updateMutation).toHaveBeenCalledWith(expect.objectContaining({ serviceDate: expect.any(Date), collectedAmount: 275 }));
     expect(screen.queryByText("عملة التحصيل")).toBeNull();
     expect((updateMutation.mock.calls[0][0].serviceDate as Date).toISOString()).toBe("2026-08-05T14:30:00.000Z");
   });

@@ -130,7 +130,7 @@ export default function TechnicianPreview() {
         queueOfflineWorkOrderProof(user.id, { visitId: input.id, kind: "photo", dataUrl: proofDataUrl });
       }
       if (audioDataUrl) queueOfflineWorkOrderProof(user.id, { visitId: input.id, kind: "audio", dataUrl: audioDataUrl });
-      queueOfflineWorkOrderUpdate(user.id, { ...input, collectedCurrency: "SAR" });
+      queueOfflineWorkOrderUpdate(user.id, input);
       setLocalUpdates(current => ({ ...current, [input.id]: { status: input.status, visitResult: input.visitResult, collectedAmount: input.collectedAmount } }));
       toast.success("تم الحفظ على الهاتف، وستتم المزامنة عند عودة الإنترنت");
       setSelectedId(null);
@@ -157,11 +157,11 @@ export default function TechnicianPreview() {
     if (!selected) return;
     const normalizedAmount = Number(amount.trim() || "0");
     if (!Number.isFinite(normalizedAmount) || !Number.isInteger(normalizedAmount) || normalizedAmount < 0) {
-      toast.error("أدخل مبلغًا صحيحًا غير سالب بالريال.");
+      toast.error("أدخل مبلغًا صحيحًا غير سالب.");
       return;
     }
     if (normalizedAmount > MAX_COLLECTION_AMOUNT) {
-      toast.error("مبلغ التحصيل غير منطقي؛ الحد الأقصى المسموح 100,000 ريال.");
+      toast.error("مبلغ التحصيل غير منطقي؛ الحد الأقصى المسموح 100,000.");
       return;
     }
     const items: SelectedItem[] = [];
@@ -176,7 +176,7 @@ export default function TechnicianPreview() {
       notCompletedReason: outcome === "not_completed" ? notCompletedReason.trim() : null,
       visitResult: result.trim() || (outcome === "completed" ? "تم تنفيذ الخدمة" : "لم يتم تنفيذ الزيارة"),
       notes: null,
-      // المبلغ موحّد بالريال الكامل في الواجهة والخادم والخزينة.
+      // المبلغ موحّد كوحدة نقدية كاملة في الواجهة والخادم والخزينة.
       collectedAmount: outcome === "completed" ? normalizedAmount : 0,
       items: outcome === "completed" ? items : [],
     });
@@ -226,7 +226,7 @@ export default function TechnicianPreview() {
             {isRecording ? <p className="mt-2 text-xs font-black text-rose-700">جاري التسجيل… اضغط الزر لإيقافه.</p> : null}
             {audioDataUrl ? <div className="mt-3 flex items-center gap-2"><audio controls src={audioDataUrl} className="h-10 min-w-0 flex-1" /><button type="button" onClick={() => { setAudioDataUrl(null); setAudioName(""); }} className="rounded-lg px-2 py-1 text-xs font-black text-rose-700">حذف</button><span className="sr-only">{audioName}</span></div> : null}
           </div>
-          <label className="mt-3 block text-sm font-black text-slate-700">المبلغ المحصل بالريال<input aria-label="المبلغ المحصل" inputMode="numeric" min="0" max={MAX_COLLECTION_AMOUNT} value={amount} onChange={event => setAmount(event.target.value.replace(/[^0-9-]/g, ""))} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 text-lg font-black" placeholder="0" /><span className="mt-1 block text-[11px] font-bold text-slate-500">اكتب الرقم كما هو، مثل: 250</span></label>
+          <label className="mt-3 block text-sm font-black text-slate-700">المبلغ المحصل<input aria-label="المبلغ المحصل" inputMode="numeric" min="0" max={MAX_COLLECTION_AMOUNT} value={amount} onChange={event => setAmount(event.target.value.replace(/[^0-9-]/g, ""))} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 text-lg font-black" placeholder="0" /><span className="mt-1 block text-[11px] font-bold text-slate-500">اكتب الرقم كما هو، مثل: 250</span></label>
           <Button type="button" onClick={completeOrder} disabled={update.isPending} className="mt-4 h-12 w-full rounded-xl bg-teal-700 font-black hover:bg-teal-800">{update.isPending ? "جاري الحفظ..." : <><CheckCircle2 className="ml-2 h-5 w-5" /> حفظ وإغلاق أمر العمل</>}</Button>
         </section>
       ) : null}

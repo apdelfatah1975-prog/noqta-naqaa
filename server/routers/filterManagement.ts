@@ -1059,7 +1059,7 @@ export const filterManagementRouter = router({
       notes: z.string().trim().max(2000).optional().nullable(),
       status: z.enum(["assigned", "en_route", "arrived", "in_progress", "completed", "postponed", "cancelled"]).optional(),
       collectedAmount: z.number().int().nonnegative(),
-      collectedCurrency: z.enum(cashCurrencies),
+      collectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
       pin: sensitivePinInput.shape.pin,
     })).mutation(async ({ ctx, input }) => {
       await requirePin(ctx.user.id, input.pin);

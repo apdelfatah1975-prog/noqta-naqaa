@@ -261,7 +261,7 @@ export function customerRowsForExcel(customers: Array<any>): CustomerExportRow[]
     followUpDays: customer.followUp ? (customer.followUp.daysRemaining < 0 ? `متأخر ${Math.abs(customer.followUp.daysRemaining)} يوم` : customer.followUp.daysRemaining === 0 ? "اليوم" : `${customer.followUp.daysRemaining} يوم`) : "لا يوجد موعد",
     lastServiceType: labelVisitType(customer.followUp?.lastServiceVisitType),
     latestTechnicianName: customer.latestTechnicianName || "",
-    totalCollectedAmount: Number(customer.totalCollectedAmount || 0) / 100,
+    totalCollectedAmount: Number(customer.totalCollectedAmount || 0),
   }));
 }
 
@@ -274,7 +274,7 @@ export function visitRowsForExcel(visits: Array<any>): VisitExportRow[] {
     visitType: labelVisitType(visit.visitType),
     visitDate: visit.visitDate ? new Date(visit.visitDate).toLocaleString("ar-EG") : "",
     technicianName: visit.technicianName || "",
-    collectedAmount: Number(visit.collectedAmount || 0) / 100,
+    collectedAmount: Number(visit.collectedAmount || 0),
     visitResult: visit.visitResult || visit.visitOutcome || visit.result || visit.notes || "",
   }));
 }
