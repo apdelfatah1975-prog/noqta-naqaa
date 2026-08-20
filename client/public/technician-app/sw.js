@@ -1,4 +1,4 @@
-const CACHE_NAME = "purepoint-technician-orders-v1";
+const CACHE_NAME = "purepoint-technician-orders-v2";
 const SCOPE_PREFIX = "/technician-app/";
 
 self.addEventListener("install", () => self.skipWaiting());

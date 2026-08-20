@@ -2,15 +2,26 @@
   "name": "نقطة نقاء | أوامر الفني",
   "short_name": "أوامر الفني",
   "description": "واجهة الفني لأوامر العمل المسندة فقط.",
-  "id": "/technician-pwa-v2",
+  "id": "/technician-app/",
   "lang": "ar",
   "dir": "rtl",
-  "start_url": "/technician-preview",
-  "scope": "/technician-",
+  "start_url": "/technician-app/login",
+  "scope": "/technician-app/",
   "display": "standalone",
   "background_color": "#f6fbfa",
   "theme_color": "#0f766e",
   "icons": [
-    { "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "/manus-storage/purepoint-technician-192_47865cd6.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/manus-storage/purepoint-technician-512_fb9ae3d4.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }

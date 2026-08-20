@@ -39,8 +39,11 @@ describe("عامل خدمة التطبيق القابل للتثبيت", () => {
     const technicianManifest = readFileSync(path.resolve(import.meta.dirname, "../client/public/technician-manifest.webmanifest"), "utf8");
     const indexHtml = readFileSync(path.resolve(import.meta.dirname, "../client/index.html"), "utf8");
     const mainSource = readFileSync(path.resolve(import.meta.dirname, "../client/src/main.tsx"), "utf8");
-    expect(technicianManifest).toContain('"start_url": "/technician-preview"');
-    expect(technicianManifest).toContain('"scope": "/technician-"');
+    expect(technicianManifest).toContain('"start_url": "/technician-app/login"');
+    expect(technicianManifest).toContain('"scope": "/technician-app/"');
+    expect(technicianManifest).toContain('"sizes": "192x192"');
+    expect(technicianManifest).toContain('"sizes": "512x512"');
+    expect(technicianManifest).toContain('"display": "standalone"');
     expect(indexHtml).toContain("window.location.pathname.startsWith('/technician-')");
     expect(indexHtml).toContain("/technician-manifest.webmanifest");
     expect(mainSource).toContain('const technicianStandalone = window.location.pathname.startsWith("/technician-app")');
