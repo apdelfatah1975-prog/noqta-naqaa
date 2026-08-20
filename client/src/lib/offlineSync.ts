@@ -175,7 +175,9 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 function writeJson(key: string, value: unknown) {
-  if (available()) localStorage.setItem(key, JSON.stringify(value));
+  if (!available()) return;
+  localStorage.setItem(key, JSON.stringify(value));
+  window.dispatchEvent(new Event("purepoint-offline-queue-changed"));
 }
 
 function queueKey(prefix: string, ownerId: number) {
@@ -434,7 +436,7 @@ export function removePendingInventory(ownerId: number, clientOperationId: strin
 }
 
 export function getPendingOperationCount(ownerId: number) {
-  return getPendingCustomers(ownerId).length + getPendingVisits(ownerId).length + getPendingVisitDeletes(ownerId).length + getPendingWorkOrderUpdates(ownerId).length + getPendingCash(ownerId).length + getPendingInventory(ownerId).length;
+  return getPendingCustomers(ownerId).length + getPendingVisits(ownerId).length + getPendingVisitDeletes(ownerId).length + getPendingWorkOrderUpdates(ownerId).length + getPendingWorkOrderProofs(ownerId).length + getPendingCash(ownerId).length + getPendingInventory(ownerId).length;
 }
 
 export type OfflineBackup = {

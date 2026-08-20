@@ -23,6 +23,7 @@ import TechnicianLocations from "./pages/TechnicianLocations";
 import AllowedTechnicians from "./pages/AllowedTechnicians";
 import WorkOrders from "./pages/WorkOrders";
 import PublicDemo from "./pages/PublicDemo";
+import PendingOperations from "./pages/PendingOperations";
 
 function AdminOnly({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -75,6 +76,7 @@ function AdminReports() { return <AdminOnly><Reports /></AdminOnly>; }
 function AdminTechnicianPayroll() { return <AdminOnly><TechnicianPayroll /></AdminOnly>; }
 function AdminTechnicianLocations() { return <AdminOnly><TechnicianLocations /></AdminOnly>; }
 function AdminAllowedTechnicians() { return <AdminOnly><AllowedTechnicians /></AdminOnly>; }
+function AdminPendingOperations() { return <AdminOnly><PendingOperations /></AdminOnly>; }
 
 function Router() {
   const [location] = useLocation();
@@ -85,6 +87,7 @@ function Router() {
   if (pathname.replace(/\/$/, "") === "/work-orders") return <DashboardLayout><AdminOnly><WorkOrders /></AdminOnly></DashboardLayout>;
   if (pathname.replace(/\/$/, "") === "/technician-locations") return <DashboardLayout><AdminTechnicianLocations /></DashboardLayout>;
   if (pathname.replace(/\/$/, "") === "/allowed-technicians") return <DashboardLayout><AdminAllowedTechnicians /></DashboardLayout>;
+  if (pathname.replace(/\/$/, "") === "/pending-operations") return <DashboardLayout><AdminPendingOperations /></DashboardLayout>;
   return (
     <DashboardLayout>
       <Switch>
@@ -99,6 +102,7 @@ function Router() {
         <Route path="/technician-payroll" component={AdminTechnicianPayroll} />
         <Route path="/technician-locations" component={AdminTechnicianLocations} />
         <Route path="/allowed-technicians" component={AdminAllowedTechnicians} />
+        <Route path="/pending-operations" component={AdminPendingOperations} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>

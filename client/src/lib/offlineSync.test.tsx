@@ -28,12 +28,21 @@ import {
   restoreOfflineBackup,
   downloadOfflineBackup,
   restoreOfflineBackupFromExcel,
+  getPendingOperationCount,
+  queueOfflineWorkOrderUpdate,
+  queueOfflineWorkOrderProof,
 } from "./offlineSync";
 
 describe("التخزين المحلي للمزامنة", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.stubGlobal("crypto", { randomUUID: () => "26c4b0f0-e34e-4a89-8d6f-4dbdfd34403e" });
+  });
+
+  it("يحسب العمليات المعلقة بما فيها تحديثات الفني وإثباتات العمل", () => {
+    queueOfflineWorkOrderUpdate(5, { id: 11, status: "completed", visitResult: "تم التنفيذ" });
+    queueOfflineWorkOrderProof(5, { visitId: 11, kind: "signature", dataUrl: "data:image/png;base64,test" });
+    expect(getPendingOperationCount(5)).toBe(2);
   });
 
   it("يحفظ ويسترجع التذكيرات وأوامر العمل من التخزين المحلي", () => {

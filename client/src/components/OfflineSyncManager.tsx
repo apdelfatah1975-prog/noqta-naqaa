@@ -205,13 +205,19 @@ export function OfflineSyncManager() {
   useEffect(() => {
     const goOnline = () => { setOnline(true); void syncPendingOperations(); };
     const goOffline = () => setOnline(false);
+    const retryRequested = () => { void syncPendingOperations(); };
+    const queueChanged = () => refreshCount();
     refreshCount();
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
+    window.addEventListener("purepoint-offline-sync-request", retryRequested);
+    window.addEventListener("purepoint-offline-queue-changed", queueChanged);
     if (navigator.onLine) void syncPendingOperations();
     return () => {
       window.removeEventListener("online", goOnline);
       window.removeEventListener("offline", goOffline);
+      window.removeEventListener("purepoint-offline-sync-request", retryRequested);
+      window.removeEventListener("purepoint-offline-queue-changed", queueChanged);
     };
   }, [refreshCount, syncPendingOperations]);
 
