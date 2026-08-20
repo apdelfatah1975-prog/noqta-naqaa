@@ -128,6 +128,8 @@ export function OfflineSyncManager() {
           status: operation.status,
           visitResult: operation.visitResult ?? null,
           notes: operation.notes ?? null,
+          executionOutcome: operation.executionOutcome ?? null,
+          notCompletedReason: operation.notCompletedReason ?? null,
           collectedAmount: operation.collectedAmount ?? 0,
           collectedCurrency: operation.collectedCurrency ?? "SAR",
           items: operation.items ?? [],

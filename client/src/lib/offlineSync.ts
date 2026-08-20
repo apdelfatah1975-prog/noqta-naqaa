@@ -86,6 +86,8 @@ export type PendingWorkOrderUpdate = {
   status: "assigned" | "en_route" | "arrived" | "in_progress" | "completed" | "postponed" | "cancelled";
   visitResult?: string | null;
   notes?: string | null;
+  executionOutcome?: "completed" | "not_completed" | null;
+  notCompletedReason?: string | null;
   collectedAmount?: number;
   collectedCurrency?: "SAR";
   items?: OfflineVisitItem[];
