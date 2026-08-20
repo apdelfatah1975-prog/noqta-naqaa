@@ -1420,12 +1420,19 @@ export const filterManagementRouter = router({
       const rows = await db.select().from(visits).where(condition).orderBy(asc(visits.visitDate));
       const ownerIds = Array.from(new Set(rows.map(row => row.ownerId)));
       if (!ownerIds.length) return [];
-      const [customerRows, incomeRows] = await Promise.all([
+      const [customerRows, incomeRows, proofRows] = await Promise.all([
         db.select().from(customers).where(inArray(customers.ownerId, ownerIds)),
         db.select().from(cashTransactions).where(and(inArray(cashTransactions.ownerId, ownerIds), eq(cashTransactions.transactionType, "income"))),
+        db.select({ id: workOrderProofs.id, visitId: workOrderProofs.visitId, kind: workOrderProofs.kind, url: workOrderProofs.url, mimeType: workOrderProofs.mimeType, createdAt: workOrderProofs.createdAt }).from(workOrderProofs).where(and(inArray(workOrderProofs.visitId, rows.map(row => row.id)), inArray(workOrderProofs.ownerId, ownerIds))).orderBy(desc(workOrderProofs.createdAt)),
       ]);
       const customerById = new Map(customerRows.map(customer => [customer.id, customer]));
       const incomeByVisit = new Map(incomeRows.filter(row => row.sourceVisitId).map(row => [row.sourceVisitId!, row]));
+      const proofsByVisit = new Map<number, typeof proofRows>();
+      for (const proof of proofRows) {
+        const existing = proofsByVisit.get(proof.visitId) ?? [];
+        existing.push(proof);
+        proofsByVisit.set(proof.visitId, existing);
+      }
       return rows.map(row => ({
         ...row,
         customer: customerById.get(row.customerId) ? {
@@ -1438,6 +1445,7 @@ export const filterManagementRouter = router({
           manualCode: customerById.get(row.customerId)!.manualCode,
         } : null,
         collectedAmount: incomeByVisit.get(row.id)?.amount ?? 0,
+        proofs: proofsByVisit.get(row.id) ?? [],
       }));
     }),
     create: adminProcedure.input(workOrderCreateInput).mutation(async ({ ctx, input }) => {
