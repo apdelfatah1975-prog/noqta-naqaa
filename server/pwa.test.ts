@@ -43,7 +43,7 @@ describe("عامل خدمة التطبيق القابل للتثبيت", () => {
     expect(technicianManifest).toContain('"scope": "/technician-preview"');
     expect(indexHtml).toContain("window.location.pathname.startsWith('/technician-')");
     expect(indexHtml).toContain("/technician-manifest.webmanifest");
-    expect(mainSource).toContain("version=17-technician-isolated");
+    expect(mainSource).toContain("version=18-technician-isolated");
   });
 
   it("يجهز جذر التطبيق داخل غلاف التخزين المحلي", () => {
@@ -52,13 +52,13 @@ describe("عامل خدمة التطبيق القابل للتثبيت", () => {
     expect(source).toContain('if (requestUrl.pathname.startsWith("/api/")) return;');
   });
 
-  it("يعيد النسخة المخزنة فورًا لمسار التطبيق ويحاول تحديثها في الخلفية", async () => {
+  it("يعرض نسخة الشبكة الحديثة لمسار التطبيق ويحدّث الكاش، ثم يستخدم المخزنة عند انقطاع الاتصال", async () => {
     const networkResponse = { ok: true, clone: () => networkResponse };
     const cachedRoot = { cached: true };
     const fetchImplementation = vi.fn(async () => networkResponse);
     const { fetchHandler, caches } = loadServiceWorker(fetchImplementation, cachedRoot, { offline: true });
 
-    await expect(executeNavigation(fetchHandler)).resolves.toBe(cachedRoot);
+    await expect(executeNavigation(fetchHandler)).resolves.toBe(networkResponse);
     await Promise.resolve();
     expect(fetchImplementation).toHaveBeenCalledOnce();
     expect(caches.match).toHaveBeenCalledWith("/");

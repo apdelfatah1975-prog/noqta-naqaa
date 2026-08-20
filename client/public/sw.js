@@ -1,4 +1,4 @@
-const CACHE_NAME = "purepoint-shell-v17-technician-isolated";
+const CACHE_NAME = "purepoint-shell-v18-technician-isolated";
 const APP_SHELL = ["/",
 
   "/technician-preview",
@@ -45,8 +45,8 @@ self.addEventListener("fetch", event => {
         return response;
       }).catch(() => cachedShell || caches.match("/offline.html"));
 
-      // افتح المسار المطلوب سريعًا، ولا تستخدم غلاف المدير إلا كحل احتياطي نهائي.
-      return cachedShell || refresh;
+      // عند الاتصال، اعرض النسخة الجديدة فورًا وحدّث الكاش؛ استخدم الكاش فقط عند انقطاع الشبكة.
+      return refresh.catch(() => cachedShell || caches.match("/offline.html"));
     })());
     return;
   }
