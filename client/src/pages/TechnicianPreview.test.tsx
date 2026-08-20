@@ -75,6 +75,6 @@ describe("واجهة الفني وأوامر العمل", () => {
     fireEvent.change(screen.getByLabelText("ما تم تنفيذه"), { target: { value: "تم تغيير الشمعات" } });
     fireEvent.change(screen.getByLabelText("المبلغ المحصل"), { target: { value: "250" } });
     fireEvent.click(screen.getByRole("button", { name: /حفظ وإغلاق أمر العمل/ }));
-    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ id: 7, status: "completed", visitResult: "تم تغيير الشمعات", collectedAmount: 250, items: [] }));
+    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ id: 7, status: "completed", visitResult: "تم تغيير الشمعات", collectedAmount: 25000, items: [] }));
   });
 });
