@@ -642,6 +642,22 @@ describe("صلاحيات الفني والإدارة", () => {
     };
   }
 
+  it("يمنع الفني من تصحيح تسجيل زيارة العميل", async () => {
+    const caller = appRouter.createCaller(createTechnicianContext());
+    await expect(caller.filters.visits.updateDetails({
+      id: 55,
+      visitType: "maintenance",
+      visitDate: new Date("2026-08-20T09:00:00.000Z"),
+      technicianName: "فني",
+      visitResult: "تصحيح ممنوع",
+      notes: null,
+      status: "completed",
+      collectedAmount: 0,
+      collectedCurrency: "SAR",
+      pin: TEST_PIN,
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
   it("يمنع الفني من قراءة وتعديل المخزن والخزينة", async () => {
     const caller = appRouter.createCaller(createTechnicianContext());
     await expect(caller.filters.inventory.summary()).rejects.toMatchObject({ code: "FORBIDDEN" });

@@ -994,6 +994,51 @@ export const filterManagementRouter = router({
       await refreshOwnerBackup(ctx.user.id);
       return { id: visitId, reminderCreated: needsAutomaticReminder(input.visitType), alreadySynced: false };
     }),
+    updateDetails: adminProcedure.input(z.object({
+      id: z.number().int().positive(),
+      visitType: z.enum(visitTypes),
+      visitDate: z.date(),
+      technicianName: z.string().trim().max(160).optional().nullable(),
+      visitResult: z.string().trim().max(2000).optional().nullable(),
+      notes: z.string().trim().max(2000).optional().nullable(),
+      status: z.enum(["assigned", "en_route", "arrived", "in_progress", "completed", "postponed", "cancelled"]).optional(),
+      collectedAmount: z.number().int().nonnegative(),
+      collectedCurrency: z.enum(cashCurrencies),
+      pin: sensitivePinInput.shape.pin,
+    })).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
+      const db = await databaseOrThrow();
+      const existing = await db.select().from(visits).where(and(eq(visits.id, input.id), eq(visits.ownerId, ctx.user.id))).limit(1);
+      if (!existing[0]) throw new TRPCError({ code: "NOT_FOUND", message: "الزيارة غير موجودة" });
+      const nextStatus = input.status ?? existing[0].status;
+      await db.update(visits).set({
+        visitType: input.visitType,
+        visitDate: input.visitDate,
+        technicianName: input.technicianName ?? null,
+        visitResult: input.visitResult ?? null,
+        notes: input.notes ?? null,
+        status: nextStatus,
+        completedAt: nextStatus === "completed" ? (existing[0].completedAt ?? new Date()) : existing[0].completedAt,
+      }).where(and(eq(visits.id, input.id), eq(visits.ownerId, ctx.user.id)));
+
+      await db.update(reminders).set({ status: "completed" }).where(and(eq(reminders.ownerId, ctx.user.id), eq(reminders.customerId, existing[0].customerId), eq(reminders.status, "pending")));
+      if (needsAutomaticReminder(input.visitType)) {
+        const pending = await db.select().from(reminders).where(and(eq(reminders.visitId, input.id), eq(reminders.ownerId, ctx.user.id), eq(reminders.status, "pending"))).limit(1);
+        if (pending[0]) await db.update(reminders).set({ reminderDate: followUpDate(input.visitDate) }).where(eq(reminders.id, pending[0].id));
+        else await db.insert(reminders).values({ customerId: existing[0].customerId, visitId: input.id, ownerId: ctx.user.id, reminderDate: followUpDate(input.visitDate) });
+      }
+
+      const income = await db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.sourceVisitId, input.id))).limit(1);
+      const category = input.visitType === "installation" ? "تحصيل تركيب" : input.visitType === "maintenance" ? "تحصيل صيانة" : input.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
+      if (input.collectedAmount > 0) {
+        if (income[0]) await db.update(cashTransactions).set({ amount: input.collectedAmount, currency: input.collectedCurrency, category, transactionDate: input.visitDate, recipientName: input.technicianName ?? null }).where(and(eq(cashTransactions.id, income[0].id), eq(cashTransactions.ownerId, ctx.user.id)));
+        else await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: input.collectedCurrency, amount: input.collectedAmount, category, transactionDate: input.visitDate, sourceVisitId: input.id, recipientName: input.technicianName ?? null, notes: "إيراد مصحح من تسجيل زيارة" });
+      } else if (income[0]) {
+        await db.delete(cashTransactions).where(and(eq(cashTransactions.id, income[0].id), eq(cashTransactions.ownerId, ctx.user.id)));
+      }
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true };
+    }),
     updateDate: protectedProcedure.input(z.object({ visitId: z.number().int().positive(), visitDate: z.date(), pin: sensitivePinInput.shape.pin })).mutation(async ({ ctx, input }) => {
       await requirePin(ctx.user.id, input.pin);
       const db = await databaseOrThrow();
