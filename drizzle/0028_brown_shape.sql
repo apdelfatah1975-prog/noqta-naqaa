@@ -1,0 +1,1 @@
+ALTER TABLE `allowedTechnicianAccounts` MODIFY COLUMN `menuPermissions` varchar(255) NOT NULL DEFAULT '["workOrders"]';

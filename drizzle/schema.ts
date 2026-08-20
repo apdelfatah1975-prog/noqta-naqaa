@@ -36,6 +36,7 @@ export const allowedTechnicianAccounts = mysqlTable(
     linkedUserId: int("linkedUserId").references(() => users.id, { onDelete: "set null" }),
     passwordHash: varchar("passwordHash", { length: 255 }),
     isActive: boolean("isActive").default(true).notNull(),
+    menuPermissions: varchar("menuPermissions", { length: 255 }).default('["workOrders"]').notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },

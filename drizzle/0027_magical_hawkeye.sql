@@ -1,0 +1,1 @@
+ALTER TABLE `allowedTechnicianAccounts` ADD `menuPermissions` text DEFAULT ('["workOrders"]') NOT NULL;

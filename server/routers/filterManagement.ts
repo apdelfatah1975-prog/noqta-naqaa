@@ -46,6 +46,18 @@ import { adminProcedure, protectedProcedure, publicProcedure, router } from "../
 import { createOwnerBackup, refreshOwnerBackup } from "../backup";
 import { storageGet, storagePut } from "../storage";
 
+type TechnicianMenuPermission = "workOrders" | "customers" | "visits";
+const defaultTechnicianMenuPermissions: TechnicianMenuPermission[] = ["workOrders"];
+export function parseTechnicianMenuPermissions(value: string | null | undefined): TechnicianMenuPermission[] {
+  try {
+    const parsed = JSON.parse(value || "[]");
+    const allowed = parsed.filter((item: unknown): item is TechnicianMenuPermission => item === "workOrders" || item === "customers" || item === "visits");
+    return allowed.length ? Array.from(new Set(allowed)) : defaultTechnicianMenuPermissions;
+  } catch {
+    return defaultTechnicianMenuPermissions;
+  }
+}
+
 const customerInput = z.object({
   name: z.string().trim().min(2, "أدخل اسم العميل").max(160),
   manualCode: z.string().trim().max(64).optional().nullable(),
@@ -478,7 +490,20 @@ export const filterManagementRouter = router({
   allowedTechnicians: router({
     list: adminProcedure.query(async ({ ctx }) => {
       const db = await databaseOrThrow();
-      return db.select({ id: allowedTechnicianAccounts.id, ownerId: allowedTechnicianAccounts.ownerId, email: allowedTechnicianAccounts.email, displayName: allowedTechnicianAccounts.displayName, linkedUserId: allowedTechnicianAccounts.linkedUserId, isActive: allowedTechnicianAccounts.isActive, createdAt: allowedTechnicianAccounts.createdAt, updatedAt: allowedTechnicianAccounts.updatedAt, hasPassword: allowedTechnicianAccounts.passwordHash }).from(allowedTechnicianAccounts).where(eq(allowedTechnicianAccounts.ownerId, ctx.user.id)).orderBy(desc(allowedTechnicianAccounts.createdAt));
+      const rows = await db.select({ id: allowedTechnicianAccounts.id, ownerId: allowedTechnicianAccounts.ownerId, email: allowedTechnicianAccounts.email, displayName: allowedTechnicianAccounts.displayName, linkedUserId: allowedTechnicianAccounts.linkedUserId, isActive: allowedTechnicianAccounts.isActive, menuPermissions: allowedTechnicianAccounts.menuPermissions, createdAt: allowedTechnicianAccounts.createdAt, updatedAt: allowedTechnicianAccounts.updatedAt, hasPassword: allowedTechnicianAccounts.passwordHash }).from(allowedTechnicianAccounts).where(eq(allowedTechnicianAccounts.ownerId, ctx.user.id)).orderBy(desc(allowedTechnicianAccounts.createdAt));
+      return rows.map(row => ({ ...row, menuPermissions: parseTechnicianMenuPermissions(row.menuPermissions) }));
+    }),
+    myPermissions: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role === "admin") return { menuPermissions: ["workOrders"] as TechnicianMenuPermission[] };
+      const db = await databaseOrThrow();
+      const account = (await db.select({ menuPermissions: allowedTechnicianAccounts.menuPermissions }).from(allowedTechnicianAccounts).where(and(eq(allowedTechnicianAccounts.linkedUserId, ctx.user.id), eq(allowedTechnicianAccounts.isActive, true))).limit(1))[0];
+      return { menuPermissions: parseTechnicianMenuPermissions(account?.menuPermissions) };
+    }),
+    updateMenuPermissions: adminProcedure.input(z.object({ id: z.number().int().positive(), menuPermissions: z.array(z.enum(["workOrders", "customers", "visits"])).min(1).max(3) })).mutation(async ({ ctx, input }) => {
+      const db = await databaseOrThrow();
+      const updated = await db.update(allowedTechnicianAccounts).set({ menuPermissions: JSON.stringify(Array.from(new Set(input.menuPermissions))) }).where(and(eq(allowedTechnicianAccounts.id, input.id), eq(allowedTechnicianAccounts.ownerId, ctx.user.id)));
+      if (!updated[0]?.affectedRows) throw new TRPCError({ code: "NOT_FOUND", message: "الحساب غير موجود." });
+      return { success: true };
     }),
     create: adminProcedure.input(z.object({
       email: z.string().trim().email("أدخل بريدًا إلكترونيًا صحيحًا").max(320),

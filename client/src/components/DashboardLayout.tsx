@@ -119,12 +119,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 }
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
+  const technicianPermissions = trpc.filters.allowedTechnicians.myPermissions.useQuery(undefined, { enabled: Boolean(user && user.role !== "admin"), retry: false, staleTime: 60_000 });
   const utils = trpc.useUtils();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const visibleMenuItems = user?.role === "admin"
     ? menuItems
-    : menuItems.filter(item => !["/inventory", "/cash", "/reports", "/technician-payroll", "/technician-locations", "/allowed-technicians"].includes(item.path));
+    : menuItems.filter(item => {
+      const permissions = technicianPermissions.data?.menuPermissions ?? ["workOrders"];
+      if (["/inventory", "/cash", "/reports", "/technician-payroll", "/technician-locations", "/allowed-technicians", "/pending-operations", "/settings"].includes(item.path)) return false;
+      if (item.path === "/work-orders" || item.path === "/technician-preview") return permissions.includes("workOrders");
+      if (item.path === "/customers") return permissions.includes("customers");
+      if (item.path === "/visits") return permissions.includes("visits");
+      return false;
+    });
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
