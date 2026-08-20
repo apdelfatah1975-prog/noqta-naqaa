@@ -118,8 +118,8 @@ export default function TechnicianPreview() {
       status: "completed",
       visitResult: result.trim() || "تم تنفيذ الخدمة",
       notes: null,
-      // المبلغ يُكتب بالريال في الشاشة، وتخزنه الخزينة بالهللات.
-      collectedAmount: Math.round(Math.max(0, Number(amount) || 0) * 100),
+      // المبلغ موحّد بالريال الكامل في الواجهة والخادم والخزينة.
+      collectedAmount: Math.round(Math.max(0, Number(amount) || 0)),
       items,
     });
   };

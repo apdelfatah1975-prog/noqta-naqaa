@@ -158,19 +158,19 @@ function EditVisitDialog({ visit, busy, onClose, onSubmit }: { visit: VisitRow; 
   const [visitResult, setVisitResult] = useState(visit.visitResult ?? "");
   const [notes, setNotes] = useState(visit.notes ?? "");
   const [status, setStatus] = useState<EditVisitValues["status"]>(visit.status ?? "completed");
-  const [collectedAmount, setCollectedAmount] = useState(String(visit.collectedAmount ? visit.collectedAmount / 100 : 0));
+  const [collectedAmount, setCollectedAmount] = useState(String(visit.collectedAmount ?? 0));
   const [collectedCurrency] = useState<EditVisitValues["collectedCurrency"]>("SAR");
   const [pin, setPin] = useState("");
 
   return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-visit-title">
-    <form className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl" onSubmit={event => { event.preventDefault(); onSubmit({ id: visit.id, visitType, visitDate: new Date(visitDate), technicianName: technicianName.trim() || null, visitResult: visitResult.trim() || null, notes: notes.trim() || null, status, collectedAmount: Math.round(Math.max(0, Number(collectedAmount) || 0) * 100), collectedCurrency, pin }); }}>
+    <form className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl" onSubmit={event => { event.preventDefault(); onSubmit({ id: visit.id, visitType, visitDate: new Date(visitDate), technicianName: technicianName.trim() || null, visitResult: visitResult.trim() || null, notes: notes.trim() || null, status, collectedAmount: Math.round(Math.max(0, Number(collectedAmount) || 0)), collectedCurrency, pin }); }}>
       <div className="mb-4 flex items-start justify-between gap-3"><div><h2 id="edit-visit-title" className="text-lg font-black text-teal-950">تصحيح تسجيل الزيارة</h2><p className="mt-1 text-sm text-slate-500">التعديل متاح للمسؤول فقط، ويُحدّث القيد المرتبط بالخزينة.</p></div><button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-xl text-slate-500 hover:bg-slate-100" aria-label="إغلاق">×</button></div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label><span className="field-label">نوع الزيارة</span><select className="field-input mt-1" value={visitType} onChange={event => setVisitType(event.target.value as EditVisitValues["visitType"])}>{Object.entries(visitTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label><span className="field-label">تاريخ الزيارة</span><input className="field-input mt-1" type="datetime-local" value={visitDate} onChange={event => setVisitDate(event.target.value)} required /></label>
         <label><span className="field-label">الفني</span><input className="field-input mt-1" value={technicianName} onChange={event => setTechnicianName(event.target.value)} /></label>
         <label><span className="field-label">حالة الزيارة</span><select className="field-input mt-1" value={status} onChange={event => setStatus(event.target.value as EditVisitValues["status"])}>{[["assigned", "مسندة"], ["en_route", "في الطريق"], ["arrived", "وصل"], ["in_progress", "قيد التنفيذ"], ["completed", "مكتملة"], ["postponed", "مؤجلة"], ["cancelled", "ملغاة"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <label><span className="field-label">المبلغ المحصل</span><input className="field-input mt-1" type="number" min="0" step="0.01" value={collectedAmount} onChange={event => setCollectedAmount(event.target.value)} /></label>
+        <label><span className="field-label">المبلغ المحصل</span><input className="field-input mt-1" type="number" min="0" step="1" value={collectedAmount} onChange={event => setCollectedAmount(event.target.value)} /></label>
         <label><span className="field-label">العملة</span><div className="field-input mt-1 bg-slate-50">ريال سعودي</div></label>
         <label className="sm:col-span-2"><span className="field-label">نتيجة الزيارة</span><textarea className="field-input mt-1 min-h-24" value={visitResult} onChange={event => setVisitResult(event.target.value)} /></label>
         <label className="sm:col-span-2"><span className="field-label">ملاحظات</span><textarea className="field-input mt-1 min-h-20" value={notes} onChange={event => setNotes(event.target.value)} /></label>
