@@ -48,7 +48,11 @@ function TechnicianPwaHead() {
     const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
     const previousHref = manifest?.getAttribute("href") ?? "/manifest.webmanifest";
     const previousTitle = document.title;
-    if (manifest) manifest.href = "/technician-manifest.webmanifest";
+    if (manifest) {
+      manifest.href = window.location.pathname.startsWith("/technician-app")
+        ? "/technician-app/technician-manifest.webmanifest"
+        : "/technician-manifest.webmanifest";
+    }
     document.title = "أوامر الفني | نقطة نقاء";
     return () => {
       if (manifest) manifest.href = previousHref;
@@ -99,9 +103,12 @@ function Router() {
   const [location] = useLocation();
   const pathname = typeof window !== "undefined" ? window.location.pathname : location;
   if (pathname.replace(/\/$/, "") === "/demo") return <PublicDemo />;
-  if (pathname.replace(/\/$/, "") === "/technician-login") return <TechnicianLogin />;
-  if (pathname.replace(/\/$/, "") === "/technician-preview") return <ProtectedTechnician />;
-  if (pathname.replace(/\/$/, "") === "/technician-pending-operations") return <TechnicianPendingOperations />;
+  const cleanPath = pathname.replace(/\/$/, "");
+  if (cleanPath === "/technician-app/login") return <TechnicianLogin />;
+  if (cleanPath === "/technician-app") return <ProtectedTechnician />;
+  if (cleanPath === "/technician-login") return <TechnicianLogin />;
+  if (cleanPath === "/technician-preview") return <ProtectedTechnician />;
+  if (cleanPath === "/technician-pending-operations") return <TechnicianPendingOperations />;
   if (pathname.replace(/\/$/, "") === "/work-orders") return <DashboardLayout><AdminOnly><WorkOrders /></AdminOnly></DashboardLayout>;
   if (pathname.replace(/\/$/, "") === "/technician-locations") return <DashboardLayout><AdminTechnicianLocations /></DashboardLayout>;
   if (pathname.replace(/\/$/, "") === "/allowed-technicians") return <DashboardLayout><AdminAllowedTechnicians /></DashboardLayout>;

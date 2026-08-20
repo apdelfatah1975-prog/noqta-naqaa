@@ -13,7 +13,7 @@ type InstallAppButtonProps = {
   technician?: boolean;
 };
 
-const TECHNICIAN_MANIFEST = "/technician-manifest.webmanifest";
+const TECHNICIAN_MANIFEST = "/technician-app/technician-manifest.webmanifest";
 const ADMIN_MANIFEST = "/manifest.webmanifest";
 
 export function InstallAppButton({ compact = false, technician = false }: InstallAppButtonProps) {

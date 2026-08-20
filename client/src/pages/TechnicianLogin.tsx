@@ -16,7 +16,7 @@ export default function TechnicianLogin() {
     const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
     const previousHref = manifest?.getAttribute("href") ?? "/manifest.webmanifest";
     const previousTitle = document.title;
-    if (manifest) manifest.href = "/technician-manifest.webmanifest";
+    if (manifest) manifest.href = "/technician-app/technician-manifest.webmanifest";
     document.title = "دخول الفني | نقطة نقاء";
     return () => {
       if (manifest) manifest.href = previousHref;
@@ -30,7 +30,7 @@ export default function TechnicianLogin() {
     onSuccess: async () => {
       await utils.auth.me.invalidate();
       toast.success("تم تسجيل الدخول بنجاح");
-      navigate("/technician-preview");
+      navigate("/technician-app");
     },
     onError: (error) => toast.error(error.message),
   });

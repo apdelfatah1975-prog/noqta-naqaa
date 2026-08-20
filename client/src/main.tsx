@@ -21,7 +21,13 @@ if (!import.meta.env.PROD && "serviceWorker" in navigator) {
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js?version=18-technician-isolated").then(registration => {
+    const technicianStandalone = window.location.pathname.startsWith("/technician-app");
+    const serviceWorkerUrl = technicianStandalone
+      ? "/technician-app/sw.js?version=1-orders-only"
+      : "/sw.js?version=19-admin-refresh";
+    void navigator.serviceWorker.register(serviceWorkerUrl, {
+      scope: technicianStandalone ? "/technician-app/" : "/",
+    }).then(registration => {
       const update = () => void registration.update();
       if ("requestIdleCallback" in window) {
         window.requestIdleCallback(update, { timeout: 3000 });
@@ -57,7 +63,8 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
   const isTechnicianPath =
     window.location.pathname === "/technician-login" ||
-    window.location.pathname === "/technician-preview";
+    window.location.pathname === "/technician-preview" ||
+    window.location.pathname.startsWith("/technician-app");
 
   if (!isUnauthorized || isTechnicianPath) return;
 

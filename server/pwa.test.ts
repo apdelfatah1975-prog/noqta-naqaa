@@ -43,7 +43,8 @@ describe("عامل خدمة التطبيق القابل للتثبيت", () => {
     expect(technicianManifest).toContain('"scope": "/technician-"');
     expect(indexHtml).toContain("window.location.pathname.startsWith('/technician-')");
     expect(indexHtml).toContain("/technician-manifest.webmanifest");
-    expect(mainSource).toContain("version=18-technician-isolated");
+    expect(mainSource).toContain('const technicianStandalone = window.location.pathname.startsWith("/technician-app")');
+    expect(mainSource).toContain("version=1-orders-only");
   });
 
   it("يجهز جذر التطبيق داخل غلاف التخزين المحلي", () => {
