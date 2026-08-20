@@ -50,7 +50,7 @@ export default function TechnicianLogin() {
                   <p className="text-sm font-black text-sky-950">ثبّت واجهة الفني على الهاتف</p>
                   <p className="mt-1 text-xs font-semibold leading-5 text-sky-800">افتح الرابط مرة، ثم اضغط التثبيت لتظهر الواجهة مثل أي تطبيق.</p>
                 </div>
-                <InstallAppButton />
+                <InstallAppButton technician />
               </div>
               <ol className="mt-3 grid gap-1 text-[11px] font-bold text-sky-800">
                 <li>١. افتح الرابط من Chrome.</li>

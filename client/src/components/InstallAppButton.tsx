@@ -8,20 +8,35 @@ type InstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-export function InstallAppButton({ compact = false }: { compact?: boolean }) {
+type InstallAppButtonProps = {
+  compact?: boolean;
+  technician?: boolean;
+};
+
+const TECHNICIAN_MANIFEST = "/technician-manifest.webmanifest";
+const ADMIN_MANIFEST = "/manifest.webmanifest";
+
+export function InstallAppButton({ compact = false, technician = false }: InstallAppButtonProps) {
   const [installEvent, setInstallEvent] = useState<InstallPromptEvent | null>(null);
+  const [promptManifest, setPromptManifest] = useState<string | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
+    const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    if (manifest) manifest.href = technician ? TECHNICIAN_MANIFEST : ADMIN_MANIFEST;
+
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
+      setPromptManifest(manifest?.getAttribute("href") ?? null);
       setInstallEvent(event as InstallPromptEvent);
     };
     const onInstalled = () => {
       setIsInstalled(true);
       setInstallEvent(null);
+      setPromptManifest(null);
       toast.success("تم تثبيت التطبيق على جهازك.");
     };
+
     setIsInstalled(window.matchMedia("(display-mode: standalone)").matches);
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onInstalled);
@@ -29,17 +44,25 @@ export function InstallAppButton({ compact = false }: { compact?: boolean }) {
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
     };
-  }, []);
+  }, [technician]);
 
   async function installApp() {
-    if (!installEvent) {
-      toast.message("من قائمة المتصفح اختر «تثبيت التطبيق» أو «Install app».");
+    const requiredManifest = technician ? TECHNICIAN_MANIFEST : ADMIN_MANIFEST;
+    const currentManifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    if (currentManifest && currentManifest.getAttribute("href") !== requiredManifest) {
+      currentManifest.href = requiredManifest;
+    }
+
+    if (!installEvent || promptManifest !== requiredManifest) {
+      toast.message("حدّث الصفحة من رابط الفني ثم اختر «تثبيت التطبيق» من جديد.");
       return;
     }
+
     await installEvent.prompt();
     const choice = await installEvent.userChoice;
     if (choice.outcome === "dismissed") toast.message("يمكنك تثبيت التطبيق لاحقًا من قائمة المتصفح.");
     setInstallEvent(null);
+    setPromptManifest(null);
   }
 
   if (isInstalled) return null;
@@ -51,3 +74,6 @@ export function InstallAppButton({ compact = false }: { compact?: boolean }) {
     </Button>
   );
 }
+
+export { TECHNICIAN_MANIFEST, ADMIN_MANIFEST };
+
