@@ -256,9 +256,11 @@ export default function Inventory() {
                 <StockBadge balance={item.currentBalance} reorderLevel={item.reorderLevel} />
               </div>
               {item.notes ? <p className="text-xs leading-5 text-muted-foreground">{item.notes}</p> : null}
-              <div className="grid grid-cols-2 gap-3 rounded-xl bg-teal-50/60 p-3 text-sm">
+              <div className="grid grid-cols-2 gap-3 rounded-xl bg-teal-50/60 p-3 text-sm sm:grid-cols-4">
                 <div><p className="text-xs text-muted-foreground">الرصيد الافتتاحي</p><p className="mt-1 font-extrabold">{item.openingQuantity}</p></div>
                 <div><p className="text-xs text-muted-foreground">الرصيد الحالي</p><p className={`mt-1 text-lg font-extrabold ${balanceTextClass(item.currentBalance, item.reorderLevel)}`}>{item.currentBalance}</p></div>
+                <div><p className="text-xs text-muted-foreground">سعر الوحدة</p><p className="mt-1 font-extrabold">{formatMoney(item.openingUnitCost ?? item.defaultUnitCost ?? 0)} ريال</p></div>
+                <div><p className="text-xs text-muted-foreground">تاريخ الإضافة</p><p className="mt-1 font-extrabold">{formatDate(item.openingAddedAt ?? item.createdAt)}</p></div>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="grid grid-cols-2 gap-2"><Button size="sm" variant="outline" onClick={() => openMovement({ id: item.id, name: item.name, defaultUnitCost: item.defaultUnitCost }, "incoming")} className="w-full rounded-xl border-emerald-200 text-emerald-800 hover:bg-emerald-50"><PackagePlus className="ml-1 h-4 w-4" />إضافة وارد</Button><Button size="sm" variant="outline" onClick={() => openMovement({ id: item.id, name: item.name, defaultUnitCost: item.defaultUnitCost }, "outgoing")} className="w-full rounded-xl border-teal-700/20 text-teal-800 hover:bg-teal-50"><PackagePlus className="ml-1 h-4 w-4" />صرف صنف</Button></div>

@@ -46,9 +46,9 @@ describe("واجهة الفني وأوامر العمل", () => {
 
   it("تعرض بيانات العميل المسموحة وتحجب أسرار الشركة", () => {
     render(<TechnicianPreview />);
-    expect(screen.getByText("أوامر اليوم")).toBeTruthy();
+    expect(screen.getByText("أوامري فقط")).toBeTruthy();
     expect(screen.getByText("أحمد محمد")).toBeTruthy();
-    expect(screen.getByText("بيانات العمل المسموحة فقط")).toBeTruthy();
+    expect(screen.getByText("أوامرك المسندة فقط")).toBeTruthy();
     expect(screen.queryByText("الخزينة العامة")).toBeNull();
     expect(screen.queryByText("تكلفة الشراء")).toBeNull();
     expect(screen.queryByText("تقارير الشركة")).toBeNull();

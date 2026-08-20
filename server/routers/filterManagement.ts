@@ -269,13 +269,19 @@ async function inventorySummary(ownerId: number) {
     .from(inventoryMovements)
     .where(and(eq(inventoryMovements.ownerId, ownerId), inArray(inventoryMovements.inventoryItemId, itemIds)))
     .orderBy(desc(inventoryMovements.movementDate));
-  const itemBalances = items.map(item => ({
-    ...item,
-    currentBalance: calculateStockBalance(
-      item.openingQuantity,
-      movements.filter(movement => movement.inventoryItemId === item.id),
-    ),
-  }));
+  const itemBalances = items.map(item => {
+    const itemMovements = movements.filter(movement => movement.inventoryItemId === item.id);
+    const openingMovement = itemMovements
+      .filter(movement => movement.movementType === "incoming" && movement.notes?.startsWith("الرصيد الافتتاحي"))
+      .sort((a, b) => new Date(a.movementDate).getTime() - new Date(b.movementDate).getTime())[0];
+    return {
+      ...item,
+      openingQuantity: item.openingQuantity || openingMovement?.quantity || 0,
+      openingUnitCost: openingMovement?.unitCost ?? item.defaultUnitCost ?? 0,
+      openingAddedAt: openingMovement?.movementDate ?? item.createdAt,
+      currentBalance: calculateStockBalance(item.openingQuantity, itemMovements),
+    };
+  });
   return {
     items: itemBalances,
     movements: movements.map(movement => ({
