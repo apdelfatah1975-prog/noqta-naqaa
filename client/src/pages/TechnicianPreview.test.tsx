@@ -78,6 +78,14 @@ describe("واجهة الفني وأوامر العمل", () => {
     expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ id: 7, status: "completed", visitResult: "تم تغيير الشمعات", collectedAmount: 250, items: [] }));
   });
 
+  it("تعرض خيار التسجيل الصوتي مع إبقاء الكتابة متاحة", () => {
+    orders[0].status = "in_progress";
+    render(<TechnicianPreview />);
+    fireEvent.click(screen.getByRole("button", { name: "تحديث" }));
+    expect(screen.getByRole("button", { name: "بدء التسجيل" })).toBeTruthy();
+    expect(screen.getByLabelText("ما تم تنفيذه")).toBeTruthy();
+  });
+
   it("ترفض المبلغ السالب ولا ترسل أمر الإغلاق", () => {
     orders[0].status = "in_progress";
     render(<TechnicianPreview />);

@@ -204,6 +204,13 @@
       "when": 1787223199939,
       "tag": "0028_brown_shape",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "5",
+      "when": 1787266361216,
+      "tag": "0029_natural_clint_barton",
+      "breakpoints": true
     }
   ]
 }

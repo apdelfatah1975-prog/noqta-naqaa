@@ -112,8 +112,8 @@ const customerImportRowInput = z.object({
 
 const workOrderProofInput = z.object({
   visitId: z.number().int().positive(),
-  kind: z.enum(["photo", "signature"]),
-  dataUrl: z.string().regex(/^data:(image\/(?:jpeg|png|webp));base64,[A-Za-z0-9+/=]+$/, "صيغة الدليل غير صالحة").max(7_000_000),
+  kind: z.enum(["photo", "signature", "audio"]),
+  dataUrl: z.string().regex(/^data:(?:image\/(?:jpeg|png|webp)|audio\/(?:webm|mp4|mpeg|ogg));base64,[A-Za-z0-9+/=]+$/, "صيغة الدليل غير صالحة").max(12_000_000),
 });
 
 const visitItemInput = z.object({
@@ -1493,11 +1493,12 @@ export const filterManagementRouter = router({
         : and(eq(visits.id, input.visitId), eq(visits.assignedTechnicianId, ctx.user.id));
       const visit = (await db.select({ id: visits.id, ownerId: visits.ownerId }).from(visits).where(condition).limit(1))[0];
       if (!visit) throw new TRPCError({ code: "NOT_FOUND", message: "أمر العمل غير موجود أو غير مسند إليك." });
-      const match = input.dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
+      const match = input.dataUrl.match(/^data:((?:image\/(?:jpeg|png|webp)|audio\/(?:webm|mp4|mpeg|ogg)));base64,(.+)$/);
       if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "صيغة الدليل غير صالحة." });
       const mimeType = match[1];
       const buffer = Buffer.from(match[2], "base64");
-      if (buffer.byteLength > 5 * 1024 * 1024) throw new TRPCError({ code: "BAD_REQUEST", message: "حجم الدليل أكبر من 5 ميجابايت." });
+      const maxBytes = input.kind === "audio" ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
+      if (buffer.byteLength > maxBytes) throw new TRPCError({ code: "BAD_REQUEST", message: input.kind === "audio" ? "حجم التسجيل الصوتي أكبر من 10 ميجابايت." : "حجم الدليل أكبر من 5 ميجابايت." });
       const extension = mimeType.split("/")[1];
       const key = `water-filter-proofs/${visit.ownerId}/${visit.id}/${Date.now()}-${randomBytes(6).toString("hex")}.${extension}`;
       const uploaded = await storagePut(key, buffer, mimeType);

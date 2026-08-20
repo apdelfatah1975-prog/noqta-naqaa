@@ -10,7 +10,7 @@ function ProofList({ visitId }: { visitId: number }) {
   const { data, isLoading } = trpc.filters.workOrders.listProofs.useQuery({ visitId });
   if (isLoading) return <p className="text-xs text-slate-500">جارٍ تحميل الأدلة…</p>;
   if (!data?.length) return <p className="text-xs text-slate-500">لا توجد أدلة محفوظة لهذا الأمر.</p>;
-  return <div className="mt-2 grid grid-cols-2 gap-2">{data.map(proof => <a key={proof.id} href={proof.url} target="_blank" rel="noreferrer" className="group relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50"><img src={proof.url} alt={proof.kind === "signature" ? "توقيع العميل" : "صورة العمل"} className="h-24 w-full object-cover transition group-hover:scale-105" /><span className="absolute bottom-1 right-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-bold text-white">{proof.kind === "signature" ? "توقيع" : "صورة"}</span></a>)}</div>;
+  return <div className="mt-2 grid grid-cols-2 gap-2">{data.map(proof => proof.kind === "audio" ? <div key={proof.id} className="rounded-xl border border-slate-200 bg-slate-50 p-2"><audio controls src={proof.url} className="w-full" /><span className="mt-1 block text-[10px] font-bold text-slate-600">تسجيل صوتي</span></div> : <a key={proof.id} href={proof.url} target="_blank" rel="noreferrer" className="group relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50"><img src={proof.url} alt={proof.kind === "signature" ? "توقيع العميل" : "صورة العمل"} className="h-24 w-full object-cover transition group-hover:scale-105" /><span className="absolute bottom-1 right-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-bold text-white">{proof.kind === "signature" ? "توقيع" : "صورة"}</span></a>)}</div>;
 }
 
 export default function TechnicianLocations() {

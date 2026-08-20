@@ -75,7 +75,7 @@ export type OfflineVisit = {
 export type PendingWorkOrderProof = {
   clientOperationId: string;
   visitId: number;
-  kind: "photo" | "signature";
+  kind: "photo" | "signature" | "audio";
   dataUrl: string;
   createdAt: string;
 };

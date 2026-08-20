@@ -288,7 +288,7 @@ export const visitItems = mysqlTable(
 
 
 
-export const workOrderProofKindValues = ["photo", "signature"] as const;
+export const workOrderProofKindValues = ["photo", "signature", "audio"] as const;
 
 export const workOrderProofs = mysqlTable(
   "workOrderProofs",

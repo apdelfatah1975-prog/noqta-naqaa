@@ -1,0 +1,1 @@
+ALTER TABLE `workOrderProofs` MODIFY COLUMN `kind` enum('photo','signature','audio') NOT NULL;
