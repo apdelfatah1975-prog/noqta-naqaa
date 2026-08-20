@@ -115,6 +115,8 @@ export const visits = mysqlTable(
     completedAt: timestamp("completedAt"),
     notes: text("notes"),
     visitResult: text("visitResult"),
+    executionOutcome: varchar("executionOutcome", { length: 32 }),
+    notCompletedReason: text("notCompletedReason"),
     clientOperationId: varchar("clientOperationId", { length: 64 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },

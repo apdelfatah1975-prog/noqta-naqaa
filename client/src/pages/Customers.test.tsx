@@ -5,6 +5,7 @@ import Customers, { addOrIncrementVisitItem, buildPartsConfirmation } from "./Cu
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
+  techniciansList: vi.fn(),
   createUseMutation: vi.fn(),
   visitUseMutation: vi.fn(),
   updateUseMutation: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock("@/lib/trpc", () => ({
         deleteAll: { useMutation: mocks.deleteAllUseMutation },
         importBulk: { useMutation: mocks.importBulkUseMutation },
       },
+      technicians: { list: { useQuery: mocks.techniciansList } },
       visits: { create: { useMutation: mocks.visitUseMutation } },
       dashboard: { invalidate: mocks.dashboardInvalidate },
       reminders: { due: { invalidate: mocks.remindersInvalidate } },
@@ -60,6 +62,7 @@ describe("ترابط تعديل بيانات العميل", () => {
       isLoading: false,
       isError: false,
     });
+    mocks.techniciansList.mockReturnValue({ data: [{ id: 7, name: "أحمد" }], isLoading: false, isError: false });
     mocks.createUseMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
     mocks.visitUseMutation.mockImplementation((options: { onSuccess?: (result: { reminderCreated?: boolean }) => void }) => {
       mocks.visitOptions = options;

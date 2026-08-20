@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { parse as parseCookie } from "cookie";
-import { and, asc, desc, eq, gte, inArray, lte, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import {
   cashTransactions,
@@ -120,6 +120,7 @@ const visitInput = z.object({
 });
 
 const workOrderStatusValues = ["assigned", "en_route", "arrived", "in_progress", "completed", "postponed", "cancelled"] as const;
+const executionOutcomeValues = ["completed", "not_completed"] as const;
 const workOrderCreateInput = z.object({
   customerId: z.number().int().positive(),
   visitType: z.enum(visitTypes),
@@ -133,9 +134,15 @@ const workOrderUpdateInput = z.object({
   status: z.enum(workOrderStatusValues),
   visitResult: z.string().trim().max(2000).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
+  executionOutcome: z.enum(executionOutcomeValues).optional().nullable(),
+  notCompletedReason: z.string().trim().max(1000).optional().nullable(),
   collectedAmount: z.number().int().nonnegative().max(100000, "مبلغ التحصيل يجب ألا يتجاوز 100,000 ريال.").optional().default(0),
   collectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
   items: z.array(visitItemInput).max(50).optional().default([]),
+}).superRefine((input, ctx) => {
+  if (input.executionOutcome === "not_completed" && !input.notCompletedReason?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["notCompletedReason"], message: "سبب عدم التنفيذ مطلوب." });
+  }
 });
 
 const inventoryItemInput = z.object({
@@ -1393,7 +1400,7 @@ export const filterManagementRouter = router({
     list: protectedProcedure.query(async ({ ctx }) => {
       const db = await databaseOrThrow();
       const condition = ctx.user.role === "admin"
-        ? eq(visits.ownerId, ctx.user.id)
+        ? and(eq(visits.ownerId, ctx.user.id), isNotNull(visits.assignedTechnicianId))
         : eq(visits.assignedTechnicianId, ctx.user.id);
       const rows = await db.select().from(visits).where(condition).orderBy(asc(visits.visitDate));
       const ownerIds = Array.from(new Set(rows.map(row => row.ownerId)));
@@ -1470,7 +1477,11 @@ export const filterManagementRouter = router({
       if (!allowed) throw new TRPCError({ code: "FORBIDDEN", message: "لا تملك صلاحية تعديل أمر العمل هذا." });
       const ownerId = visit.ownerId;
       const now = new Date();
-      await db.update(visits).set({ status: input.status, visitResult: input.visitResult ?? visit.visitResult, notes: input.notes ?? visit.notes, arrivedAt: input.status === "arrived" ? now : visit.arrivedAt, completedAt: input.status === "completed" ? now : visit.completedAt }).where(and(eq(visits.id, input.id), eq(visits.ownerId, ownerId)));
+      const outcome = input.executionOutcome ?? (input.status === "completed" ? "completed" : input.status === "postponed" || input.status === "cancelled" ? "not_completed" : visit.executionOutcome);
+      if (outcome === "not_completed" && !input.notCompletedReason?.trim() && !visit.notCompletedReason?.trim()) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "اكتب سبب عدم تنفيذ الزيارة قبل الحفظ." });
+      }
+      await db.update(visits).set({ status: input.status, visitResult: input.visitResult ?? visit.visitResult, notes: input.notes ?? visit.notes, executionOutcome: outcome, notCompletedReason: outcome === "not_completed" ? input.notCompletedReason?.trim() ?? visit.notCompletedReason : null, arrivedAt: input.status === "arrived" ? now : visit.arrivedAt, completedAt: input.status === "completed" ? now : visit.completedAt }).where(and(eq(visits.id, input.id), eq(visits.ownerId, ownerId)));
       if (input.status === "completed" && visit.status !== "completed") {
         const inventoryRows = input.items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ownerId), inArray(inventoryItems.id, input.items.map(item => item.inventoryItemId)))) : [];
         const inventoryById = new Map(inventoryRows.map(item => [item.id, item]));
