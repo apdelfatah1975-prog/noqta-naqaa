@@ -3,7 +3,7 @@ import { Download, FileText, Printer, RefreshCw, Save, UserPlus, WalletCards } f
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { getOfflineCash, getOfflineSession, getOfflineVisits } from "@/lib/offlineSync";
-import { getAppSettings, saveAppSettings, type AppSettings } from "@/lib/appSettings";
+import { getAppSettings, saveAppSettings, type AppSettings, type SalesAgentCommissionMode, type SalesAgentProfile } from "@/lib/appSettings";
 import { printArabicPdf } from "@/lib/pdfExport";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -12,6 +12,27 @@ const paidCategories = new Set(["راتب فني", "دفعة راتب فني", "
 const dueCategory = "مستحق فني";
 
 type TechnicianProfile = { monthlySalary: number; installationPercent: number; maintenancePercent: number; phone?: string };
+
+export function upsertSalesAgentProfile(agents: Record<string, SalesAgentProfile>, name: string) {
+  const cleanName = name.trim();
+  if (!cleanName || agents[cleanName]) return agents;
+  return { ...agents, [cleanName]: { commissionMode: "per_filter" as const, commissionValue: 0, filtersPerGroup: 1, phone: "" } };
+}
+
+export function updateSalesAgentProfile(agents: Record<string, SalesAgentProfile>, name: string, field: keyof SalesAgentProfile, value: number | string) {
+  const profile = agents[name] ?? { commissionMode: "per_filter" as const, commissionValue: 0, filtersPerGroup: 1, phone: "" };
+  if (field === "commissionMode") return { ...agents, [name]: { ...profile, commissionMode: value as SalesAgentCommissionMode } };
+  if (field === "phone") return { ...agents, [name]: { ...profile, phone: String(value) } };
+  const numericValue = Number(value);
+  const safeValue = field === "filtersPerGroup" ? Math.max(1, Math.min(1000, Number.isFinite(numericValue) ? Math.round(numericValue) : 1)) : Math.max(0, Math.min(99_999_999, Number.isFinite(numericValue) ? numericValue : 0));
+  return { ...agents, [name]: { ...profile, [field]: safeValue } };
+}
+
+export function calculateSalesAgentCommission(filterCount: number, profile: SalesAgentProfile) {
+  const count = Math.max(0, Math.floor(filterCount));
+  if (profile.commissionMode === "per_group") return Math.floor(count / Math.max(1, profile.filtersPerGroup)) * Math.max(0, profile.commissionValue);
+  return count * Math.max(0, profile.commissionValue);
+}
 
 export function upsertTechnicianProfile(payroll: Record<string, TechnicianProfile>, name: string) {
   const cleanName = name.trim();
@@ -32,7 +53,7 @@ const currentMonth = () => { const now = new Date(); return `${now.getFullYear()
 export const monthBounds = (month: string) => { const [year, monthNumber] = month.split("-").map(Number); const from = `${month}-01`; const lastDay = new Date(year, monthNumber, 0).getDate(); return { from, to: `${month}-${String(lastDay).padStart(2, "0")}` }; };
 
 type PayrollTransaction = { id: number; transactionType: "income" | "expense"; amount: number; category: string; transactionDate: string | Date; recipientName: string | null; notes: string | null };
-type VisitRecord = { id: number; visitType: string; visitDate: string | Date; technicianName: string | null; collectedAmount?: number | null };
+type VisitRecord = { id: number; visitType: string; visitDate: string | Date; technicianName: string | null; salesAgentName?: string | null; filterCount?: number | null; collectedAmount?: number | null };
 type CashData = { transactions: PayrollTransaction[] };
 type PayrollRow = { technician: string; required: number; paid: number; remaining: number; status: "paid" | "remaining"; transactions: PayrollTransaction[] }; 
 const installationTypes = new Set(["installation"]);
@@ -59,6 +80,7 @@ export default function TechnicianPayroll() {
   const [technician, setTechnician] = useState("all");
   const [settings, setSettings] = useState<AppSettings>(() => getAppSettings());
   const [technicianNameDraft, setTechnicianNameDraft] = useState("");
+  const [salesAgentNameDraft, setSalesAgentNameDraft] = useState("");
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentTechnician, setPaymentTechnician] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -101,6 +123,25 @@ export default function TechnicianPayroll() {
   const updateTechnician = (name: string, field: "monthlySalary" | "installationPercent" | "maintenancePercent" | "phone", value: number | string) => {
     const next = saveAppSettings({ technicianPayroll: updateTechnicianProfile(settings.technicianPayroll, name, field, value) });
     setSettings(next);
+  };
+  const addSalesAgent = () => {
+    const name = salesAgentNameDraft.trim();
+    if (!name) { toast.error("اكتب اسم متابع العملاء أولًا."); return; }
+    if (settings.salesAgents[name]) { toast.error("هذا المتابع مضاف بالفعل."); return; }
+    const next = saveAppSettings({ salesAgents: upsertSalesAgentProfile(settings.salesAgents, name) });
+    setSettings(next);
+    setSalesAgentNameDraft("");
+    toast.success(`تمت إضافة متابع العملاء ${name}`);
+  };
+  const updateSalesAgent = (name: string, field: keyof SalesAgentProfile, value: number | string) => {
+    const next = saveAppSettings({ salesAgents: updateSalesAgentProfile(settings.salesAgents, name, field, value) });
+    setSettings(next);
+  };
+  const removeSalesAgent = (name: string) => {
+    if (!window.confirm(`حذف إعدادات متابع العملاء ${name} فقط؟ لن تُحذف الزيارات المرتبطة به.`)) return;
+    const nextAgents = { ...settings.salesAgents };
+    delete nextAgents[name];
+    setSettings(saveAppSettings({ salesAgents: nextAgents }));
   };
   const removeTechnician = (name: string) => {
     if (!window.confirm(`حذف إعدادات الفني ${name} فقط؟ لن تُحذف زياراته أو معاملاته.`)) return;
@@ -149,6 +190,10 @@ export default function TechnicianPayroll() {
     }
     return Array.from(grouped.values()).map(row => ({ ...row, remaining: Math.max(row.required - row.paid, 0), status: (Math.max(row.required - row.paid, 0) > 0 ? "remaining" : "paid") as "paid" | "remaining" })).filter(row => row.required > 0 || row.paid > 0 || row.transactions.length > 0).sort((a, b) => b.remaining - a.remaining || a.technician.localeCompare(b.technician, "ar"));
   }, [transactions, visits, settings, bounds.from, bounds.to, month]);
+  const salesAgentRows = useMemo(() => Object.entries(settings.salesAgents).map(([name, profile]) => {
+    const filterCount = visits.filter(visit => visit.salesAgentName?.trim() === name).reduce((sum, visit) => sum + Math.max(0, Number(visit.filterCount ?? 1)), 0);
+    return { name, filterCount, commission: calculateSalesAgentCommission(filterCount, profile), profile };
+  }).sort((a, b) => b.commission - a.commission || a.name.localeCompare(b.name, "ar")), [settings.salesAgents, visits]);
   const selected = technician === "all" ? rows : rows.filter(row => row.technician === technician);
   const totals = selected.reduce((acc, row) => ({ required: acc.required + row.required, paid: acc.paid + row.paid, remaining: acc.remaining + row.remaining }), { required: 0, paid: 0, remaining: 0 });
   const technicians = rows.map(row => row.technician).sort((a, b) => a.localeCompare(b, "ar"));
@@ -193,6 +238,7 @@ export default function TechnicianPayroll() {
       </div>
     </header>
     {!query.data ? <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 print:hidden"><span className="grid h-8 w-8 place-items-center rounded-full bg-amber-100">!</span><span>يُعرض الكشف من البيانات المحلية؛ يمكنك متابعة الرواتب والتصدير دون اتصال.</span></div> : null}
+    <section className="soft-card overflow-hidden print:hidden"><div className="border-b border-cyan-950/6 bg-gradient-to-l from-cyan-50 to-white p-3 sm:p-4"><div className="flex items-start gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-cyan-700 text-white shadow-lg shadow-cyan-700/20"><UserPlus className="h-5 w-5" /></div><div><h2 className="text-lg font-black text-cyan-950">متابعو العملاء</h2><p className="mt-1 text-xs leading-6 text-muted-foreground">أضف الشخص الذي يتصل بالعملاء ويتابع الصيانة أو يجلب فلاتر جديدة، ثم اختر طريقة العمولة المناسبة له.</p></div></div></div><div className="space-y-3 p-3 sm:p-4"><div className="flex flex-col gap-2 rounded-2xl bg-slate-50 p-3 sm:flex-row"><input className="field-input flex-1 bg-white" value={salesAgentNameDraft} onChange={event => setSalesAgentNameDraft(event.target.value)} placeholder="اكتب اسم متابع العملاء" aria-label="اسم متابع العملاء الجديد" /><Button type="button" onClick={addSalesAgent} className="h-11 rounded-xl bg-cyan-700 hover:bg-cyan-800"><UserPlus className="ml-2 h-4 w-4" />إضافة متابع</Button></div>{salesAgentRows.length ? <div className="grid gap-2 md:grid-cols-2">{salesAgentRows.map(({ name, profile, filterCount, commission }) => <article key={name} className="rounded-xl border border-cyan-200/70 bg-gradient-to-br from-white to-cyan-50/70 p-2.5 shadow-sm"><div className="mb-2 flex items-center justify-between gap-2"><div className="min-w-0"><p className="text-[11px] font-bold text-muted-foreground">متابع عملاء</p><h3 className="truncate text-base font-black text-cyan-950">{name}</h3></div><Button type="button" variant="ghost" className="h-8 rounded-lg px-2 text-xs font-bold text-rose-700 hover:bg-rose-50 hover:text-rose-800" onClick={() => removeSalesAgent(name)}>حذف</Button></div><div className="grid grid-cols-2 gap-2"><label><span className="field-label">طريقة العمولة</span><select className="field-input mt-1 h-9 text-sm" value={profile.commissionMode} onChange={event => updateSalesAgent(name, "commissionMode", event.target.value)}><option value="per_filter">عن كل فلتر</option><option value="per_group">عن كل مجموعة فلاتر</option></select></label><label><span className="field-label">قيمة العمولة</span><input type="number" min="0" step="1" className="field-input mt-1 h-9 text-sm" value={profile.commissionValue} onChange={event => updateSalesAgent(name, "commissionValue", event.target.value)} /></label></div><div className="mt-2 grid grid-cols-2 gap-2"><label><span className="field-label">عدد الفلاتر بالمجموعة</span><input type="number" min="1" step="1" disabled={profile.commissionMode !== "per_group"} className="field-input mt-1 h-9 text-sm disabled:bg-slate-100" value={profile.filtersPerGroup} onChange={event => updateSalesAgent(name, "filtersPerGroup", event.target.value)} /></label><div className="rounded-lg bg-white/80 p-2 text-center"><p className="text-[10px] font-bold text-muted-foreground">المحتسب من الزيارات</p><p className="text-sm font-black text-cyan-950">{filterCount.toLocaleString("ar-SA")} فلتر</p><p className="mt-0.5 text-xs font-bold text-emerald-700">{money(commission)} ريال عمولة</p></div></div></article>)}</div> : <div className="rounded-2xl border border-dashed border-cyan-200 bg-cyan-50/40 p-6 text-center text-sm font-bold text-cyan-800">لم تتم إضافة متابعين بعد.</div>}<div className="flex items-center gap-2 text-xs font-semibold text-cyan-800"><Save className="h-4 w-4" />تُحسب العمولة من الزيارات التي تحمل اسم متابع العملاء.</div></div></section>
     <section className="soft-card overflow-hidden print:hidden"><div className="border-b border-teal-950/6 bg-gradient-to-l from-teal-50 to-white p-3 sm:p-4"><div className="flex items-start gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-teal-700 text-white shadow-lg shadow-teal-700/20"><UserPlus className="h-5 w-5" /></div><div><h2 className="text-lg font-black text-teal-950">الفنيون وإعدادات الاستحقاق</h2><p className="mt-1 text-xs leading-6 text-muted-foreground">أضف الفني مرة واحدة، ثم حدد راتبه ونسبة عمولة التركيبات والصيانة. هذه الإعدادات لا تعني أن المبلغ دُفع.</p></div></div></div><div className="space-y-3 p-3 sm:p-4"><div className="flex flex-col gap-2 rounded-2xl bg-slate-50 p-3 sm:flex-row"><input className="field-input flex-1 bg-white" value={technicianNameDraft} onChange={event => setTechnicianNameDraft(event.target.value)} placeholder="اكتب اسم الفني لإضافته" aria-label="اسم الفني الجديد" /><Button type="button" onClick={addTechnician} className="h-11 rounded-xl bg-teal-700 hover:bg-teal-800"><UserPlus className="ml-2 h-4 w-4" />إضافة فني</Button></div>{Object.keys(settings.technicianPayroll).length ? <div className="grid gap-2 md:grid-cols-2">{Object.entries(settings.technicianPayroll).map(([name, profile]) => <article key={name} className="rounded-xl border border-teal-200/70 bg-gradient-to-br from-white via-white to-teal-50/70 p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><div className="mb-2 flex items-center justify-between gap-2"><div className="min-w-0"><p className="text-[11px] font-bold text-muted-foreground">بيانات الفني</p><h3 className="truncate text-base font-black text-teal-950">{name}</h3></div><Button type="button" variant="ghost" className="h-8 rounded-lg px-2 text-xs font-bold text-rose-700 hover:bg-rose-50 hover:text-rose-800" onClick={() => removeTechnician(name)}>حذف</Button></div><label className="mb-2 block"><span className="field-label">هاتف الفني</span><input type="tel" dir="ltr" className="field-input mt-1 h-9 text-sm" value={profile.phone ?? ""} placeholder="01xxxxxxxxx" onChange={event => updateTechnician(name, "phone", event.target.value)} /></label><div className="grid gap-2 sm:grid-cols-3"><label className="rounded-lg bg-indigo-50/70 p-1.5"><span className="field-label text-indigo-900">الراتب الشهري</span><input type="number" min="0" step="0.01" className="field-input mt-1 h-9 text-sm" value={(profile.monthlySalary / 100).toString()} onChange={event => updateTechnician(name, "monthlySalary", Math.round(Number(event.target.value || 0) * 100))} /></label><label className="rounded-lg bg-cyan-50/70 p-1.5"><span className="field-label text-cyan-900">تركيبات %</span><input type="number" min="0" max="100" step="0.01" className="field-input mt-1 h-9 text-sm" value={profile.installationPercent} onChange={event => updateTechnician(name, "installationPercent", Number(event.target.value))} /></label><label className="rounded-lg bg-amber-50/80 p-1.5"><span className="field-label text-amber-900">صيانة %</span><input type="number" min="0" max="100" step="0.01" className="field-input mt-1 h-9 text-sm" value={profile.maintenancePercent} onChange={event => updateTechnician(name, "maintenancePercent", Number(event.target.value))} /></label></div></article>)}</div> : <div className="rounded-2xl border border-dashed border-teal-200 bg-teal-50/40 p-6 text-center text-sm font-bold text-teal-800">لم تتم إضافة فنيين بعد. ابدأ بإضافة أول فني من الحقل أعلاه.</div>}<div className="flex items-center gap-2 text-xs font-semibold text-teal-800"><Save className="h-4 w-4" />يتم حفظ كل تعديل تلقائيًا على هذا الجهاز.</div></div></section>
     <section className="soft-card grid gap-2 p-3 sm:grid-cols-2 sm:p-4 print:hidden"><label><span className="field-label">الشهر</span><input type="month" className="field-input mt-1" value={month} onChange={event => setMonth(event.target.value)} /></label><label><span className="field-label">الفني</span><select className="field-input mt-1" value={technician} onChange={event => setTechnician(event.target.value)}><option value="all">كل الفنيين</option>{technicians.map(name => <option key={name} value={name}>{name}</option>)}</select></label><div className="rounded-xl bg-teal-50 px-4 py-3 text-sm font-bold text-teal-900 sm:col-span-2">الفترة: <span dir="ltr">{bounds.from} — {bounds.to}</span></div></section>
     <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><SummaryCard label="عدد الفنيين" value={selected.length.toLocaleString("ar-SA")} tone="text-sky-950 bg-sky-50 border-sky-100" /><SummaryCard label="إجمالي المستحق" value={money(totals.required)} tone="text-indigo-950 bg-indigo-50 border-indigo-100" /><SummaryCard label="إجمالي المدفوع" value={money(totals.paid)} tone="text-emerald-950 bg-emerald-50 border-emerald-100" /><SummaryCard label="إجمالي المتبقي" value={money(totals.remaining)} tone="text-amber-950 bg-amber-50 border-amber-100" /></section>

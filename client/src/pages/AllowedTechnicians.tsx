@@ -23,6 +23,7 @@ export default function AllowedTechnicians() {
       setEmail("");
       setPassword("");
       utils.filters.allowedTechnicians.list.invalidate();
+      utils.filters.technicians.list.invalidate();
     },
     onError: (error) => toast.error(error.message),
   });
@@ -36,7 +37,10 @@ export default function AllowedTechnicians() {
     onError: (error) => toast.error(error.message),
   });
   const setActive = trpc.filters.allowedTechnicians.setActive.useMutation({
-    onSuccess: () => utils.filters.allowedTechnicians.list.invalidate(),
+    onSuccess: () => {
+      utils.filters.allowedTechnicians.list.invalidate();
+      utils.filters.technicians.list.invalidate();
+    },
     onError: (error) => toast.error(error.message),
   });
 

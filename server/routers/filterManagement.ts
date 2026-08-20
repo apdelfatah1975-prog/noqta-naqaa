@@ -67,6 +67,8 @@ const customerCreateInput = customerInput.extend({
   firstVisitType: z.enum(visitTypes).optional(),
   firstVisitDate: z.date().optional(),
   firstTechnicianName: z.string().trim().max(160).optional().nullable(),
+  firstSalesAgentName: z.string().trim().max(160).optional().nullable(),
+  firstFilterCount: z.number().int().positive().max(1000).optional().default(1),
   firstVisitNotes: z.string().trim().max(2000).optional().nullable(),
   firstVisitResult: z.string().trim().max(2000).optional().nullable(),
   firstCollectedAmount: z.number().int().nonnegative().optional().default(0),
@@ -89,6 +91,8 @@ const customerImportRowInput = z.object({
   longitude: z.string().trim().max(32).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
   technicianName: z.string().trim().max(160).optional().nullable(),
+  salesAgentName: z.string().trim().max(160).optional().nullable(),
+  filterCount: z.number().int().positive().max(1000).optional().default(1),
   visitDate: z.coerce.date().optional().nullable(),
   visitType: z.enum(visitTypes).optional().nullable(),
   collectedAmount: z.number().nonnegative().max(999999999).optional().nullable(),
@@ -111,6 +115,8 @@ const visitInput = z.object({
   visitType: z.enum(visitTypes),
   visitDate: z.date(),
   technicianName: z.string().trim().max(160).optional().nullable(),
+  salesAgentName: z.string().trim().max(160).optional().nullable(),
+  filterCount: z.number().int().positive().max(1000).optional().default(1),
   visitResult: z.string().trim().max(2000).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
   collectedAmount: z.number().int().nonnegative().max(100000, "مبلغ التحصيل يجب ألا يتجاوز 100,000 ريال.").optional().default(0),
@@ -730,7 +736,7 @@ export const filterManagementRouter = router({
         )).limit(1);
         if (existing[0]) return { id: existing[0].id, alreadySynced: true };
       }
-      const { clientOperationId, firstVisitType, firstVisitDate, firstTechnicianName, firstVisitResult, firstVisitNotes, firstCollectedAmount, firstCollectedCurrency, items, ...data } = input;
+      const { clientOperationId, firstVisitType, firstVisitDate, firstTechnicianName, firstSalesAgentName, firstFilterCount, firstVisitResult, firstVisitNotes, firstCollectedAmount, firstCollectedCurrency, items, ...data } = input;
       const existingNames = await db.select({ id: customers.id, name: customers.name }).from(customers).where(eq(customers.ownerId, ctx.user.id)).limit(100000);
       if (existingNames.some(customer => normalizeCustomerName(customer.name) === normalizeCustomerName(data.name))) {
         throw new TRPCError({ code: "CONFLICT", message: "اسم العميل موجود بالفعل، استخدم اسمًا مختلفًا." });
@@ -746,7 +752,7 @@ export const filterManagementRouter = router({
         return { id: customerId, alreadySynced: false, firstVisitCreated: false };
       }
       const visitDate = firstVisitDate ?? new Date();
-      const visitResult = await db.insert(visits).values({ customerId, ownerId: ctx.user.id, visitType: firstVisitType, visitDate, technicianName: firstTechnicianName ?? null, visitResult: firstVisitResult ?? null, notes: firstVisitNotes ?? null });
+      const visitResult = await db.insert(visits).values({ customerId, ownerId: ctx.user.id, visitType: firstVisitType, visitDate, technicianName: firstTechnicianName ?? null, salesAgentName: firstSalesAgentName ?? null, filterCount: firstFilterCount, visitResult: firstVisitResult ?? null, notes: firstVisitNotes ?? null });
       const visitId = Number(visitResult[0].insertId);
       const inventoryRows = items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ctx.user.id), inArray(inventoryItems.id, items.map(item => item.inventoryItemId)))) : [];
       const inventoryById = new Map(inventoryRows.map(item => [item.id, item]));
@@ -1012,6 +1018,8 @@ export const filterManagementRouter = router({
       visitType: z.enum(visitTypes),
       visitDate: z.date(),
       technicianName: z.string().trim().max(160).optional().nullable(),
+      salesAgentName: z.string().trim().max(160).optional().nullable(),
+      filterCount: z.number().int().positive().max(1000).optional().default(1),
       visitResult: z.string().trim().max(2000).optional().nullable(),
       notes: z.string().trim().max(2000).optional().nullable(),
       status: z.enum(["assigned", "en_route", "arrived", "in_progress", "completed", "postponed", "cancelled"]).optional(),
@@ -1028,6 +1036,8 @@ export const filterManagementRouter = router({
         visitType: input.visitType,
         visitDate: input.visitDate,
         technicianName: input.technicianName ?? null,
+        salesAgentName: input.salesAgentName ?? null,
+        filterCount: input.filterCount,
         visitResult: input.visitResult ?? null,
         notes: input.notes ?? null,
         status: nextStatus,
@@ -1370,10 +1380,15 @@ export const filterManagementRouter = router({
   technicians: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       const db = await databaseOrThrow();
-      const accounts = await db.select({ linkedUserId: allowedTechnicianAccounts.linkedUserId }).from(allowedTechnicianAccounts).where(and(eq(allowedTechnicianAccounts.ownerId, ctx.user.id), eq(allowedTechnicianAccounts.isActive, true)));
-      const linkedIds = accounts.map(account => account.linkedUserId).filter((id): id is number => id !== null);
-      if (!linkedIds.length) return [];
-      return db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(inArray(users.id, linkedIds));
+      const accounts = await db.select({ linkedUserId: allowedTechnicianAccounts.linkedUserId, email: allowedTechnicianAccounts.email, displayName: allowedTechnicianAccounts.displayName }).from(allowedTechnicianAccounts).where(and(eq(allowedTechnicianAccounts.ownerId, ctx.user.id), eq(allowedTechnicianAccounts.isActive, true)));
+      const technicians: Array<{ id: number; name: string | null; role: "admin" | "user" }> = [];
+      for (const account of accounts) {
+        const match = account.linkedUserId
+          ? (await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(and(eq(users.id, account.linkedUserId), eq(users.role, "user"))).limit(1))[0]
+          : (await db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(and(eq(users.email, account.email), eq(users.role, "user"))).limit(1))[0];
+        if (match) technicians.push({ id: match.id, name: match.name || account.displayName, role: match.role });
+      }
+      return technicians;
     }),
     updateLocation: protectedProcedure.input(z.object({ latitude: z.string().regex(/^-?\d{1,3}(?:\.\d+)?$/), longitude: z.string().regex(/^-?\d{1,3}(?:\.\d+)?$/), accuracy: z.number().int().nonnegative().max(100000).optional(), sharingUntil: z.date().nullable().optional() })).mutation(async ({ ctx, input }) => {
       if (ctx.user.role === "admin") throw new TRPCError({ code: "FORBIDDEN", message: "تحديث الموقع مخصص لحساب الفني." });

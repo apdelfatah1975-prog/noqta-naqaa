@@ -33,6 +33,8 @@ export type PendingCustomer = Omit<OfflineCustomer, "id"> & {
   firstVisitType?: PendingVisit["visitType"];
   firstVisitDate?: string;
   firstTechnicianName?: string | null;
+  firstSalesAgentName?: string | null;
+  firstFilterCount?: number;
   firstVisitNotes?: string | null;
   firstVisitResult?: string | null;
   firstCollectedAmount?: number;
@@ -61,6 +63,8 @@ export type OfflineVisit = {
   visitType: "installation" | "maintenance" | "cartridge_change" | "follow_up" | "other";
   visitDate: string;
   technicianName?: string | null;
+  salesAgentName?: string | null;
+  filterCount?: number;
   visitResult?: string | null;
   notes?: string | null;
   collectedAmount?: number;
@@ -94,6 +98,8 @@ export type PendingVisit = {
   visitType: "installation" | "maintenance" | "cartridge_change" | "follow_up" | "other";
   visitDate: string;
   technicianName?: string | null;
+  salesAgentName?: string | null;
+  filterCount?: number;
   visitResult?: string | null;
   notes: string | null;
   collectedAmount?: number;

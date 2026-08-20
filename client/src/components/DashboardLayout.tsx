@@ -70,8 +70,25 @@ const mobileNavItems = menuItems.filter(item => ["/", "/customers", "/visits", "
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { loading, user } = useAuth();
+  const [, setLocation] = useLocation();
+
+  React.useEffect(() => {
+    if (!loading && user && user.role !== "admin") setLocation("/technician-preview");
+  }, [loading, user, setLocation]);
 
   if (loading) return <DashboardLayoutSkeleton />;
+
+  if (user && user.role !== "admin") {
+    return (
+      <section className="flex min-h-screen items-center justify-center bg-slate-50 px-5 text-center" dir="rtl">
+        <div className="max-w-sm rounded-3xl border border-teal-100 bg-white p-7 shadow-sm">
+          <Droplets className="mx-auto h-10 w-10 text-teal-700" />
+          <h1 className="mt-4 text-xl font-black text-slate-900">جارٍ فتح أوامر العمل</h1>
+          <p className="mt-2 text-sm font-bold leading-6 text-slate-500">حساب الفني مخصص لأوامر العمل فقط.</p>
+        </div>
+      </section>
+    );
+  }
 
   if (!user) {
     return (

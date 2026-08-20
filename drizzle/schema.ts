@@ -109,6 +109,8 @@ export const visits = mysqlTable(
     visitType: mysqlEnum("visitType", visitTypeValues).notNull(),
     visitDate: timestamp("visitDate").notNull(),
     technicianName: varchar("technicianName", { length: 160 }),
+    salesAgentName: varchar("salesAgentName", { length: 160 }),
+    filterCount: int("filterCount").default(1).notNull(),
     status: mysqlEnum("status", ["assigned", "en_route", "arrived", "in_progress", "completed", "postponed", "cancelled"]).default("assigned").notNull(),
     assignedTechnicianId: int("assignedTechnicianId").references(() => users.id, { onDelete: "set null" }),
     arrivedAt: timestamp("arrivedAt"),

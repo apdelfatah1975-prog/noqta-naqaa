@@ -1,5 +1,8 @@
 export const APP_SETTINGS_KEY = "purepoint-app-settings";
 
+export type SalesAgentCommissionMode = "per_filter" | "per_group";
+export type SalesAgentProfile = { phone?: string; commissionMode: SalesAgentCommissionMode; commissionValue: number; filtersPerGroup: number };
+
 export type AppSettings = {
   companyName: string;
   companyPhone: string;
@@ -29,6 +32,7 @@ export type AppSettings = {
   compactCustomersOnMobile: boolean;
   compactVisitsOnMobile: boolean;
   technicianPayroll: Record<string, { monthlySalary: number; installationPercent: number; maintenancePercent: number; phone?: string }>;
+  salesAgents: Record<string, SalesAgentProfile>;
 };
 
 export const defaultAppSettings: AppSettings = {
@@ -60,6 +64,7 @@ export const defaultAppSettings: AppSettings = {
   compactCustomersOnMobile: false,
   compactVisitsOnMobile: false,
   technicianPayroll: {},
+  salesAgents: {},
 };
 
 function canUseStorage() {
