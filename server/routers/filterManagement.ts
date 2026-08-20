@@ -113,7 +113,7 @@ const visitInput = z.object({
   technicianName: z.string().trim().max(160).optional().nullable(),
   visitResult: z.string().trim().max(2000).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
-  collectedAmount: z.number().int().nonnegative().optional().default(0),
+  collectedAmount: z.number().int().nonnegative().max(100000, "مبلغ التحصيل يجب ألا يتجاوز 100,000 ريال.").optional().default(0),
   collectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
   clientOperationId: z.string().uuid().optional(),
   items: z.array(visitItemInput).max(50).optional().default([]),
@@ -133,7 +133,7 @@ const workOrderUpdateInput = z.object({
   status: z.enum(workOrderStatusValues),
   visitResult: z.string().trim().max(2000).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
-  collectedAmount: z.number().int().nonnegative().optional().default(0),
+  collectedAmount: z.number().int().nonnegative().max(100000, "مبلغ التحصيل يجب ألا يتجاوز 100,000 ريال.").optional().default(0),
   collectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
   items: z.array(visitItemInput).max(50).optional().default([]),
 });

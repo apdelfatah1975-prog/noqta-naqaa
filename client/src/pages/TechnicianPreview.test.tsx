@@ -77,4 +77,22 @@ describe("واجهة الفني وأوامر العمل", () => {
     fireEvent.click(screen.getByRole("button", { name: /حفظ وإغلاق أمر العمل/ }));
     expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ id: 7, status: "completed", visitResult: "تم تغيير الشمعات", collectedAmount: 250, items: [] }));
   });
+
+  it("ترفض المبلغ السالب ولا ترسل أمر الإغلاق", () => {
+    orders[0].status = "in_progress";
+    render(<TechnicianPreview />);
+    fireEvent.click(screen.getByRole("button", { name: "تحديث" }));
+    fireEvent.change(screen.getByLabelText("المبلغ المحصل"), { target: { value: "-50" } });
+    fireEvent.click(screen.getByRole("button", { name: /حفظ وإغلاق أمر العمل/ }));
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("ترفض المبلغ الذي يتجاوز الحد المنطقي ولا ترسل أمر الإغلاق", () => {
+    orders[0].status = "in_progress";
+    render(<TechnicianPreview />);
+    fireEvent.click(screen.getByRole("button", { name: "تحديث" }));
+    fireEvent.change(screen.getByLabelText("المبلغ المحصل"), { target: { value: "100001" } });
+    fireEvent.click(screen.getByRole("button", { name: /حفظ وإغلاق أمر العمل/ }));
+    expect(mutate).not.toHaveBeenCalled();
+  });
 });
