@@ -27,16 +27,16 @@ describe("واجهة دخول الفني المستقلة", () => {
     render(<TechnicianLogin />);
     expect(screen.getByRole("heading", { name: "تسجيل الدخول" })).toBeTruthy();
     expect(screen.getByLabelText("البريد الإلكتروني")).toBeTruthy();
-    expect(screen.getByLabelText("كلمة السر")).toBeTruthy();
+    expect(screen.getByLabelText("رمز دخول الفني")).toBeTruthy();
     expect(screen.getByRole("button", { name: "تثبيت التطبيق" })).toBeTruthy();
     expect(screen.getByText(/لا تعرض الخزينة أو التقارير/)).toBeTruthy();
     expect(screen.queryByText("العملاء")).toBeNull();
   });
 
-  it("ترسل البريد وكلمة السر إلى دخول الفني", () => {
+  it("ترسل البريد ورمز الدخول إلى دخول الفني", () => {
     render(<TechnicianLogin />);
     fireEvent.change(screen.getByLabelText("البريد الإلكتروني"), { target: { value: "tech@example.com" } });
-    fireEvent.change(screen.getByLabelText("كلمة السر"), { target: { value: "password123" } });
+    fireEvent.change(screen.getByLabelText("رمز دخول الفني"), { target: { value: "password123" } });
     fireEvent.click(screen.getByRole("button", { name: "دخول إلى أوامر العمل" }));
     expect(mutate).toHaveBeenCalledWith({ email: "tech@example.com", password: "password123" });
   });
