@@ -73,12 +73,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [, setLocation] = useLocation();
 
   React.useEffect(() => {
-    if (!loading && user && user.role !== "admin") setLocation("/technician-preview");
+    if (!loading && user && user.role !== "admin" && window.location.pathname !== "/technician-app") setLocation("/technician-app");
   }, [loading, user, setLocation]);
 
   if (loading) return <DashboardLayoutSkeleton />;
 
-  if (user && user.role !== "admin") {
+  if (user && user.role !== "admin" && window.location.pathname !== "/technician-app") {
     return (
       <section className="flex min-h-screen items-center justify-center bg-slate-50 px-5 text-center" dir="rtl">
         <div className="max-w-sm rounded-3xl border border-teal-100 bg-white p-7 shadow-sm">
