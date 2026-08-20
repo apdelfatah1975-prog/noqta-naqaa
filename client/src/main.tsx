@@ -55,8 +55,11 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (typeof window === "undefined") return;
 
   const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
+  const isTechnicianPath =
+    window.location.pathname === "/technician-login" ||
+    window.location.pathname === "/technician-preview";
 
-  if (!isUnauthorized) return;
+  if (!isUnauthorized || isTechnicianPath) return;
 
   startLogin();
 };
