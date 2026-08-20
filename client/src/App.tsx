@@ -86,6 +86,7 @@ function TechnicianOnly({ children }: { children: ReactNode }) {
 }
 
 function ProtectedTechnician() { return <TechnicianOnly><TechnicianPreview /></TechnicianOnly>; }
+function TechnicianPendingOperations() { return <TechnicianOnly><PendingOperations /></TechnicianOnly>; }
 function AdminInventory() { return <AdminOnly><Inventory /></AdminOnly>; }
 function AdminCash() { return <AdminOnly><Cash /></AdminOnly>; }
 function AdminReports() { return <AdminOnly><Reports /></AdminOnly>; }
@@ -100,6 +101,7 @@ function Router() {
   if (pathname.replace(/\/$/, "") === "/demo") return <PublicDemo />;
   if (pathname.replace(/\/$/, "") === "/technician-login") return <TechnicianLogin />;
   if (pathname.replace(/\/$/, "") === "/technician-preview") return <ProtectedTechnician />;
+  if (pathname.replace(/\/$/, "") === "/technician-pending-operations") return <TechnicianPendingOperations />;
   if (pathname.replace(/\/$/, "") === "/work-orders") return <DashboardLayout><AdminOnly><WorkOrders /></AdminOnly></DashboardLayout>;
   if (pathname.replace(/\/$/, "") === "/technician-locations") return <DashboardLayout><AdminTechnicianLocations /></DashboardLayout>;
   if (pathname.replace(/\/$/, "") === "/allowed-technicians") return <DashboardLayout><AdminAllowedTechnicians /></DashboardLayout>;

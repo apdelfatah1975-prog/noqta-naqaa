@@ -140,7 +140,7 @@ export default function TechnicianPreview() {
           <div className="text-left"><p className="text-xs font-bold text-teal-100">حساب الفني</p><h1 className="mt-1 text-2xl font-black">أوامري فقط</h1></div>
           <Wrench className="h-7 w-7 text-teal-100" />
         </div>
-        <div className="mt-5 flex items-center justify-between rounded-2xl bg-white/10 px-3 py-3 text-sm"><span className="font-bold">الفني: {user?.name || "حساب الفني"}</span><span className="flex items-center gap-1.5 text-teal-50"><Wifi className="h-4 w-4" /> {online ? "متصل ومزامن" : "محفوظ على الهاتف"}</span></div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-white/10 px-3 py-3 text-sm"><span className="font-bold">الفني: {user?.name || "حساب الفني"}</span><div className="flex items-center gap-2"><span className="flex items-center gap-1.5 text-teal-50"><Wifi className="h-4 w-4" /> {online ? "متصل ومزامن" : "محفوظ على الهاتف"}</span><Button type="button" onClick={() => setLocation("/technician-pending-operations")} variant="secondary" size="sm" className="h-8 rounded-lg bg-white text-teal-800 hover:bg-teal-50">العمليات المعلقة</Button></div></div>
       </section>
 
       <section className="grid grid-cols-3 gap-2">

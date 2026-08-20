@@ -46,12 +46,12 @@ import { adminProcedure, protectedProcedure, publicProcedure, router } from "../
 import { createOwnerBackup, refreshOwnerBackup } from "../backup";
 import { storageGet, storagePut } from "../storage";
 
-type TechnicianMenuPermission = "workOrders" | "customers" | "visits";
+type TechnicianMenuPermission = "workOrders" | "pendingOperations" | "customers" | "visits";
 const defaultTechnicianMenuPermissions: TechnicianMenuPermission[] = ["workOrders"];
 export function parseTechnicianMenuPermissions(value: string | null | undefined): TechnicianMenuPermission[] {
   try {
     const parsed = JSON.parse(value || "[]");
-    const allowed = parsed.filter((item: unknown): item is TechnicianMenuPermission => item === "workOrders" || item === "customers" || item === "visits");
+    const allowed = parsed.filter((item: unknown): item is TechnicianMenuPermission => item === "workOrders" || item === "pendingOperations" || item === "customers" || item === "visits");
     return allowed.length ? Array.from(new Set(allowed)) : defaultTechnicianMenuPermissions;
   } catch {
     return defaultTechnicianMenuPermissions;
@@ -499,7 +499,7 @@ export const filterManagementRouter = router({
       const account = (await db.select({ menuPermissions: allowedTechnicianAccounts.menuPermissions }).from(allowedTechnicianAccounts).where(and(eq(allowedTechnicianAccounts.linkedUserId, ctx.user.id), eq(allowedTechnicianAccounts.isActive, true))).limit(1))[0];
       return { menuPermissions: parseTechnicianMenuPermissions(account?.menuPermissions) };
     }),
-    updateMenuPermissions: adminProcedure.input(z.object({ id: z.number().int().positive(), menuPermissions: z.array(z.enum(["workOrders", "customers", "visits"])).min(1).max(3) })).mutation(async ({ ctx, input }) => {
+    updateMenuPermissions: adminProcedure.input(z.object({ id: z.number().int().positive(), menuPermissions: z.array(z.enum(["workOrders", "pendingOperations", "customers", "visits"])).min(1).max(4) })).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const updated = await db.update(allowedTechnicianAccounts).set({ menuPermissions: JSON.stringify(Array.from(new Set(input.menuPermissions))) }).where(and(eq(allowedTechnicianAccounts.id, input.id), eq(allowedTechnicianAccounts.ownerId, ctx.user.id)));
       if (!updated[0]?.affectedRows) throw new TRPCError({ code: "NOT_FOUND", message: "الحساب غير موجود." });

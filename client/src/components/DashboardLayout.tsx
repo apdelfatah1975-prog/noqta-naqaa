@@ -127,8 +127,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     ? menuItems
     : menuItems.filter(item => {
       const permissions = technicianPermissions.data?.menuPermissions ?? ["workOrders"];
-      if (["/inventory", "/cash", "/reports", "/technician-payroll", "/technician-locations", "/allowed-technicians", "/pending-operations", "/settings"].includes(item.path)) return false;
+      if (["/", "/inventory", "/cash", "/reports", "/technician-payroll", "/technician-locations", "/allowed-technicians", "/settings"].includes(item.path)) return false;
       if (item.path === "/work-orders" || item.path === "/technician-preview") return permissions.includes("workOrders");
+      if (item.path === "/pending-operations") return permissions.includes("pendingOperations");
       if (item.path === "/customers") return permissions.includes("customers");
       if (item.path === "/visits") return permissions.includes("visits");
       return false;
