@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Camera, CheckCircle2, Clock3, MapPin, PenLine, Phone, ShieldCheck, UserRound, Wifi, Wrench } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock3, MapPin, Phone, ShieldCheck, UserRound, Wifi, Wrench } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { queueOfflineWorkOrderProof, queueOfflineWorkOrderUpdate } from "@/lib/offlineSync";
+import { queueOfflineWorkOrderUpdate } from "@/lib/offlineSync";
 
 const statusLabels: Record<string, string> = {
   assigned: "مسند",
@@ -37,14 +37,8 @@ export default function TechnicianPreview() {
   const [outcome, setOutcome] = useState<"completed" | "not_completed">("completed");
   const [notCompletedReason, setNotCompletedReason] = useState("");
   const [amount, setAmount] = useState("");
-  const [selectedItems, setSelectedItems] = useState<Record<number, number>>({});
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [localUpdates, setLocalUpdates] = useState<Record<number, { status: string; visitResult?: string | null; collectedAmount?: number }>>({});
-  const signatureCanvas = useRef<HTMLCanvasElement | null>(null);
-  const drawing = useRef(false);
-  const clearSignature = () => { const canvas = signatureCanvas.current; if (!canvas) return; canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height); };
-  const signaturePoint = (event: React.PointerEvent<HTMLCanvasElement>) => { const canvas = signatureCanvas.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineWidth = 2.5; context.lineCap = "round"; context.strokeStyle = "#0f766e"; context.lineTo((event.clientX - rect.left) * canvas.width / rect.width, (event.clientY - rect.top) * canvas.height / rect.height); context.stroke(); };
-  const saveSignature = () => { const canvas = signatureCanvas.current; if (!selected || !canvas) return; const dataUrl = canvas.toDataURL("image/png"); if (!dataUrl.endsWith("base64,")) return; if (!online && user) { queueOfflineWorkOrderProof(user.id, { visitId: selected.id, kind: "signature", dataUrl }); toast.success("تم حفظ التوقيع على الهاتف، وستتم مزامنته عند عودة الإنترنت"); return; } proofUpload.mutate({ visitId: selected.id, kind: "signature", dataUrl }); };
   useEffect(() => {
     const goOnline = () => setOnline(true);
     const goOffline = () => setOnline(false);
@@ -53,9 +47,7 @@ export default function TechnicianPreview() {
     return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
   }, []);
   const query = trpc.filters.workOrders.list.useQuery(undefined, { retry: false, staleTime: 30_000 });
-  const inventoryQuery = trpc.filters.inventory.technicianSummary.useQuery(undefined, { retry: false, staleTime: 30_000 });
   const utils = trpc.useUtils();
-  const proofUpload = trpc.filters.workOrders.addProof.useMutation({ onSuccess: () => toast.success("تم حفظ الدليل بأمان"), onError: error => toast.error(error.message || "تعذر حفظ الدليل") });
   const update = trpc.filters.workOrders.updateStatus.useMutation({
     onSuccess: () => {
       toast.success("تم حفظ تحديث أمر العمل");
@@ -67,13 +59,11 @@ export default function TechnicianPreview() {
       setOutcome("completed");
       setNotCompletedReason("");
       setAmount("");
-      setSelectedItems({});
     },
     onError: error => toast.error(error.message || "تعذر حفظ التحديث"),
   });
 
   const orders = useMemo(() => (query.data ?? []).map(order => localUpdates[order.id] ? { ...order, ...localUpdates[order.id] } : order), [localUpdates, query.data]);
-  const inventory = inventoryQuery.data?.items ?? [];
   const visible = useMemo(() => filter === "all" ? orders : orders.filter(order => order.status === filter), [filter, orders]);
   const selected = orders.find(order => order.id === selectedId);
 
@@ -87,32 +77,12 @@ export default function TechnicianPreview() {
       setOutcome("completed");
       setNotCompletedReason("");
       setAmount("");
-      setSelectedItems({});
       return;
     }
     update.mutate(input);
   };
   const updateOrder = (id: number, status: "en_route" | "arrived" | "in_progress") => {
     saveUpdate({ id, status, visitResult: null, notes: null, executionOutcome: null, notCompletedReason: null, collectedAmount: 0, items: [] });
-  };
-
-  const toggleItem = (id: number, balance: number) => {
-    setSelectedItems(current => {
-      if (current[id]) {
-        const next = { ...current };
-        delete next[id];
-        return next;
-      }
-      return { ...current, [id]: Math.min(1, balance) };
-    });
-  };
-
-  const uploadProof = (kind: "photo" | "signature", file: File | undefined) => {
-    if (!selected || !file) return;
-    if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) { toast.error("اختر صورة لا تتجاوز 5 ميجابايت"); return; }
-    const reader = new FileReader();
-    reader.onload = () => { if (typeof reader.result !== "string") return; if (!online && user) { queueOfflineWorkOrderProof(user.id, { visitId: selected.id, kind, dataUrl: reader.result }); toast.success("تم حفظ الدليل على الهاتف، وستتم مزامنته عند عودة الإنترنت"); return; } proofUpload.mutate({ visitId: selected.id, kind, dataUrl: reader.result }); };
-    reader.readAsDataURL(file);
   };
 
   const completeOrder = () => {
@@ -126,9 +96,7 @@ export default function TechnicianPreview() {
       toast.error("مبلغ التحصيل غير منطقي؛ الحد الأقصى المسموح 100,000 ريال.");
       return;
     }
-    const items: SelectedItem[] = Object.entries(selectedItems)
-      .filter(([, quantity]) => quantity > 0)
-      .map(([inventoryItemId, quantity]) => ({ inventoryItemId: Number(inventoryItemId), quantity, source: "manual" }));
+    const items: SelectedItem[] = [];
     if (outcome === "not_completed" && !notCompletedReason.trim()) {
       toast.error("اكتب سبب عدم تنفيذ الزيارة قبل الحفظ.");
       return;
@@ -167,7 +135,28 @@ export default function TechnicianPreview() {
         {visible.length ? visible.map(order => <article key={order.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-start gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-teal-50 text-teal-700"><UserRound className="h-6 w-6" /></div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><h3 className="truncate text-base font-black text-slate-900">{order.customer?.name || "عميل"}</h3><p className="mt-1 text-xs font-bold text-slate-500">{serviceLabels[order.visitType] || order.visitType}</p></div><span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-700">{statusLabels[order.status] || order.status}</span></div><div className="mt-3 space-y-2 text-xs font-bold text-slate-500"><span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4 text-teal-600" />{new Date(order.visitDate).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" })}</span><span className="flex items-start gap-1.5"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" />{order.customer?.address || "العنوان غير مسجل"}</span></div></div></div><div className="mt-4 grid grid-cols-3 gap-2"><a href={`tel:${order.customer?.phone || ""}`} className="flex h-10 items-center justify-center gap-1 rounded-xl bg-slate-100 text-xs font-black text-slate-700"><Phone className="h-4 w-4" /> اتصال</a><a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.customer?.latitude && order.customer?.longitude ? `${order.customer.latitude},${order.customer.longitude}` : order.customer?.address || "")}`} target="_blank" rel="noreferrer" className="flex h-10 items-center justify-center gap-1 rounded-xl bg-sky-50 text-xs font-black text-sky-800"><MapPin className="h-4 w-4" /> خريطة</a>{order.status === "assigned" ? <Button type="button" onClick={() => updateOrder(order.id, "en_route")} className="h-10 rounded-xl bg-teal-700 text-xs font-black">في الطريق</Button> : order.status !== "completed" && order.status !== "cancelled" ? <Button type="button" onClick={() => { setSelectedId(order.id); setResult(order.visitResult || ""); setOutcome(order.executionOutcome === "not_completed" ? "not_completed" : "completed"); setNotCompletedReason(order.notCompletedReason || ""); }} aria-label="تحديث" className="h-10 rounded-xl bg-teal-700 text-xs font-black">تحديث / تسجيل التنفيذ</Button> : <span className="flex h-10 items-center justify-center rounded-xl bg-emerald-50 text-xs font-black text-emerald-800">تم الحفظ</span>}</div>{order.status === "en_route" ? <Button type="button" onClick={() => updateOrder(order.id, "arrived")} className="mt-2 h-10 w-full rounded-xl bg-sky-700 text-xs font-black">وصلت إلى العميل</Button> : null}{order.status === "arrived" ? <Button type="button" onClick={() => updateOrder(order.id, "in_progress")} className="mt-2 h-10 w-full rounded-xl bg-indigo-700 text-xs font-black">بدء التنفيذ</Button> : null}</article>) : <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm font-bold text-slate-500">لا توجد أوامر مسندة حاليًا.</div>}
       </section>
 
-      {selected ? <section className="rounded-3xl border border-teal-200 bg-white p-5 shadow-lg"><div className="flex items-center justify-between"><div><p className="text-xs font-bold text-teal-700">إغلاق أمر العمل</p><h2 className="mt-1 text-lg font-black text-slate-900">{selected.customer?.name}</h2></div><button type="button" onClick={() => setSelectedId(null)} className="text-sm font-black text-slate-500">إغلاق</button></div><div className="mt-4"><p className="text-sm font-black text-slate-700">نتيجة الزيارة</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => setOutcome("completed")} className={`rounded-xl border p-3 text-sm font-black ${outcome === "completed" ? "border-emerald-500 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-100" : "border-slate-200 bg-white text-slate-600"}`}>تم التنفيذ</button><button type="button" onClick={() => setOutcome("not_completed")} className={`rounded-xl border p-3 text-sm font-black ${outcome === "not_completed" ? "border-amber-500 bg-amber-50 text-amber-800 ring-2 ring-amber-100" : "border-slate-200 bg-white text-slate-600"}`}>لم يتم التنفيذ</button></div>{outcome === "not_completed" ? <label className="mt-3 block text-sm font-black text-amber-900">سبب عدم التنفيذ<textarea aria-label="سبب عدم التنفيذ" value={notCompletedReason} onChange={event => setNotCompletedReason(event.target.value)} className="mt-2 min-h-20 w-full rounded-xl border border-amber-200 bg-amber-50/40 p-3 font-bold" placeholder="مثال: العميل لم يحضر أو تم تأجيل الموعد" /></label> : null}</div><label className="mt-4 block text-sm font-black text-slate-700">ما تم تنفيذه<textarea aria-label="ما تم تنفيذه" value={result} onChange={event => setResult(event.target.value)} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 font-bold" placeholder="مثال: تم تغيير الشمعات وفحص التسريب" /></label><label className="mt-3 block text-sm font-black text-slate-700">المبلغ المحصل بالريال<input aria-label="المبلغ المحصل" inputMode="numeric" min="0" max={MAX_COLLECTION_AMOUNT} value={amount} onChange={event => setAmount(event.target.value.replace(/[^0-9-]/g, ""))} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 text-lg font-black" placeholder="0" /><span className="mt-1 block text-[11px] font-bold text-slate-500">اكتب الرقم كما هو، مثل: 250</span></label><div className="mt-4 grid grid-cols-2 gap-2"><label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs font-black text-sky-800"><Camera className="h-4 w-4" /> صورة العمل<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="hidden" onChange={event => uploadProof("photo", event.target.files?.[0])} /></label><div className="col-span-2 rounded-xl border border-violet-200 bg-violet-50 p-3"><div className="mb-2 flex items-center justify-between text-xs font-black text-violet-800"><span className="flex items-center gap-2"><PenLine className="h-4 w-4" /> توقيع العميل</span><button type="button" onClick={clearSignature} className="text-[11px] underline">مسح</button></div><canvas ref={signatureCanvas} width={640} height={180} onPointerDown={event => { drawing.current = true; event.currentTarget.setPointerCapture(event.pointerId); const context = event.currentTarget.getContext("2d"); context?.beginPath(); signaturePoint(event); }} onPointerMove={event => { if (drawing.current) signaturePoint(event); }} onPointerUp={() => { drawing.current = false; }} onPointerCancel={() => { drawing.current = false; }} className="h-28 w-full touch-none rounded-lg border border-violet-200 bg-white" aria-label="لوحة توقيع العميل" /><div className="mt-2 flex gap-2"><Button type="button" onClick={saveSignature} className="h-8 flex-1 bg-violet-700 text-xs">حفظ التوقيع</Button><label className="flex h-8 cursor-pointer items-center justify-center rounded-lg border border-violet-200 px-3 text-[11px] font-black text-violet-800">رفع ملف<input type="file" accept="image/png,image/jpeg" className="hidden" onChange={event => uploadProof("signature", event.target.files?.[0])} /></label></div></div></div><div className="mt-4"><h3 className="text-sm font-black text-slate-700">الأصناف المستخدمة</h3><p className="mt-1 text-xs font-semibold text-slate-500">اختر الصنف واكتب الكمية، وسيتم خصمها عند إغلاق الأمر.</p><div className="mt-2 space-y-2">{inventory.length ? inventory.map(item => { const selectedQuantity = selectedItems[item.id] || 0; const balance = Math.max(0, item.currentBalance ?? 0); return <div key={item.id} className={`flex items-center gap-2 rounded-xl border p-2 ${selectedQuantity ? "border-teal-400 bg-teal-50" : "border-slate-200 bg-white"}`}><button type="button" onClick={() => toggleItem(item.id, balance)} disabled={balance < 1} className="min-w-0 flex-1 text-right text-xs font-black text-slate-800"><span>{item.name}</span><span className={`mr-2 rounded-full px-2 py-0.5 text-[10px] ${balance > (item.reorderLevel ?? 0) ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>الرصيد {balance}</span></button>{selectedQuantity ? <input aria-label={`كمية ${item.name}`} inputMode="numeric" value={selectedQuantity} onChange={event => setSelectedItems(current => ({ ...current, [item.id]: Math.max(1, Math.min(balance, Number(event.target.value.replace(/[^0-9]/g, "")) || 1)) }))} className="h-9 w-16 rounded-lg border border-teal-300 bg-white text-center font-black" /> : null}</div>; }) : <p className="rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-500">لا توجد أصناف متاحة.</p>}</div></div><Button type="button" onClick={completeOrder} disabled={update.isPending} className="mt-4 h-12 w-full rounded-xl bg-teal-700 font-black hover:bg-teal-800">{update.isPending ? "جاري الحفظ..." : <><CheckCircle2 className="ml-2 h-5 w-5" /> حفظ وإغلاق أمر العمل</>}</Button></section> : null}
+      {selected ? (
+        <section className="rounded-3xl border border-teal-200 bg-white p-5 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-teal-700">إغلاق أمر العمل</p>
+              <h2 className="mt-1 text-lg font-black text-slate-900">{selected.customer?.name}</h2>
+            </div>
+            <button type="button" onClick={() => setSelectedId(null)} className="text-sm font-black text-slate-500">إغلاق</button>
+          </div>
+          <div className="mt-4">
+            <p className="text-sm font-black text-slate-700">نتيجة الزيارة</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setOutcome("completed")} className={`rounded-xl border p-3 text-sm font-black ${outcome === "completed" ? "border-emerald-500 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-100" : "border-slate-200 bg-white text-slate-600"}`}>تم التنفيذ</button>
+              <button type="button" onClick={() => setOutcome("not_completed")} className={`rounded-xl border p-3 text-sm font-black ${outcome === "not_completed" ? "border-amber-500 bg-amber-50 text-amber-800 ring-2 ring-amber-100" : "border-slate-200 bg-white text-slate-600"}`}>لم يتم التنفيذ</button>
+            </div>
+            {outcome === "not_completed" ? <label className="mt-3 block text-sm font-black text-amber-900">سبب عدم التنفيذ<textarea aria-label="سبب عدم التنفيذ" value={notCompletedReason} onChange={event => setNotCompletedReason(event.target.value)} className="mt-2 min-h-20 w-full rounded-xl border border-amber-200 bg-amber-50/40 p-3 font-bold" placeholder="مثال: العميل لم يحضر أو تم تأجيل الموعد" /></label> : null}
+          </div>
+          <label className="mt-4 block text-sm font-black text-slate-700">ما تم تنفيذه<textarea aria-label="ما تم تنفيذه" value={result} onChange={event => setResult(event.target.value)} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 font-bold" placeholder="مثال: تم تغيير الشمعات وفحص التسريب" /></label>
+          <label className="mt-3 block text-sm font-black text-slate-700">المبلغ المحصل بالريال<input aria-label="المبلغ المحصل" inputMode="numeric" min="0" max={MAX_COLLECTION_AMOUNT} value={amount} onChange={event => setAmount(event.target.value.replace(/[^0-9-]/g, ""))} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 text-lg font-black" placeholder="0" /><span className="mt-1 block text-[11px] font-bold text-slate-500">اكتب الرقم كما هو، مثل: 250</span></label>
+          <Button type="button" onClick={completeOrder} disabled={update.isPending} className="mt-4 h-12 w-full rounded-xl bg-teal-700 font-black hover:bg-teal-800">{update.isPending ? "جاري الحفظ..." : <><CheckCircle2 className="ml-2 h-5 w-5" /> حفظ وإغلاق أمر العمل</>}</Button>
+        </section>
+      ) : null}
     </main>
   );
 }
