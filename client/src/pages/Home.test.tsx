@@ -81,6 +81,27 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     expect(screen.queryByText("تمت المتابعة")).toBeNull();
   });
 
+  it("تعرض ملخص حالات أوامر الشغل وتفتح شاشة أوامر الفنيين", () => {
+    mocks.dashboard.mockReturnValue({
+      isLoading: false,
+      data: {
+        todayVisits: [],
+        upcomingVisits: [],
+        upcomingFollowUps: [],
+        dueReminders: [],
+        inventory: { totalItems: 0, lowStockCount: 0, lowStock: [] },
+        workOrderSummary: { total: 8, assigned: 2, inProgress: 3, completed: 2, notCompleted: 1 },
+      },
+    });
+    render(<Home />);
+    expect(screen.getByRole("heading", { name: "متابعة أوامر الشغل" })).toBeTruthy();
+    const completedButton = screen.getByRole("button", { name: "فتح أوامر مكتملة" });
+    expect(completedButton).toBeTruthy();
+    expect(completedButton.textContent).toContain("٢");
+    fireEvent.click(screen.getByRole("button", { name: "فتح أوامر الفنيين" }));
+    expect(mocks.setLocation).toHaveBeenCalledWith("/work-orders");
+  });
+
   it("تفتح بطاقة تسجيل الزيارة من الإجراء السريع في الصفحة الرئيسية", () => {
     render(<Home />);
     fireEvent.click(screen.getByRole("button", { name: "تسجيل زيارة جديدة" }));

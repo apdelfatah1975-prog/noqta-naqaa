@@ -552,7 +552,7 @@ export const filterManagementRouter = router({
     const endOfUpcomingWindow = new Date(startOfToday);
     endOfUpcomingWindow.setDate(endOfUpcomingWindow.getDate() + 6);
     endOfUpcomingWindow.setMilliseconds(-1);
-    const [todayVisits, upcomingVisits, upcomingFollowUps, dueReminders, inventory, cash, chartTransactions] = await Promise.all([
+    const [todayVisits, upcomingVisits, upcomingFollowUps, dueReminders, inventory, cash, chartTransactions, workOrderRows] = await Promise.all([
       db.select().from(visits).where(and(eq(visits.ownerId, ownerId), gte(visits.visitDate, startOfToday), lte(visits.visitDate, endOfToday))).orderBy(visits.visitDate),
       db.select().from(visits).where(and(eq(visits.ownerId, ownerId), gte(visits.visitDate, endOfToday), lte(visits.visitDate, endOfUpcomingWindow))).orderBy(visits.visitDate).limit(20),
       remindersWithCustomers(ownerId, false, 5),
@@ -560,6 +560,7 @@ export const filterManagementRouter = router({
       inventorySummary(ownerId),
       cashSummary(ownerId),
       db.select().from(cashTransactions).where(eq(cashTransactions.ownerId, ownerId)),
+      db.select({ status: visits.status, executionOutcome: visits.executionOutcome }).from(visits).where(and(eq(visits.ownerId, ownerId), isNotNull(visits.assignedTechnicianId))),
     ]);
     const visitCustomerIds = Array.from(new Set([...todayVisits, ...upcomingVisits].map(visit => visit.customerId)));
     const [visitCustomers, allCustomers] = await Promise.all([
@@ -591,6 +592,14 @@ export const filterManagementRouter = router({
       if (day) day.expenses += transaction.amount;
     }
     const lowStock = inventory.items.filter(item => item.currentBalance <= 2);
+    const workOrderSummary = workOrderRows.reduce((summary, row) => {
+      if (row.status === "completed") summary.completed += 1;
+      else if (row.status === "postponed" || row.status === "cancelled" || row.executionOutcome === "not_completed") summary.notCompleted += 1;
+      else if (["en_route", "arrived", "in_progress"].includes(row.status)) summary.inProgress += 1;
+      else summary.assigned += 1;
+      summary.total += 1;
+      return summary;
+    }, { total: 0, assigned: 0, inProgress: 0, completed: 0, notCompleted: 0 });
     return {
       todayVisits: todayVisits.map(visit => {
         const customer = customerById.get(visit.customerId);
@@ -610,6 +619,7 @@ export const filterManagementRouter = router({
         items: inventory.items.map(item => ({ id: item.id, name: item.name, currentBalance: item.currentBalance, reorderLevel: item.reorderLevel })),
       },
       cash: { incomeTotal: cash.incomeTotal, expenseTotal: cash.expenseTotal, balance: cash.balance, summaries: cash.summaries },
+      workOrderSummary,
       chart: { days: chartDays, generatedAt: new Date() },
     };
   }),

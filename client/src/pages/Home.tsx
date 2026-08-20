@@ -6,7 +6,7 @@ import { printArabicPdf } from "@/lib/pdfExport";
 import { AppSettings, getAppSettings } from "@/lib/appSettings";
 import { getTrashItems } from "@/lib/trashBin";
 import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
-import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, CloudDownload, CloudOff, CloudUpload, Download, Droplets, Filter, Info, PackageSearch, Plus, Printer, Refrigerator, RefreshCw, Snowflake, Trash2, Upload, UsersRound } from "lucide-react";
+import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, ClipboardList, CloudDownload, CloudOff, CloudUpload, Download, Droplets, Filter, Info, PackageSearch, Plus, Printer, Refrigerator, RefreshCw, Snowflake, Trash2, Upload, UsersRound } from "lucide-react";
 import React from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -111,6 +111,7 @@ export default function Home() {
   };
   const nextVisit = displayData?.upcomingVisits[0];
   const nextDueReminder = displayData?.dueReminders[0];
+  const workOrderSummary = displayData?.workOrderSummary;
   function saveLocalSnapshot() {
     if (!displayData && !cash) {
       toast.error("لا توجد بيانات متاحة للحفظ المحلي بعد");
@@ -202,6 +203,24 @@ export default function Home() {
       </section>
 
       <ReminderAlertBanner />
+
+      <section className="soft-card border border-teal-200/80 bg-gradient-to-l from-teal-50/80 via-white to-sky-50/60 p-5 sm:p-6" aria-labelledby="work-orders-summary-title">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-teal-600" aria-hidden="true" /><h2 id="work-orders-summary-title" className="font-extrabold text-teal-950">متابعة أوامر الشغل</h2><span className="rounded-full bg-teal-100 px-2.5 py-1 text-xs font-extrabold text-teal-800">{isLoading ? "—" : workOrderSummary?.total ?? 0} أمر</span></div>
+            <p className="mt-1 text-xs font-semibold text-muted-foreground">ملخص سريع لحالة الأوامر المسندة إلى الفنيين</p>
+          </div>
+          <Button type="button" onClick={() => setLocation("/work-orders")} variant="outline" className="rounded-xl border-teal-700/25 text-teal-800 hover:bg-teal-100"><ClipboardList className="ml-2 h-4 w-4" />فتح أوامر الفنيين</Button>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            { label: "مسندة", value: workOrderSummary?.assigned ?? 0, tone: "border-sky-200 bg-sky-50 text-sky-800" },
+            { label: "قيد التنفيذ", value: workOrderSummary?.inProgress ?? 0, tone: "border-amber-200 bg-amber-50 text-amber-800" },
+            { label: "مكتملة", value: workOrderSummary?.completed ?? 0, tone: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+            { label: "لم تُنفذ", value: workOrderSummary?.notCompleted ?? 0, tone: "border-rose-200 bg-rose-50 text-rose-800" },
+          ].map(card => <button type="button" key={card.label} onClick={() => setLocation("/work-orders")} className={`rounded-2xl border p-3 text-right transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${card.tone}`} aria-label={`فتح أوامر ${card.label}`}><p className="text-xs font-extrabold">{card.label}</p><p className="mt-1 text-2xl font-black">{isLoading ? "—" : card.value.toLocaleString("ar-SA")}</p></button>)}
+        </div>
+      </section>
 
       <section className="grid gap-6 xl:grid-cols-5">
         <div className="soft-card border border-orange-200 bg-orange-50/35 xl:col-span-3">
