@@ -1312,7 +1312,10 @@ export const filterManagementRouter = router({
   technicians: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       const db = await databaseOrThrow();
-      return db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(eq(users.role, "user"));
+      const accounts = await db.select({ linkedUserId: allowedTechnicianAccounts.linkedUserId }).from(allowedTechnicianAccounts).where(and(eq(allowedTechnicianAccounts.ownerId, ctx.user.id), eq(allowedTechnicianAccounts.isActive, true)));
+      const linkedIds = accounts.map(account => account.linkedUserId).filter((id): id is number => id !== null);
+      if (!linkedIds.length) return [];
+      return db.select({ id: users.id, name: users.name, role: users.role }).from(users).where(inArray(users.id, linkedIds));
     }),
     updateLocation: protectedProcedure.input(z.object({ latitude: z.string().regex(/^-?\d{1,3}(?:\.\d+)?$/), longitude: z.string().regex(/^-?\d{1,3}(?:\.\d+)?$/), accuracy: z.number().int().nonnegative().max(100000).optional(), sharingUntil: z.date().nullable().optional() })).mutation(async ({ ctx, input }) => {
       if (ctx.user.role === "admin") throw new TRPCError({ code: "FORBIDDEN", message: "تحديث الموقع مخصص لحساب الفني." });
@@ -1367,8 +1370,8 @@ export const filterManagementRouter = router({
     create: adminProcedure.input(workOrderCreateInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const customer = await getOwnedCustomer(ctx.user.id, input.customerId);
-      const technician = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, input.assignedTechnicianId)).limit(1);
-      if (!technician[0]) throw new TRPCError({ code: "NOT_FOUND", message: "الفني غير موجود." });
+      const technician = await db.select({ id: users.id, name: users.name }).from(users).innerJoin(allowedTechnicianAccounts, eq(allowedTechnicianAccounts.linkedUserId, users.id)).where(and(eq(users.id, input.assignedTechnicianId), eq(allowedTechnicianAccounts.ownerId, ctx.user.id), eq(allowedTechnicianAccounts.isActive, true))).limit(1);
+      if (!technician[0]) throw new TRPCError({ code: "NOT_FOUND", message: "الفني غير موجود أو غير مرتبط بحساب الشركة." });
       if (input.clientOperationId) {
         const existing = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), eq(visits.clientOperationId, input.clientOperationId))).limit(1);
         if (existing[0]) return { id: existing[0].id, alreadySynced: true };
