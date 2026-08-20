@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ArrowLeft, KeyRound, ShieldCheck, UserRound } from "lucide-react";
+import { InstallAppButton } from "@/components/InstallAppButton";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +31,21 @@ export default function TechnicianLogin() {
           <CardTitle className="text-2xl font-black">دخول الفني</CardTitle>
           <p className="mt-2 text-sm leading-6 text-cyan-50">استخدم البريد وكلمة السر اللذين أعطاك إياهما مدير الشركة.</p>
         </CardHeader>
-        <CardContent className="p-6 sm:p-7">
+          <CardContent className="p-6 sm:p-7">
+            <div className="mb-5 rounded-2xl border border-sky-100 bg-sky-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-sky-950">ثبّت واجهة الفني على الهاتف</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-sky-800">افتح الرابط مرة، ثم اضغط التثبيت لتظهر الواجهة مثل أي تطبيق.</p>
+                </div>
+                <InstallAppButton />
+              </div>
+              <ol className="mt-3 grid gap-1 text-[11px] font-bold text-sky-800">
+                <li>١. افتح الرابط من Chrome.</li>
+                <li>٢. اضغط «تثبيت التطبيق».</li>
+                <li>٣. افتح الرمز من شاشة الهاتف لاحقًا.</li>
+              </ol>
+            </div>
           <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); login.mutate({ email, password }); }}>
             <div className="space-y-2"><Label htmlFor="technician-login-email">البريد الإلكتروني</Label><div className="relative"><UserRound className="pointer-events-none absolute right-3 top-3 h-5 w-5 text-slate-400" /><Input id="technician-login-email" className="pr-10" type="email" dir="ltr" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="technician@example.com" autoComplete="username" required /></div></div>
             <div className="space-y-2"><Label htmlFor="technician-login-password">كلمة السر</Label><div className="relative"><KeyRound className="pointer-events-none absolute right-3 top-3 h-5 w-5 text-slate-400" /><Input id="technician-login-password" className="pr-10" type="password" dir="ltr" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="أدخل كلمة السر" autoComplete="current-password" required minLength={8} /></div></div>
