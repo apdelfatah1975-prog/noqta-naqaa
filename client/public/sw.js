@@ -1,4 +1,4 @@
-const CACHE_NAME = "purepoint-shell-v16-technician-safe";
+const CACHE_NAME = "purepoint-shell-v17-technician-isolated";
 const APP_SHELL = ["/",
 
   "/technician-preview",

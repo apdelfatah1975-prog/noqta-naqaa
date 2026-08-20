@@ -39,11 +39,11 @@ describe("عامل خدمة التطبيق القابل للتثبيت", () => {
     const technicianManifest = readFileSync(path.resolve(import.meta.dirname, "../client/public/technician-manifest.webmanifest"), "utf8");
     const indexHtml = readFileSync(path.resolve(import.meta.dirname, "../client/index.html"), "utf8");
     const mainSource = readFileSync(path.resolve(import.meta.dirname, "../client/src/main.tsx"), "utf8");
-    expect(technicianManifest).toContain('"start_url": "/technician-preview"');
+    expect(technicianManifest).toContain('"start_url": "/technician-preview?mode=technician"');
     expect(technicianManifest).toContain('"scope": "/technician-preview"');
     expect(indexHtml).toContain("window.location.pathname.startsWith('/technician-')");
     expect(indexHtml).toContain("/technician-manifest.webmanifest");
-    expect(mainSource).toContain("version=16-technician-safe");
+    expect(mainSource).toContain("version=17-technician-isolated");
   });
 
   it("يجهز جذر التطبيق داخل غلاف التخزين المحلي", () => {

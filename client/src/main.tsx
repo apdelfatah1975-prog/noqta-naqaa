@@ -21,7 +21,7 @@ if (!import.meta.env.PROD && "serviceWorker" in navigator) {
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js?version=16-technician-safe").then(registration => {
+    void navigator.serviceWorker.register("/sw.js?version=17-technician-isolated").then(registration => {
       const update = () => void registration.update();
       if ("requestIdleCallback" in window) {
         window.requestIdleCallback(update, { timeout: 3000 });
