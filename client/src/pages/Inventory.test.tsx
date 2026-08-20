@@ -49,7 +49,7 @@ describe("تفاصيل المنصرف في المخزون", () => {
       isLoading: false,
       isError: false,
       data: {
-        items: [{ id: 4, name: "شمعة كربون 10 بوصة", notes: null, openingQuantity: 10, currentBalance: 7, reorderLevel: 2 }],
+        items: [{ id: 4, name: "شمعة كربون 10 بوصة", category: "شمع فلاتر", unit: "قطعة", notes: "مقاس 10 بوصة", openingQuantity: 10, currentBalance: 7, reorderLevel: 2, openingUnitCost: 5000, openingAddedAt: new Date("2026-08-01T09:00:00.000Z") }],
         movements: [{
           id: 8,
           inventoryItemId: 4,
@@ -85,6 +85,18 @@ describe("تفاصيل المنصرف في المخزون", () => {
     const dialog = within(screen.getByRole("dialog"));
     expect(dialog.getByText(/صرف صنف من المخزن/)).toBeTruthy();
     expect(dialog.getByDisplayValue("منصرف")).toBeTruthy();
+  });
+
+  it("يفتح كل بيانات الصنف عند الضغط على اسمه", () => {
+    render(<Inventory />);
+    fireEvent.click(screen.getAllByRole("button", { name: "شمعة كربون 10 بوصة" })[0]);
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByText("تفاصيل الصنف: شمعة كربون 10 بوصة")).toBeTruthy();
+    expect(dialog.getByText("شمع فلاتر")).toBeTruthy();
+    expect(dialog.getByText("مقاس 10 بوصة")).toBeTruthy();
+    expect(dialog.getByText("سجل التوريد وتغير السعر")).toBeTruthy();
+    expect(dialog.getByText("سجل المنصرف")).toBeTruthy();
+    expect(dialog.getByText("محمد الفني")).toBeTruthy();
   });
 
   it("يعرض مسار إضافة الوارد للصنف الموجود لتحديث رصيده", () => {
