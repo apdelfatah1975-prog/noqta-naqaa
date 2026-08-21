@@ -19,6 +19,8 @@ vi.mock("@/lib/trpc", () => ({
       customers: {
         create: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
         deleteAll: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+        seedPerformanceCustomers: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+        deletePerformanceCustomers: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       },
       visits: { create: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) } },
       cash: { create: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) } },
@@ -29,6 +31,7 @@ vi.mock("@/lib/trpc", () => ({
         updateAppearance: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
       },
     },
+    useUtils: () => ({ filters: { customers: { list: { invalidate: vi.fn() } }, dashboard: { invalidate: vi.fn() } } }),
   },
 }));
 
@@ -45,6 +48,9 @@ describe("صفحة الإعدادات", () => {
 
     expect(screen.getByRole("heading", { name: "الإعدادات" })).toBeTruthy();
     expect(screen.getByText("الرقم السري للحماية")).toBeTruthy();
+    expect(screen.getByText("اختبار أداء التطبيق")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "إنشاء 1000 عميل تجريبي" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "حذف العملاء التجريبيين" })).toBeTruthy();
 
     fireEvent.change(screen.getByPlaceholderText("اتركه فارغًا عند الإعداد لأول مرة"), { target: { value: "1234" } });
     fireEvent.change(screen.getByPlaceholderText("4 أحرف أو أرقام على الأقل"), { target: { value: "5678" } });

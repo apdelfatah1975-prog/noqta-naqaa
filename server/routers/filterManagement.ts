@@ -909,6 +909,28 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       if (added) await refreshOwnerBackup(ctx.user.id);
       return { added, linked, visitsAdded, incomeAdded, rejected, total: input.rows.length, processed: added + linked + rejected.length };
     }),
+    seedPerformanceCustomers: protectedProcedure.mutation(async ({ ctx }) => {
+      const db = await databaseOrThrow();
+      const marker = "__PUREPOINT_PERFORMANCE_TEST__";
+      const existing = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.ownerId, ctx.user.id), eq(customers.notes, marker)));
+      if (existing.length) return { created: 0, existing: existing.length, marker };
+      const rows = Array.from({ length: 1000 }, (_, index) => {
+        const sequence = String(index + 1).padStart(4, "0");
+        return { ownerId: ctx.user.id, name: `عميل تجريبي للأداء ${sequence}`, phone: `099${String(index + 1).padStart(7, "0")}`, manualCode: `PERF-${sequence}`, address: `عنوان تجريبي ${sequence}`, latitude: null, longitude: null, notes: marker };
+      });
+      for (let offset = 0; offset < rows.length; offset += 250) await db.insert(customers).values(rows.slice(offset, offset + 250));
+      await refreshOwnerBackup(ctx.user.id);
+      return { created: rows.length, existing: 0, marker };
+    }),
+    deletePerformanceCustomers: protectedProcedure.input(sensitivePinInput).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
+      const db = await databaseOrThrow();
+      const marker = "__PUREPOINT_PERFORMANCE_TEST__";
+      const rows = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.ownerId, ctx.user.id), eq(customers.notes, marker)));
+      if (rows.length) await db.delete(customers).where(and(eq(customers.ownerId, ctx.user.id), inArray(customers.id, rows.map(row => row.id))));
+      if (rows.length) await refreshOwnerBackup(ctx.user.id);
+      return { deleted: rows.length };
+    }),
     update: protectedProcedure.input(customerInput.extend({ id: z.number().int().positive(), pin: sensitivePinInput.shape.pin })).mutation(async ({ ctx, input }) => {
       await requirePin(ctx.user.id, input.pin);
       const db = await databaseOrThrow();
