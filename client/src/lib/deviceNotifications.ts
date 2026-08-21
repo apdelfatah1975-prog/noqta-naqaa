@@ -1,6 +1,8 @@
 export type DeviceNotificationPermission = NotificationPermission | "unsupported";
 const SOUND_ENABLED_KEY = "water-filter-reminder-sound-enabled";
 const VIBRATION_ENABLED_KEY = "water-filter-notification-vibration-enabled";
+const NOTIFICATION_TONE_GAIN = 0.32;
+const NOTIFICATION_TONE_DURATION_SECONDS = 0.78;
 
 export function getDeviceNotificationPermission(): DeviceNotificationPermission {
   if (typeof Notification === "undefined") return "unsupported";
@@ -91,12 +93,12 @@ export function playReminderTone(): boolean {
     const gain = context.createGain();
     oscillator.frequency.setValueAtTime(740, context.currentTime);
     gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.13, context.currentTime + 0.03);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.6);
+    gain.gain.exponentialRampToValueAtTime(NOTIFICATION_TONE_GAIN, context.currentTime + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + NOTIFICATION_TONE_DURATION_SECONDS - 0.08);
     oscillator.connect(gain);
     gain.connect(context.destination);
     oscillator.start();
-    oscillator.stop(context.currentTime + 0.62);
+    oscillator.stop(context.currentTime + NOTIFICATION_TONE_DURATION_SECONDS);
     oscillator.onended = () => void context.close();
     return true;
   } catch {

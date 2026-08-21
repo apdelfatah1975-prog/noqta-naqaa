@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getDeviceNotificationPermission, isNotificationVibrationEnabled, requestDeviceNotificationPermission, setNotificationVibrationEnabled, showDeviceReminderNotification, vibrateNotification } from "./deviceNotifications";
+import { getDeviceNotificationPermission, isNotificationVibrationEnabled, playReminderTone, requestDeviceNotificationPermission, setNotificationVibrationEnabled, showDeviceReminderNotification, vibrateNotification } from "./deviceNotifications";
 
 const serviceWorkerDescriptor = Object.getOwnPropertyDescriptor(navigator, "serviceWorker");
 
@@ -34,6 +34,35 @@ describe("حالة إذن إشعارات الجهاز", () => {
 
     expect(getDeviceNotificationPermission()).toBe("unsupported");
     await expect(requestDeviceNotificationPermission()).resolves.toBe("unsupported");
+  });
+
+  it("يشغل نغمة التنبيه الأقوى عندما يكون الصوت مفعّلًا ويمنعها عند إيقافه", () => {
+    const setValueAtTime = vi.fn();
+    const exponentialRampToValueAtTime = vi.fn();
+    const oscillator = {
+      frequency: { setValueAtTime },
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+      onended: undefined as (() => void) | undefined,
+    };
+    const gain = { gain: { setValueAtTime, exponentialRampToValueAtTime }, connect: vi.fn() };
+    const close = vi.fn(async () => undefined);
+    class AudioContextMock {
+      currentTime = 0;
+      destination = {};
+      createOscillator() { return oscillator; }
+      createGain() { return gain; }
+      close = close;
+    }
+    vi.stubGlobal("AudioContext", AudioContextMock);
+    localStorage.removeItem("water-filter-reminder-sound-enabled");
+    expect(playReminderTone()).toBe(true);
+    expect(exponentialRampToValueAtTime).toHaveBeenCalledWith(0.32, 0.03);
+    expect(oscillator.stop).toHaveBeenCalledWith(0.78);
+    localStorage.setItem("water-filter-reminder-sound-enabled", "false");
+    expect(playReminderTone()).toBe(false);
+    expect(close).not.toHaveBeenCalled();
   });
 
   it("يشغل الاهتزاز عندما يكون مفعّلًا ويمنعه عند إيقافه", () => {
