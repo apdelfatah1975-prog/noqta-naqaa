@@ -14,6 +14,12 @@ describe("CustomerContactActions", () => {
     expect(screen.getByRole("link", { name: "فتح موقع العميل" }).getAttribute("href")).toContain("google.com/maps");
   });
 
+  it("يعرض الموقع عند وجود رابط محفوظ في حقل location", () => {
+    render(<CustomerContactActions customer={{ phone: null, address: null, location: "https://maps.google.com/?q=30.0444,31.2357", latitude: null, longitude: null }} labels />);
+
+    expect(screen.getByRole("link", { name: "فتح موقع العميل" }).getAttribute("href")).toContain("google.com/maps");
+  });
+
   it("لا يعرض روابط فارغة عند غياب بيانات التواصل", () => {
     render(<CustomerContactActions customer={{ phone: null, address: null, latitude: null, longitude: null }} labels />);
 

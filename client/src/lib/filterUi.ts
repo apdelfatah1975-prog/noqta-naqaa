@@ -36,10 +36,10 @@ export function toDateTimeLocal(value = new Date()) {
   return new Date(value.getTime() - offset).toISOString().slice(0, 16);
 }
 
-export function customerMapUrl(customer: { address?: string | null; latitude?: string | null; longitude?: string | null }) {
+export function customerMapUrl(customer: { address?: string | null; location?: string | null; latitude?: string | null; longitude?: string | null }) {
   const query = customer.latitude && customer.longitude
     ? `${customer.latitude},${customer.longitude}`
-    : customer.address;
+    : customer.location?.trim() || customer.address?.trim();
   return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : null;
 }
 

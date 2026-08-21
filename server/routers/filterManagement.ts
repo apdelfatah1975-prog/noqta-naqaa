@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { parse as parseCookie } from "cookie";
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, like, lte, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import {
   cashTransactions,
@@ -916,20 +916,43 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       if (existing.length) return { created: 0, existing: existing.length, marker };
       const rows = Array.from({ length: 1000 }, (_, index) => {
         const sequence = String(index + 1).padStart(4, "0");
-        return { ownerId: ctx.user.id, name: `عميل تجريبي للأداء ${sequence}`, phone: `099${String(index + 1).padStart(7, "0")}`, manualCode: `PERF-${sequence}`, address: `عنوان تجريبي ${sequence}`, latitude: null, longitude: null, notes: marker };
+        const latitude = (24.70 + (index % 25) * 0.002).toFixed(6);
+        const longitude = (46.63 + (index % 40) * 0.002).toFixed(6);
+        return { ownerId: ctx.user.id, name: `عميل تجريبي للأداء ${sequence}`, phone: `099${String(index + 1).padStart(7, "0")}`, manualCode: `PERF-${sequence}`, address: `عنوان تجريبي ${sequence}`, latitude, longitude, notes: marker };
       });
       for (let offset = 0; offset < rows.length; offset += 250) await db.insert(customers).values(rows.slice(offset, offset + 250));
-      await refreshOwnerBackup(ctx.user.id);
-      return { created: rows.length, existing: 0, marker };
+      const seededCustomers = await db.select({ id: customers.id, manualCode: customers.manualCode }).from(customers).where(and(eq(customers.ownerId, ctx.user.id), eq(customers.notes, marker)));
+      const visitRows = seededCustomers.map((customer, index) => {
+        const sequence = String(index + 1).padStart(4, "0");
+        const visitDate = new Date(Date.now() - (index % 365) * 86_400_000);
+        return { customerId: customer.id, ownerId: ctx.user.id, visitType: index % 3 === 0 ? "installation" as const : index % 3 === 1 ? "maintenance" as const : "cartridge_change" as const, visitDate, technicianName: index % 2 === 0 ? "فني تجريبي" : "فني اختبار", status: "completed" as const, completedAt: visitDate, notes: marker, visitResult: "تم التنفيذ - بيانات اختبار أداء", clientOperationId: `${marker}:visit:${sequence}` };
+      });
+      for (let offset = 0; offset < visitRows.length; offset += 250) await db.insert(visits).values(visitRows.slice(offset, offset + 250));
+      const seededVisits = await db.select({ id: visits.id, customerId: visits.customerId, visitDate: visits.visitDate }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), like(visits.clientOperationId, `${marker}:visit:%`)));
+      const visitByCustomer = new Map(seededVisits.map(visit => [visit.customerId, visit]));
+      const cashRows = seededCustomers.flatMap((customer, index) => {
+        const visit = visitByCustomer.get(customer.id);
+        if (!visit) return [];
+        const sequence = String(index + 1).padStart(4, "0");
+        const amount = 150 + (index % 8) * 50;
+        return [{ ownerId: ctx.user.id, transactionType: "income" as const, currency: "SAR" as const, amount, category: "تحصيل اختبار أداء", transactionDate: visit.visitDate, sourceVisitId: visit.id, recipientName: "فني تجريبي", clientOperationId: `${marker}:cash:${sequence}`, notes: marker }];
+      });
+      for (let offset = 0; offset < cashRows.length; offset += 250) await db.insert(cashTransactions).values(cashRows.slice(offset, offset + 250));
+      void refreshOwnerBackup(ctx.user.id).catch(error => console.error("[PerformanceSeed] backup refresh failed", error));
+      return { created: seededCustomers.length, visitsCreated: visitRows.length, cashCreated: cashRows.length, existing: 0, marker };
     }),
     deletePerformanceCustomers: protectedProcedure.input(sensitivePinInput).mutation(async ({ ctx, input }) => {
       await requirePin(ctx.user.id, input.pin);
       const db = await databaseOrThrow();
       const marker = "__PUREPOINT_PERFORMANCE_TEST__";
       const rows = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.ownerId, ctx.user.id), eq(customers.notes, marker)));
-      if (rows.length) await db.delete(customers).where(and(eq(customers.ownerId, ctx.user.id), inArray(customers.id, rows.map(row => row.id))));
-      if (rows.length) await refreshOwnerBackup(ctx.user.id);
-      return { deleted: rows.length };
+      const customerIds = rows.map(row => row.id);
+      const performanceVisits = customerIds.length ? await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), inArray(visits.customerId, customerIds))) : [];
+      const visitIds = performanceVisits.map(row => row.id);
+      if (visitIds.length) await db.delete(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), inArray(cashTransactions.sourceVisitId, visitIds)));
+      if (customerIds.length) await db.delete(customers).where(and(eq(customers.ownerId, ctx.user.id), inArray(customers.id, customerIds)));
+      if (rows.length) void refreshOwnerBackup(ctx.user.id).catch(error => console.error("[PerformanceSeed] backup refresh failed", error));
+      return { deleted: rows.length, visitsDeleted: visitIds.length };
     }),
     update: protectedProcedure.input(customerInput.extend({ id: z.number().int().positive(), pin: sensitivePinInput.shape.pin })).mutation(async ({ ctx, input }) => {
       await requirePin(ctx.user.id, input.pin);

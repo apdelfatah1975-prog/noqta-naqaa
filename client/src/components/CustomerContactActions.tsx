@@ -6,6 +6,7 @@ type CustomerContact = {
   name?: string | null;
   phone?: string | null;
   address?: string | null;
+  location?: string | null;
   latitude?: string | null;
   longitude?: string | null;
   followUp?: { nextVisitDate?: Date | string | null } | null;
