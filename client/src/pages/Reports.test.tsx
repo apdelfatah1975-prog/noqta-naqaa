@@ -57,10 +57,10 @@ describe("تقارير نقطة نقاء", () => {
     render(<Reports />);
     expect(screen.getByText("التقارير")).toBeTruthy();
     expect(screen.getByText("الزيارات المنفذة")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "الزيارات" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /العملاء والخدمات/ })).toBeTruthy();
     expect(screen.queryByText("عميل الاختبار")).toBeNull();
     expect(screen.queryByText("maintenance")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "الزيارات" }));
+    fireEvent.click(screen.getByRole("button", { name: /العملاء والخدمات/ }));
     expect(screen.getByText("عميل الاختبار")).toBeTruthy();
     expect(screen.getAllByText("بنزين").length).toBeGreaterThan(0);
     expect(screen.getAllByText("صيانة").length).toBeGreaterThan(0);
@@ -68,7 +68,7 @@ describe("تقارير نقطة نقاء", () => {
 
   it("تعرض بطاقات المخزون أسماء وشرحًا عربيًا واضحًا", () => {
     render(<Reports />);
-    fireEvent.click(screen.getByRole("button", { name: "المخزون" }));
+    fireEvent.click(screen.getByRole("button", { name: /المخزون/ }));
     expect(screen.getByText("إجمالي الوارد")).toBeTruthy();
     expect(screen.getByText("إجمالي المنصرف")).toBeTruthy();
     expect(screen.getByText("قيمة المشتريات")).toBeTruthy();
@@ -79,7 +79,7 @@ describe("تقارير نقطة نقاء", () => {
 
   it("تعرض كشف PDF مستقلًا للفني من قسم المالية", () => {
     render(<Reports />);
-    fireEvent.click(screen.getByRole("button", { name: "المالية" }));
+    fireEvent.click(screen.getByRole("button", { name: /الفنيون والرواتب/ }));
     expect(screen.getByText("فني أحمد")).toBeTruthy();
     expect(screen.getByRole("button", { name: /PDF الفني/ })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /PDF الفني/ }));
@@ -102,7 +102,7 @@ describe("تقارير نقطة نقاء", () => {
 
   it("تطبق فلاتر الخزينة حسب الفني والنوع والتصنيف وتعرض الحركات", () => {
     render(<Reports />);
-    fireEvent.click(screen.getByRole("button", { name: "الخزينة" }));
+    fireEvent.click(screen.getByRole("button", { name: /الخزينة/ }));
     expect(screen.getByText("تقرير حركات الخزينة")).toBeTruthy();
     expect(screen.getByText("عميل الاختبار")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("الفني"), { target: { value: "فني أحمد" } });
@@ -113,7 +113,7 @@ describe("تقارير نقطة نقاء", () => {
 
   it("تعرض أزرار تصدير معاملات الخزينة إلى Excel وPDF", () => {
     render(<Reports />);
-    fireEvent.click(screen.getByRole("button", { name: "الخزينة" }));
+    fireEvent.click(screen.getByRole("button", { name: /الخزينة/ }));
     expect(screen.getByRole("button", { name: "تصدير معاملات PDF" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "تصدير معاملات Excel" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "تصدير معاملات Excel" }));
@@ -127,6 +127,6 @@ it("تعرض تقريرًا محليًا فارغًا عند فشل الشبكة
   render(<Reports />);
   expect(screen.getAllByText("التقارير").length).toBeGreaterThan(0);
   expect(screen.getByText("الزيارات المنفذة")).toBeTruthy();
-  expect(screen.getByText("نظرة عامة")).toBeTruthy();
+  expect(screen.getByText("ملخص الإدارة")).toBeTruthy();
   expect(screen.queryByText("تعذر تحميل التقرير")).toBeNull();
 });

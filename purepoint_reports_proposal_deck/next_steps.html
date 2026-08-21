@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+.slide-container{width:1280px;min-height:720px;background:#f7fbfb;color:#12333b;font-family:Arial,"Tahoma",sans-serif;position:relative;padding-top:68px}
+.rail{position:absolute;right:0;top:0;width:18px;min-height:720px;background:#0d9488}
+.wrap{padding:0 78px}
+.kicker{font-size:18px;color:#0d9488;font-weight:700;margin-bottom:14px}
+.title{font-size:47px;line-height:1.15;margin:0;max-width:820px}
+.decision{margin-top:28px;background:#e8f5f3;padding:22px 28px;font-size:25px;font-weight:700;color:#0b7169;max-width:1040px}
+.steps{display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px;margin-top:56px;direction:rtl}
+.step{min-height:220px;background:#fff;border-top:6px solid #0d9488;padding:24px 24px 0;border-bottom:1px solid #d6e8e6}
+.step:nth-child(2){border-top-color:#3c82a1}
+.step:nth-child(3){border-top-color:#7ab9b0}
+.num{font-size:50px;font-weight:800;color:#c8ebe6;line-height:1;margin-bottom:18px}
+.step h2{font-size:24px;margin:0 0 12px}
+.step p{font-size:18px;color:#61767b;line-height:1.45;margin:0}
+.success{margin-top:36px;font-size:20px;color:#526b70}
+.success b{color:#0d9488}
+.foot{position:absolute;bottom:32px;right:78px;font-size:15px;color:#789096}
+</style>
+</head>
+<body>
+<div class="slide-container">
+  <div class="rail"></div>
+  <div class="wrap">
+    <div class="kicker">الخاتمة · القرار المطلوب</div>
+    <h1 class="title">نعتمد الهيكل المبسط ونحوّل الفكرة إلى شاشة قابلة للاستخدام</h1>
+    <div class="decision">المطلوب من الفريق: الموافقة على ترتيب الصفحة، ثم بدء التنفيذ على مراحل قصيرة.</div>
+    <div class="steps">
+      <div class="step"><div class="num">١</div><h2>اعتماد الهيكل</h2><p>الفترة أولًا، ثم خمسة مؤشرات، ثم أربعة أقسام واضحة للتقارير.</p></div>
+      <div class="step"><div class="num">٢</div><h2>تنفيذ الواجهة</h2><p>إظهار الفلاتر الأساسية وإخفاء المتقدمة، مع تفاصيل قابلة للفتح.</p></div>
+      <div class="step"><div class="num">٣</div><h2>اختبار الفريق</h2><p>تجربة سيناريوهات الخزينة والفنيين والتصدير على الهاتف والحاسوب.</p></div>
+    </div>
+    <div class="success">معيار النجاح: <b>يفهم المستخدم التقرير بسرعة، ويصل إلى البيانات المطلوبة ويصدرها دون مساعدة.</b></div>
+    <div class="foot">نقطة نقاء · واجهة تقارير أوضح وأسرع</div>
+  </div>
+</div>
+</body>
+</html>

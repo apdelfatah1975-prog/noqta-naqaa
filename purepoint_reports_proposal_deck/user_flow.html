@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+.slide-container{width:1280px;min-height:720px;background:#f7fbfb;color:#12333b;font-family:Arial,"Tahoma",sans-serif;position:relative;padding-top:66px}
+.rail{position:absolute;right:0;top:0;width:18px;min-height:720px;background:#0d9488}
+.wrap{padding:0 76px}
+.kicker{font-size:18px;color:#0d9488;font-weight:700;margin-bottom:12px}
+.title{font-size:44px;line-height:1.15;margin:0 0 16px}
+.lead{font-size:21px;color:#65787c;margin:0;line-height:1.4}
+.path{position:relative;margin-top:92px;display:grid;grid-template-columns:repeat(5,1fr);gap:24px;direction:rtl}
+.path:before{content:"";position:absolute;top:36px;right:80px;left:80px;height:4px;background:#b7ddd8}
+.step{position:relative;text-align:center;z-index:1}
+.dot{width:72px;height:72px;margin:0 auto 22px;background:#0d9488;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;border:8px solid #e8f5f3}
+.step:nth-child(2) .dot,.step:nth-child(4) .dot{background:#3c82a1}
+.step h2{font-size:22px;margin:0 0 12px;line-height:1.2}
+.step p{font-size:16px;color:#687b80;line-height:1.4;margin:0 auto;width:170px}
+.result{margin:74px auto 0;width:720px;min-height:74px;border-top:2px solid #0d9488;border-bottom:1px solid #cfe5e2;text-align:center;padding-top:22px;color:#0d9488;font-size:21px;font-weight:700}
+.foot{position:absolute;bottom:30px;right:76px;font-size:15px;color:#789096}
+</style>
+</head>
+<body>
+<div class="slide-container">
+  <div class="rail"></div>
+  <div class="wrap">
+    <div class="kicker">رحلة الاستخدام المقترحة</div>
+    <h1 class="title">من فتح التقارير إلى استخراج الملف في خمس خطوات</h1>
+    <p class="lead">كل خطوة لها هدف واضح، ولا تظهر التفاصيل إلا عندما يطلبها المستخدم.</p>
+    <div class="path">
+      <div class="step"><div class="dot">١</div><h2>اختيار الفترة</h2><p>اليوم، الأسبوع، الشهر أو فترة مخصصة.</p></div>
+      <div class="step"><div class="dot">٢</div><h2>قراءة الملخص</h2><p>الإيرادات والمصروفات والصافي في نظرة واحدة.</p></div>
+      <div class="step"><div class="dot">٣</div><h2>اختيار القسم</h2><p>الخزينة أو الفنيون أو العملاء والخدمات.</p></div>
+      <div class="step"><div class="dot">٤</div><h2>تطبيق فلتر</h2><p>الفني أو التصنيف أو نوع الحركة عند الحاجة.</p></div>
+      <div class="step"><div class="dot">٥</div><h2>التصدير</h2><p>Excel للتحليل أو PDF للطباعة والمشاركة.</p></div>
+    </div>
+    <div class="result">النتيجة: قرار أسرع وبيانات جاهزة للاستخدام</div>
+    <div class="foot">نقطة نقاء · تجربة بسيطة قابلة للتوسع</div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,100 @@
+{
+  "project_info": {
+    "title": "واجهة التقارير الجديدة",
+    "created": 1787309993.081,
+    "last_updated": 1787310119.083,
+    "total_slides": 8
+  },
+  "slides": [
+    {
+      "id": "cover",
+      "state": "edited",
+      "pageNum": 1
+    },
+    {
+      "id": "why_change",
+      "state": "edited",
+      "pageNum": 2
+    },
+    {
+      "id": "design_principle",
+      "state": "edited",
+      "pageNum": 3
+    },
+    {
+      "id": "page_structure",
+      "state": "edited",
+      "pageNum": 4
+    },
+    {
+      "id": "report_sections",
+      "state": "edited",
+      "pageNum": 5
+    },
+    {
+      "id": "user_flow",
+      "state": "edited",
+      "pageNum": 6
+    },
+    {
+      "id": "mobile_export",
+      "state": "edited",
+      "pageNum": 7
+    },
+    {
+      "id": "next_steps",
+      "state": "edited",
+      "pageNum": 8
+    }
+  ],
+  "outline": [
+    {
+      "id": "cover",
+      "title": "واجهة التقارير الجديدة",
+      "summary": "عرض مقترح لتبسيط قراءة التقارير واستخراج البيانات بسرعة داخل نظام نقطة نقاء.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "why_change",
+      "title": "لماذا نحتاج إلى تبسيط التقارير؟",
+      "summary": "توضيح مشكلة ازدحام الصفحة الحالية وكثرة الفلاتر والتفاصيل في الشاشة الأولى.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "design_principle",
+      "title": "الفكرة: الإجابة أولًا ثم التفاصيل",
+      "summary": "شرح مبدأ عرض الملخص أولًا وإخفاء التفاصيل المتقدمة حتى يحتاجها المستخدم.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "page_structure",
+      "title": "هيكل الصفحة المقترح",
+      "summary": "عرض ترتيب الصفحة من الفترة والملخص إلى الأقسام والتفاصيل والتصدير.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "report_sections",
+      "title": "أربعة أقسام تجيب عن أسئلة العمل",
+      "summary": "توضيح أقسام ملخص الإدارة والخزينة والفنيين والعملاء والخدمات.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "user_flow",
+      "title": "رحلة المستخدم في خمس خطوات",
+      "summary": "شرح المسار السريع: اختيار الفترة، قراءة الملخص، اختيار القسم، التصفية، ثم التصدير.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "mobile_export",
+      "title": "تجربة الهاتف والتصدير",
+      "summary": "توضيح سلوك التصميم على الهاتف وأسماء أزرار Excel وPDF المقترحة.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "next_steps",
+      "title": "القرار المطلوب من الفريق",
+      "summary": "تلخيص ما سيتم اعتماده والخطوات التالية لتحويل المقترح إلى تنفيذ.",
+      "image_plan": "Use a suitable image if needed"
+    }
+  ]
+}

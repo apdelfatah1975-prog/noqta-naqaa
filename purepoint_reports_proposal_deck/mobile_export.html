@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+.slide-container{width:1280px;min-height:720px;background:#f7fbfb;color:#12333b;font-family:Arial,"Tahoma",sans-serif;position:relative;padding-top:62px}
+.rail{position:absolute;right:0;top:0;width:18px;min-height:720px;background:#0d9488}
+.wrap{padding:0 78px}
+.kicker{font-size:18px;color:#0d9488;font-weight:700;margin-bottom:12px}
+.title{font-size:43px;line-height:1.15;margin:0 0 42px}
+.columns{display:grid;grid-template-columns:1fr 1fr;gap:82px;direction:ltr;align-items:start}
+.phone-area{direction:rtl;display:flex;gap:32px;align-items:center;min-height:440px}
+.phone{width:245px;min-height:430px;border:8px solid #12333b;background:#fff;padding:26px 18px 0;position:relative}
+.phone:before{content:"";position:absolute;top:10px;left:88px;width:55px;height:5px;background:#12333b}
+.phone-title{font-size:18px;font-weight:700;margin:24px 0 20px}
+.phone-line{height:10px;background:#d6eeeb;margin:12px 0}
+.phone-line.short{width:62%}
+.phone-metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:22px}
+.metric{background:#edf8f6;padding:12px 8px;border-top:4px solid #0d9488}
+.metric strong{display:block;font-size:19px}.metric span{font-size:11px;color:#64777b}
+.phone-filter{margin-top:24px;padding-top:15px;border-top:1px solid #d6e8e6;color:#0d9488;font-size:14px;font-weight:700}
+.mobile-copy{flex:1}.mobile-copy h2{font-size:25px;margin:0 0 14px}.mobile-copy p{font-size:18px;line-height:1.5;color:#64777b;margin:0}.mobile-copy .tag{display:inline-block;margin-top:24px;color:#0d9488;font-weight:700;font-size:18px}
+.export-area{direction:rtl;min-height:440px;padding-top:32px;border-top:1px solid #d6e8e6}
+.export-area h2{font-size:27px;margin:0 0 15px}.export-area>p{font-size:18px;color:#64777b;line-height:1.5;margin:0 0 34px}
+.export-row{display:flex;gap:18px;direction:rtl;margin-bottom:34px}
+.export{width:205px;min-height:112px;border:1px solid #b9dcd8;background:#fff;padding:20px 18px}.export.excel{border-top:7px solid #0d9488}.export.pdf{border-top:7px solid #3c82a1}.export b{display:block;font-size:22px;margin-bottom:10px}.export span{font-size:14px;color:#64777b}
+.filename{font-size:17px;color:#12333b;border-top:1px dashed #a8cfca;padding-top:22px;line-height:1.55}.filename strong{color:#0d9488}
+.foot{position:absolute;bottom:30px;right:78px;font-size:15px;color:#789096}
+</style>
+</head>
+<body>
+<div class="slide-container">
+<div class="rail"></div>
+<div class="wrap">
+<div class="kicker">الوصول والتصدير</div>
+<h1 class="title">نفس الفكرة تعمل بسرعة على الهاتف وتُخرج البيانات باسم واضح</h1>
+<div class="columns">
+<div class="phone-area">
+<div class="phone">
+<div class="phone-title">ملخص الإدارة</div>
+<div class="phone-line"></div><div class="phone-line short"></div>
+<div class="phone-metrics"><div class="metric"><strong>15230</strong><span>إيرادات</span></div><div class="metric"><strong>10693</strong><span>الصافي</span></div></div>
+<div class="phone-filter">الفلاتر الإضافية ↓</div>
+</div>
+<div class="mobile-copy"><h2>على الهاتف</h2><p>المؤشرات تظهر كبطاقات مختصرة، والفلاتر المتقدمة تفتح من أسفل الشاشة عند الحاجة، دون تمرير طويل.</p><span class="tag">ملائم للميدان والعمل السريع</span></div>
+</div>
+<div class="export-area">
+<h2>التصدير يصبح مرتبطًا بالتقرير</h2>
+<p>بعد اختيار القسم والفترة، يعرف المستخدم بالضبط ما الذي سيحصل عليه.</p>
+<div class="export-row"><div class="export excel"><b>Excel</b><span>للمراجعة والتحليل والتعديل</span></div><div class="export pdf"><b>PDF</b><span>للطباعة والمشاركة والتسليم</span></div></div>
+<div class="filename">اسم الملف المقترح:<br><strong>تقرير-الخزينة-يناير-2026.xlsx</strong></div>
+</div>
+</div>
+<div class="foot">نقطة نقاء · تجربة متسقة من الشاشة إلى الملف</div>
+</div>
+</div>
+</body>
+</html>

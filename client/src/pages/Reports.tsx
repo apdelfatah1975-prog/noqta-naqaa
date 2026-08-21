@@ -876,51 +876,39 @@ export default function Reports() {
               </div>
             </div>
           </section>
-          <div className="soft-card p-4 print:hidden">
-            <p className="text-sm font-black text-teal-950">اختر ما تريد مراجعته</p>
-            <p className="mt-1 text-xs text-muted-foreground">ابدأ بنظرة عامة، ثم افتح القسم المطلوب فقط بدل عرض التقرير كله دفعة واحدة.</p>
-          <nav
-            aria-label="أقسام التقرير"
-            className="mt-3 flex gap-2 overflow-x-auto"
-          >
-            <SectionButton
-              active={reportSection === "overview"}
-              onClick={() => setReportSection("overview")}
-            >
-              نظرة عامة
-            </SectionButton>
-            <SectionButton
-              active={reportSection === "financial"}
-              onClick={() => setReportSection("financial")}
-            >
-              المالية
-            </SectionButton>
-            <SectionButton
-              active={reportSection === "treasury"}
-              onClick={() => setReportSection("treasury")}
-            >
-              الخزينة
-            </SectionButton>
-            <SectionButton
-              active={reportSection === "visits"}
-              onClick={() => setReportSection("visits")}
-            >
-              الزيارات
-            </SectionButton>
-            <SectionButton
-              active={reportSection === "inventory"}
-              onClick={() => setReportSection("inventory")}
-            >
-              المخزون
-            </SectionButton>
-            <SectionButton
-              active={reportSection === "all"}
-              onClick={() => setReportSection("all")}
-            >
-              كل التفاصيل
-            </SectionButton>
-          </nav>
-          </div>
+          <section className="soft-card p-4 print:hidden">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-black text-teal-950">ماذا تريد أن تعرف؟</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  اختر إجابة واحدة، وستظهر التفاصيل المرتبطة بها فقط.
+                </p>
+              </div>
+              <span className="w-fit rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black text-violet-900">
+                {dateFrom && dateTo ? `الفترة: ${dateFrom} — ${dateTo}` : "حدد الفترة أولًا"}
+              </span>
+            </div>
+            <nav aria-label="أقسام التقرير" className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <SectionButton active={reportSection === "overview"} onClick={() => setReportSection("overview")} description="أهم الأرقام والتنبيهات">
+                ملخص الإدارة
+              </SectionButton>
+              <SectionButton active={reportSection === "treasury"} onClick={() => setReportSection("treasury")} description="ما دخل وخرج والصافي">
+                الخزينة
+              </SectionButton>
+              <SectionButton active={reportSection === "financial"} onClick={() => setReportSection("financial")} description="المستحق والمدفوع لكل فني">
+                الفنيون والرواتب
+              </SectionButton>
+              <SectionButton active={reportSection === "visits"} onClick={() => setReportSection("visits")} description="العملاء والزيارات والخدمات">
+                العملاء والخدمات
+              </SectionButton>
+              <SectionButton active={reportSection === "inventory"} onClick={() => setReportSection("inventory")} description="الوارد والمنصرف والرصيد">
+                المخزون
+              </SectionButton>
+              <SectionButton active={reportSection === "all"} onClick={() => setReportSection("all")} description="عرض كل الأقسام معًا">
+                كل التفاصيل
+              </SectionButton>
+            </nav>
+          </section>
           <div className="hidden border-b pb-4 print:block">
             <h1 className="text-2xl font-black">تقرير نقطة نقاء</h1>
             <p className="mt-2 text-sm">
@@ -1397,19 +1385,24 @@ function SectionButton({
   active,
   onClick,
   children,
+  description,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  description: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-xl px-4 py-2.5 text-sm font-bold transition-colors ${active ? "bg-teal-700 text-white shadow-sm" : "bg-teal-50 text-teal-900 hover:bg-teal-100"}`}
+      className={`min-h-[76px] rounded-xl px-4 py-3 text-right transition-colors ${active ? "bg-teal-700 text-white shadow-sm" : "bg-teal-50 text-teal-900 hover:bg-teal-100"}`}
     >
-      {children}
+      <span className="block text-sm font-black">{children}</span>
+      <span className={`mt-1 block text-[11px] leading-4 ${active ? "text-white/75" : "text-teal-900/65"}`}>
+        {description}
+      </span>
     </button>
   );
 }

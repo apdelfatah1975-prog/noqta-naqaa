@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+.slide-container{width:1280px;min-height:720px;background:#f7fbfb;color:#12333b;font-family:Arial,"Tahoma",sans-serif;position:relative;padding-top:62px}
+.rail{position:absolute;right:0;top:0;width:18px;min-height:720px;background:#0d9488}
+.wrap{padding:0 76px}
+.kicker{font-size:18px;color:#0d9488;font-weight:700;margin-bottom:12px}
+.title{font-size:43px;line-height:1.15;margin:0 0 40px}
+.layout{display:grid;grid-template-columns:560px 1fr;gap:86px;direction:ltr;align-items:start}
+.mockup{direction:rtl;background:#e8f5f3;padding:24px 26px 28px;min-height:470px;border:1px solid #cfe5e2}
+.mock-head{font-size:18px;font-weight:700;color:#567177;margin-bottom:15px}
+.layer{display:flex;align-items:center;gap:14px;min-height:61px;background:#fff;border-bottom:1px solid #d6e8e6;padding:12px 16px;direction:rtl}
+.layer:first-of-type{border-top:5px solid #0d9488}
+.layer:nth-of-type(3){background:#f2faf9}
+.layer:nth-of-type(5){border-bottom:5px solid #3c82a1}
+.layer .tag{width:34px;height:34px;background:#0d9488;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;border-radius:50%;flex:none}
+.layer:nth-of-type(4) .tag{background:#3c82a1}
+.layer strong{font-size:18px;display:block}
+.layer span{font-size:13px;color:#718589;display:block;margin-top:4px}
+.side{direction:rtl;padding-top:6px}
+.item{display:grid;grid-template-columns:42px 1fr;gap:16px;border-bottom:1px solid #d7e8e7;padding:18px 0;align-items:start}
+.item:last-child{border-bottom:0}
+.num{width:35px;height:35px;border-radius:50%;background:#c8ebe6;color:#0d6f68;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700}
+.item h3{font-size:21px;margin:0 0 7px}
+.item p{font-size:16px;line-height:1.45;color:#66797d;margin:0}
+.note{margin-top:22px;color:#0d9488;font-size:19px;font-weight:700}
+.foot{position:absolute;bottom:30px;right:76px;font-size:15px;color:#789096}
+</style>
+</head>
+<body>
+<div class="slide-container">
+  <div class="rail"></div>
+  <div class="wrap">
+    <div class="kicker">هيكل الصفحة المقترح</div>
+    <h1 class="title">كل طبقة لها وظيفة واحدة ومكان واضح</h1>
+    <div class="layout">
+      <div class="mockup">
+        <div class="mock-head">واجهة التقارير · من الأعلى إلى الأسفل</div>
+        <div class="layer"><div class="tag">١</div><div><strong>الفترة والفلاتر الأساسية</strong><span>اختيار سريع للفترة والفني</span></div></div>
+        <div class="layer"><div class="tag">٢</div><div><strong>ملخص الإدارة</strong><span>الإيرادات · المصروفات · الصافي · الزيارات · المتابعة</span></div></div>
+        <div class="layer"><div class="tag">٣</div><div><strong>أقسام التقارير</strong><span>الخزينة · الفنيون · العملاء والخدمات · المخزون</span></div></div>
+        <div class="layer"><div class="tag">٤</div><div><strong>التفاصيل عند الطلب</strong><span>جدول مختصر ثم فتح التفاصيل الكاملة</span></div></div>
+        <div class="layer"><div class="tag">٥</div><div><strong>التصدير</strong><span>Excel أو PDF للتقرير والفترة المحددين</span></div></div>
+      </div>
+      <div class="side">
+        <div class="item"><div class="num">١</div><div><h3>ابدأ بما يهم</h3><p>يصل المستخدم إلى الفترة والملخص قبل أي جدول طويل.</p></div></div>
+        <div class="item"><div class="num">٢</div><div><h3>اختَر القسم</h3><p>الأقسام الأربعة مرتبة حسب أسئلة العمل اليومية، لا حسب بنية النظام الداخلية.</p></div></div>
+        <div class="item"><div class="num">٣</div><div><h3>افتح التفاصيل عند الحاجة</h3><p>لا تختفي البيانات، لكنها لا تزاحم الشاشة الأولى.</p></div></div>
+        <div class="item"><div class="num">٤</div><div><h3>صدّر النتيجة الصحيحة</h3><p>زر التصدير يظهر بجوار التقرير المختار حتى لا يحدث التباس.</p></div></div>
+        <div class="note">الترتيب المقترح يحوّل الصفحة من «قائمة طويلة» إلى «مسار قرار».</div>
+      </div>
+    </div>
+    <div class="foot">نقطة نقاء · بنية واضحة قبل التفاصيل</div>
+  </div>
+</div>
+</body>
+</html>
