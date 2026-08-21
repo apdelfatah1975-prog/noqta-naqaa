@@ -118,7 +118,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="min-h-screen bg-[radial-gradient(circle_at_top,#dff6f2,transparent_48%),#f6fbfa] p-5 flex items-center justify-center" dir="rtl">
         <div className="w-full max-w-md rounded-[2rem] bg-card p-8 sm:p-10 text-center shadow-[0_24px_80px_rgba(15,118,110,.14)] border border-emerald-100">
           <div className="mx-auto mb-7 grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-cyan-400 via-teal-600 to-emerald-700 text-white shadow-lg shadow-teal-700/25 ring-4 ring-cyan-100">
-            <Droplets className="h-8 w-8 drop-shadow-sm" />
+            <Droplets className="relative z-10 h-8 w-8 drop-shadow-sm" />
+            <span className="absolute h-2.5 w-2.5 rounded-full bg-gradient-to-br from-amber-200 to-orange-400 shadow-sm ring-1 ring-white/80" aria-hidden="true" />
           </div>
           <p className="text-sm font-bold text-teal-700">نقطة نقاء</p>
           <h1 className="mt-2 text-2xl font-extrabold tracking-tight">أهلًا بك في نظام الفلاتر</h1>
@@ -256,6 +257,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             <div className="relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-cyan-200 via-teal-100 to-amber-100 text-teal-800 shadow-lg shadow-black/15 ring-1 ring-cyan-100/90">
               <span className="absolute inset-1 rounded-xl border border-white/80" aria-hidden="true" />
               <Droplets className="relative z-10 h-6 w-6 drop-shadow-sm" strokeWidth={2.3} />
+              <span className="absolute h-1.5 w-1.5 rounded-full bg-gradient-to-br from-amber-200 to-orange-400 shadow-sm ring-1 ring-white/90" aria-hidden="true" />
               <Sparkles className="absolute -right-1 -top-1 z-20 h-3.5 w-3.5 text-amber-300 drop-shadow-sm" strokeWidth={2.4} aria-hidden="true" />
             </div>
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
