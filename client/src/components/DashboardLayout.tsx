@@ -5,7 +5,12 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -42,6 +47,7 @@ import {
   MapPinned,
   UserRoundPlus,
   RefreshCw,
+  Timer,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -50,6 +56,7 @@ import { AutomaticReminderNotifications } from "./AutomaticReminderNotifications
 import { InstallAppButton } from "./InstallAppButton";
 import { OfflineSyncManager } from "./OfflineSyncManager";
 import { countPendingReminders, countPendingWorkOrders } from "@/lib/notificationBadges";
+import { formatLastRefreshTime, getAutoRefreshSettings, setAutoRefreshSettings, type AutoRefreshIntervalMinutes } from "@/lib/autoRefresh";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "الرئيسية", path: "/" },
@@ -138,6 +145,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const technicianPermissions = trpc.filters.allowedTechnicians.myPermissions.useQuery(undefined, { enabled: Boolean(user && user.role !== "admin"), retry: false, staleTime: 60_000 });
   const utils = trpc.useUtils();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [autoRefreshSettings, setAutoRefreshSettingsState] = React.useState(getAutoRefreshSettings);
+  const [lastAutoRefreshAt, setLastAutoRefreshAt] = React.useState<number | null>(null);
   const visibleMenuItems = user?.role === "admin"
     ? menuItems
     : menuItems.filter(item => {
@@ -175,7 +184,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             ? { bar: "from-indigo-500 via-blue-500 to-cyan-500", label: "text-indigo-800", surface: "bg-indigo-50/95", glow: "shadow-[0_8px_28px_rgba(99,102,241,.20)]" }
             : { bar: "from-teal-500 via-cyan-500 to-sky-500", label: "text-teal-800", surface: "bg-teal-50/95", glow: "shadow-[0_8px_28px_rgba(20,184,166,.16)]" };
 
-  const refreshData = async () => {
+  const refreshData = React.useCallback(async (source: "manual" | "automatic" = "manual") => {
     if (isRefreshing) return;
     setIsRefreshing(true);
     try {
@@ -189,13 +198,28 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         utils.filters.cash.summary.invalidate(),
         utils.filters.notifications.nextAlert.invalidate(),
       ]);
-      toast.success("تم تحديث البيانات المحفوظة");
+      if (source === "automatic") setLastAutoRefreshAt(Date.now());
+      toast.success(source === "automatic" ? "تم تحديث البيانات تلقائيًا" : "تم تحديث البيانات المحفوظة");
     } catch {
       toast.error("تعذر تحديث البيانات. ستظل البيانات المحفوظة كما هي.");
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [isRefreshing, utils]);
+
+  React.useEffect(() => {
+    if (!autoRefreshSettings.enabled) return;
+    const intervalMs = autoRefreshSettings.intervalMinutes * 60 * 1000;
+    const timer = window.setInterval(() => { void refreshData("automatic"); }, intervalMs);
+    return () => window.clearInterval(timer);
+  }, [autoRefreshSettings.enabled, autoRefreshSettings.intervalMinutes, refreshData]);
+
+  function updateAutoRefresh(next: Partial<typeof autoRefreshSettings>) {
+    const saved = setAutoRefreshSettings({ ...autoRefreshSettings, ...next });
+    setAutoRefreshSettingsState(saved);
+    if (saved.enabled) toast.success(`تم تفعيل التحديث التلقائي كل ${saved.intervalMinutes} دقيقة`);
+    else toast.success("تم إيقاف التحديث التلقائي");
+  }
 
   return (
     <>
@@ -272,7 +296,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
-              onClick={refreshData}
+              onClick={() => void refreshData()}
               disabled={isRefreshing}
               aria-label="تحديث البيانات المحفوظة"
               title="تحديث البيانات المحفوظة"
@@ -280,6 +304,27 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             >
               <RefreshCw className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`} />
             </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" aria-label="إعدادات التحديث التلقائي" title="إعدادات التحديث التلقائي" className={`grid h-11 w-11 place-items-center rounded-xl border border-teal-950/8 bg-white transition hover:bg-teal-50 ${autoRefreshSettings.enabled ? "text-teal-800" : "text-slate-500"}`}>
+                  <Timer className="h-5 w-5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>التحديث التلقائي</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem checked={autoRefreshSettings.enabled} onCheckedChange={checked => updateAutoRefresh({ enabled: checked === true })}>
+                  تفعيل التحديث التلقائي
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">الفترة</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={String(autoRefreshSettings.intervalMinutes)} onValueChange={value => updateAutoRefresh({ intervalMinutes: Number(value) as AutoRefreshIntervalMinutes })}>
+                  <DropdownMenuRadioItem value="5">كل 5 دقائق</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="15">كل 15 دقيقة</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled className="text-xs text-muted-foreground">{autoRefreshSettings.enabled ? `مفعّل — ${formatLastRefreshTime(lastAutoRefreshAt)}` : "متوقف — فعّله من هنا"}</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <InstallAppButton compact={isMobile} />
             {!isMobile ? (
               <button onClick={toggleSidebar} className="grid h-10 w-10 place-items-center rounded-xl border border-teal-950/8 bg-white text-teal-800 transition hover:bg-teal-50" aria-label="طي القائمة الجانبية">
