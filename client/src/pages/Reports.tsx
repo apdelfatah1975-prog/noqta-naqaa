@@ -4,11 +4,12 @@ import { trpc } from "@/lib/trpc";
 import { cacheOfflineReport, getLatestOfflineReport, getOfflineReport, getOfflineSession } from "@/lib/offlineSync";
 import { CalendarDays, Download, FileBarChart, PackageSearch, Printer, RefreshCw, WalletCards, SlidersHorizontal } from "lucide-react";
 import { labelVisitType } from "@/lib/filterUi";
+import { formatAppMoney } from "@/lib/appSettings";
 import { printArabicPdf } from "@/lib/pdfExport";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
-const money = (amount: number) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(Number(amount) || 0);
+const money = (amount: number) => formatAppMoney(Number(amount) || 0);
 const number = (value: number) => new Intl.NumberFormat("ar-SA").format(value);
 const dateLabel = (value: string | Date) => new Intl.DateTimeFormat("ar-SA", { dateStyle: "medium" }).format(new Date(value));
 const isoDate = (date: Date) => { const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, "0"); const day = String(date.getDate()).padStart(2, "0"); return `${year}-${month}-${day}`; };

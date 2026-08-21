@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { cacheOfflineCash, cacheOfflineInventory, getOfflineCash, getOfflineInventory, getOfflineSession, queueOfflineDelete, queueOfflineInventoryItem, queueOfflineInventoryMovement } from "@/lib/offlineSync";
 import { moveToTrash } from "@/lib/trashBin";
 import { canRemoveInventoryCategory, getInventoryCategoryOptions, INVENTORY_CATEGORY_OPTIONS, INVENTORY_CATEGORY_STORAGE_KEY, readCustomInventoryCategories } from "@/lib/inventoryCategories";
+import { formatAppMoney } from "@/lib/appSettings";
 
 function shouldCreateOfflinePurchase(quantity: number, unitCost: number) { return quantity > 0 && unitCost > 0; }
 
@@ -304,7 +305,7 @@ export default function Inventory() {
 }
 
 
-function formatMoney(amount: number) { return Number(amount || 0).toLocaleString("ar-EG", { maximumFractionDigits: 2, minimumFractionDigits: 0 }); }
+function formatMoney(amount: number) { return formatAppMoney(Number(amount || 0)); }
 function latestPurchaseUnitCost(itemId: number, movements: Array<{ inventoryItemId: number; movementType: string; unitCost?: number | null }>) { return movements.find(movement => movement.inventoryItemId === itemId && movement.movementType === "incoming" && (movement.unitCost ?? 0) > 0)?.unitCost ?? 0; }
 function InventorySummaryCard({ label, value, hint, tone }: { label: string; value: string; hint: string; tone: "teal" | "amber" | "sky" | "violet" }) { const tones = { teal: "border-teal-200 bg-teal-50 text-teal-950", amber: "border-amber-200 bg-amber-50 text-amber-950", sky: "border-sky-200 bg-sky-50 text-sky-950", violet: "border-violet-200 bg-violet-50 text-violet-950" }; return <article className={`min-h-28 rounded-2xl border p-4 shadow-sm ${tones[tone]}`}><p className="text-xs font-bold opacity-75">{label}</p><p className="mt-2 text-xl font-black">{value}</p><p className="mt-1 text-[11px] opacity-70">{hint}</p></article>; }
 function InventoryDecisionCard({ icon, label, value, detail, tone }: { icon: React.ReactNode; label: string; value: string; detail: string; tone: "teal" | "amber" | "green" }) { const tones = { teal: "border-teal-200 bg-teal-50 text-teal-950", amber: "border-amber-200 bg-amber-50 text-amber-950", green: "border-emerald-200 bg-emerald-50 text-emerald-950" }; return <article className={`min-h-36 rounded-2xl border p-4 shadow-sm ${tones[tone]}`}><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold opacity-70">{label}</p><p className="mt-2 text-3xl font-black">{value}</p></div><span className="rounded-xl bg-white/80 p-2.5 shadow-sm">{icon}</span></div><p className="mt-3 truncate text-xs font-bold opacity-70" title={detail}>{detail}</p></article>; }

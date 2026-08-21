@@ -3,7 +3,7 @@ import { Download, FileText, Printer, RefreshCw, Save, UserPlus, WalletCards } f
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { getOfflineCash, getOfflineSession, getOfflineVisits } from "@/lib/offlineSync";
-import { getAppSettings, saveAppSettings, type AppSettings, type SalesAgentCommissionMode, type SalesAgentProfile } from "@/lib/appSettings";
+import { formatAppMoney, getAppSettings, saveAppSettings, type AppSettings, type SalesAgentCommissionMode, type SalesAgentProfile } from "@/lib/appSettings";
 import { printArabicPdf } from "@/lib/pdfExport";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -47,7 +47,7 @@ export function updateTechnicianProfile(payroll: Record<string, TechnicianProfil
   const maximum = field === "monthlySalary" ? 99_999_999 : 100;
   return { ...payroll, [name]: { ...profile, [field]: Math.max(0, Math.min(maximum, Number.isFinite(numericValue) ? numericValue : 0)) } };
 }
-export const formatPayrollMoney = (amount: number) => new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(Math.round(Number(amount) || 0));
+export const formatPayrollMoney = (amount: number) => formatAppMoney(Number(amount) || 0);
 const dateLabel = (value: string | Date) => new Intl.DateTimeFormat("ar-SA", { dateStyle: "medium" }).format(new Date(value));
 const currentMonth = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; };
 export const monthBounds = (month: string) => { const [year, monthNumber] = month.split("-").map(Number); const from = `${month}-01`; const lastDay = new Date(year, monthNumber, 0).getDate(); return { from, to: `${month}-${String(lastDay).padStart(2, "0")}` }; };

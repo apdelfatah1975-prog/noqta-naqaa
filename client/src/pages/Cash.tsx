@@ -12,13 +12,14 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { cacheOfflineCash, getOfflineCash, getOfflineSession, queueOfflineCash, queueOfflineDelete } from "@/lib/offlineSync";
 import { moveToTrash } from "@/lib/trashBin";
+import { formatAppMoney } from "@/lib/appSettings";
 
 type Currency = "SAR";
 type IncomeFilter = "all" | "service" | "installation" | "maintenance";
 type PartyTypeFilter = "all" | "technician" | "customer" | "entity";
 type DateFilterMode = "all" | "month" | "day" | "range";
 // العملة موحدة داخليًا للحسابات، لكن واجهة الخزينة تعرض المبلغ كرقم فقط.
-const formatMoney = (amount: number, _currency: Currency = "SAR") => new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 0 }).format(amount);
+const formatMoney = (amount: number, _currency: Currency = "SAR") => formatAppMoney(amount);
 
 function filterCashLocally(source: any, filters: { incomeFilter: IncomeFilter; category?: string; technician?: string; partyType: PartyTypeFilter; itemName?: string; month?: string; startDate?: string; endDate?: string; search?: string }) {
   if (!source) return source;

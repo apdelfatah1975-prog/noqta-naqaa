@@ -100,7 +100,7 @@ export function resetAppSettings(): AppSettings {
 export function formatAppMoney(amount: number, settings = getAppSettings()) {
   void settings;
   const safeAmount = Number.isFinite(Number(amount)) ? Number(amount) : 0;
-  return new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(safeAmount);
+  return new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 0, minimumFractionDigits: 0, useGrouping: true }).format(Math.round(safeAmount));
 }
 
 export function formatAppDate(value: string | Date, settings = getAppSettings()) {

@@ -22,4 +22,11 @@ describe("إعدادات التطبيق المحلية", () => {
     expect(formatted).not.toContain("ر.س");
     expect(formatted).not.toContain("ريال");
   });
+
+  it("لا تضيف أصفارًا أو منازل عشرية للمبالغ المسجلة كوحدات كاملة", () => {
+    expect(formatAppMoney(250)).toContain("٢٥٠");
+    expect(formatAppMoney(250)).not.toContain("٫");
+    expect(formatAppMoney(250)).not.toContain("٫٠");
+    expect(formatAppMoney(2.5)).toContain("٣");
+  });
 });

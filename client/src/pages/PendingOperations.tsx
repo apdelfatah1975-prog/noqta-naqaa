@@ -18,6 +18,7 @@ import {
   removePendingInventory,
 } from "@/lib/offlineSync";
 import { CloudOff, RefreshCw, Trash2, Wifi } from "lucide-react";
+import { formatAppMoney } from "@/lib/appSettings";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 
@@ -62,7 +63,7 @@ export default function PendingOperations() {
     getPendingVisitDeletes(ownerId).forEach(item => rows.push({ id: item.clientOperationId, title: "حذف زيارة", detail: `رقم الزيارة ${item.id}`, createdAt: item.createdAt, remove: () => removePendingVisitDelete(ownerId, item.clientOperationId) }));
     getPendingWorkOrderUpdates(ownerId).forEach(item => rows.push({ id: item.clientOperationId, title: "تحديث أمر فني", detail: `الأمر ${item.id} — ${item.status}`, createdAt: item.createdAt, remove: () => removePendingWorkOrderUpdate(ownerId, item.clientOperationId) }));
     getPendingWorkOrderProofs(ownerId).forEach(item => rows.push({ id: item.clientOperationId, title: item.kind === "photo" ? "صورة إثبات عمل" : "توقيع عميل", detail: `أمر الزيارة ${item.visitId}`, createdAt: item.createdAt, remove: () => removePendingWorkOrderProof(ownerId, item.clientOperationId) }));
-    getPendingCash(ownerId).forEach(item => rows.push({ id: item.clientOperationId, title: "عملية خزينة", detail: "transactionType" in item ? `${item.transactionType === "income" ? "إيراد" : "مصروف"} — ${Number(item.amount).toLocaleString("ar-SA", { maximumFractionDigits: 2 })}` : `حذف العملية ${item.id}`, createdAt: item.createdAt, remove: () => removePendingCash(ownerId, item.clientOperationId) }));
+    getPendingCash(ownerId).forEach(item => rows.push({ id: item.clientOperationId, title: "عملية خزينة", detail: "transactionType" in item ? `${item.transactionType === "income" ? "إيراد" : "مصروف"} — ${formatAppMoney(Number(item.amount))}` : `حذف العملية ${item.id}`, createdAt: item.createdAt, remove: () => removePendingCash(ownerId, item.clientOperationId) }));
     getPendingInventory(ownerId).forEach(item => rows.push({ id: item.clientOperationId, title: item.entity === "item" ? "إضافة صنف مخزن" : item.entity === "movement" ? "حركة مخزن" : "حذف من المخزن", detail: item.entity === "item" ? item.name : item.entity === "movement" ? `${item.movementType === "incoming" ? "وارد" : "منصرف"} — ${item.quantity}` : `رقم السجل ${item.id}`, createdAt: item.createdAt, remove: () => removePendingInventory(ownerId, item.clientOperationId) }));
     return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [ownerId, version]);
