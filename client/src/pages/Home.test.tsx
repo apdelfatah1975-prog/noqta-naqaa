@@ -53,7 +53,7 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
         inventory: { totalItems: 0, lowStockCount: 0, lowStock: [] },
       },
     });
-    mocks.cashSummary.mockReturnValue({ data: { balance: 250000 } });
+    mocks.cashSummary.mockReturnValue({ data: { balance: 250 } });
     mocks.backupStatus.mockReturnValue({ data: { generatedAt: null, downloadUrl: null }, isLoading: false });
     mocks.backupCreateNow.mockReturnValue({ isPending: false, isSuccess: false, mutate: vi.fn() });
   });
@@ -155,7 +155,7 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
 
     const cashCard = screen.getByRole("button", { name: "فتح تفاصيل رصيد الخزينة" });
     expect(cashCard.textContent).toContain("رصيد الخزينة");
-    expect(cashCard.textContent).toContain("2500");
+    expect(cashCard.textContent).toContain("250");
 
     fireEvent.click(cashCard);
     expect(mocks.setLocation).toHaveBeenCalledWith("/cash");

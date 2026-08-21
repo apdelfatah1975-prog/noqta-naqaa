@@ -107,7 +107,7 @@ export default function Home() {
     upcoming: displayData?.upcomingVisits.length ?? 0,
     due: displayData?.dueReminders.length ?? 0,
     inventory: displayData?.inventory.totalItems ?? 0,
-    cash: Math.round((cash?.balance ?? 0) / 100),
+    cash: Math.round(cash?.balance ?? 0),
   };
   const nextVisit = displayData?.upcomingVisits[0];
   const nextDueReminder = displayData?.dueReminders[0];
@@ -128,7 +128,7 @@ export default function Home() {
     displayData?.upcomingVisits?.forEach(visit => rows.push({ القسم: "زيارات قادمة", العميل: visit.customer?.name || "—", التاريخ: formatDateTime(visit.visitDate), التفاصيل: visitTypeLabels[visit.visitType as keyof typeof visitTypeLabels] || visit.visitType || "—" }));
     displayData?.dueReminders?.forEach(reminder => rows.push({ القسم: "متابعات مستحقة", العميل: reminder.customer?.name || "—", التاريخ: formatDateTime(reminder.reminderDate), التفاصيل: `متأخر ${reminder.daysOverdue ?? 0} يوم` }));
     displayData?.inventory?.items?.forEach(item => rows.push({ القسم: "المخزن", العميل: item.name, التاريخ: `رقم ${item.id}`, التفاصيل: `الرصيد ${item.currentBalance} — الحد الأدنى ${item.reorderLevel ?? 2}` }));
-    rows.push({ القسم: "الخزينة", العميل: "الرصيد الحالي", التاريخ: "—", التفاصيل: `${Math.round((cash?.balance ?? 0) / 100)}` });
+    rows.push({ القسم: "الخزينة", العميل: "الرصيد الحالي", التاريخ: "—", التفاصيل: `${Math.round(cash?.balance ?? 0)}` });
     const opened = printArabicPdf("تقرير ملخص التطبيق", rows, [
       { key: "القسم", label: "القسم" },
       { key: "العميل", label: "العميل / الصنف" },
