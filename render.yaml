@@ -1,16 +1,44 @@
 services:
+
   - type: web
+  
     name: purepoint
+    
     runtime: node
+    
     plan: free
+    
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm run build
-    preDeployCommand: pnpm run db:migrate
-    startCommand: pnpm start
+    
+    startCommand: pnpm run db:migrate && pnpm start
+    
     healthCheckPath: /
+    
     envVars:
+    
       - key: NODE_ENV
+      
         value: production
+        
       - key: DATABASE_URL
+      
         sync: false
+        
       - key: JWT_SECRET
+      
         generateValue: true
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
