@@ -2,7 +2,9 @@ export type DeviceNotificationPermission = NotificationPermission | "unsupported
 const SOUND_ENABLED_KEY = "water-filter-reminder-sound-enabled";
 const VIBRATION_ENABLED_KEY = "water-filter-notification-vibration-enabled";
 const NOTIFICATION_TONE_GAIN = 0.32;
+const WORK_ORDER_TONE_GAIN = 0.78;
 const NOTIFICATION_TONE_DURATION_SECONDS = 0.78;
+const WORK_ORDER_TONE_DURATION_SECONDS = 1.15;
 
 export function getDeviceNotificationPermission(): DeviceNotificationPermission {
   if (typeof Notification === "undefined") return "unsupported";
@@ -83,7 +85,7 @@ export function vibrateNotification(): boolean {
   }
 }
 
-export function playReminderTone(): boolean {
+function playTone(gainLevel: number, durationSeconds: number, frequency: number): boolean {
   if (!isReminderSoundEnabled() || typeof window === "undefined") return false;
   const AudioContextConstructor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AudioContextConstructor) return false;
@@ -91,17 +93,25 @@ export function playReminderTone(): boolean {
     const context = new AudioContextConstructor();
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    oscillator.frequency.setValueAtTime(740, context.currentTime);
+    oscillator.frequency.setValueAtTime(frequency, context.currentTime);
     gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(NOTIFICATION_TONE_GAIN, context.currentTime + 0.03);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + NOTIFICATION_TONE_DURATION_SECONDS - 0.08);
+    gain.gain.exponentialRampToValueAtTime(gainLevel, context.currentTime + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + durationSeconds - 0.08);
     oscillator.connect(gain);
     gain.connect(context.destination);
     oscillator.start();
-    oscillator.stop(context.currentTime + NOTIFICATION_TONE_DURATION_SECONDS);
+    oscillator.stop(context.currentTime + durationSeconds);
     oscillator.onended = () => void context.close();
     return true;
   } catch {
     return false;
   }
+}
+
+export function playReminderTone(): boolean {
+  return playTone(NOTIFICATION_TONE_GAIN, NOTIFICATION_TONE_DURATION_SECONDS, 740);
+}
+
+export function playWorkOrderTone(): boolean {
+  return playTone(WORK_ORDER_TONE_GAIN, WORK_ORDER_TONE_DURATION_SECONDS, 880);
 }

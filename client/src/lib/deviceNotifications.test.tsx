@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getDeviceNotificationPermission, isNotificationVibrationEnabled, playReminderTone, requestDeviceNotificationPermission, setNotificationVibrationEnabled, showDeviceReminderNotification, vibrateNotification } from "./deviceNotifications";
+import { getDeviceNotificationPermission, isNotificationVibrationEnabled, playReminderTone, playWorkOrderTone, requestDeviceNotificationPermission, setNotificationVibrationEnabled, showDeviceReminderNotification, vibrateNotification } from "./deviceNotifications";
 
 const serviceWorkerDescriptor = Object.getOwnPropertyDescriptor(navigator, "serviceWorker");
 
@@ -63,6 +63,32 @@ describe("حالة إذن إشعارات الجهاز", () => {
     localStorage.setItem("water-filter-reminder-sound-enabled", "false");
     expect(playReminderTone()).toBe(false);
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it("يشغل نغمة أمر الفني المرتفعة بتردد ومدة مميزين", () => {
+    const setValueAtTime = vi.fn();
+    const exponentialRampToValueAtTime = vi.fn();
+    const oscillator = {
+      frequency: { setValueAtTime },
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+      onended: undefined as (() => void) | undefined,
+    };
+    const gain = { gain: { setValueAtTime, exponentialRampToValueAtTime }, connect: vi.fn() };
+    class AudioContextMock {
+      currentTime = 0;
+      destination = {};
+      createOscillator() { return oscillator; }
+      createGain() { return gain; }
+      close = vi.fn(async () => undefined);
+    }
+    vi.stubGlobal("AudioContext", AudioContextMock);
+    localStorage.removeItem("water-filter-reminder-sound-enabled");
+    expect(playWorkOrderTone()).toBe(true);
+    expect(setValueAtTime).toHaveBeenCalledWith(880, 0);
+    expect(exponentialRampToValueAtTime).toHaveBeenCalledWith(0.78, 0.03);
+    expect(oscillator.stop).toHaveBeenCalledWith(1.15);
   });
 
   it("يشغل الاهتزاز عندما يكون مفعّلًا ويمنعه عند إيقافه", () => {

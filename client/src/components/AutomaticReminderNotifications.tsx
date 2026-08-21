@@ -3,6 +3,7 @@ import {
   isNotificationVibrationEnabled,
   isReminderSoundEnabled,
   playReminderTone,
+  playWorkOrderTone,
   showDeviceReminderNotification,
   showDeviceWorkOrderNotification,
   vibrateNotification,
@@ -67,7 +68,7 @@ export function AutomaticReminderNotifications() {
       const orderId = String(order.id);
       if (previousIds.has(orderId)) continue;
       const key = `water-work-order-${order.id}`;
-      if (isReminderSoundEnabled()) playReminderTone();
+      if (isReminderSoundEnabled()) playWorkOrderTone();
       if (isNotificationVibrationEnabled()) vibrateNotification();
       if (!permissionGranted || localStorage.getItem(key)) continue;
       void showDeviceWorkOrderNotification(order.customer?.name || "عميل", key).then(sent => {
