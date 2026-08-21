@@ -19,6 +19,7 @@ vi.mock("@/lib/trpc", () => ({
       customers: {
         create: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
         deleteAll: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+        deleteAllData: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         seedPerformanceCustomers: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         deletePerformanceCustomers: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       },
@@ -31,7 +32,7 @@ vi.mock("@/lib/trpc", () => ({
         updateAppearance: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
       },
     },
-    useUtils: () => ({ filters: { customers: { list: { invalidate: vi.fn() } }, dashboard: { invalidate: vi.fn() } } }),
+    useUtils: () => ({ filters: { customers: { list: { invalidate: vi.fn() } }, dashboard: { invalidate: vi.fn() }, invalidate: vi.fn() } }),
   },
 }));
 

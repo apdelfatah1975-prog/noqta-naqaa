@@ -1008,6 +1008,38 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       await refreshOwnerBackup(ctx.user.id);
       return { success: true, deletedCustomers: customerIds.length, deletedVisits: visitIds.length, deletedReminders: ownedReminders.length };
     }),
+    deleteAllData: protectedProcedure.input(sensitivePinInput.extend({ confirmation: z.literal("مسح كل بيانات التطبيق") })).mutation(async ({ ctx, input }) => {
+      await requirePin(ctx.user.id, input.pin);
+      const db = await databaseOrThrow();
+      const ownerWhere = (table: any) => eq(table.ownerId, ctx.user.id);
+      const count = async (table: any, idColumn: any) => (await db.select({ id: idColumn }).from(table).where(ownerWhere(table))).length;
+      const deleted = {
+        customers: await count(customers, customers.id),
+        visits: await count(visits, visits.id),
+        reminders: await count(reminders, reminders.id),
+        cashTransactions: await count(cashTransactions, cashTransactions.id),
+        inventoryItems: await count(inventoryItems, inventoryItems.id),
+        inventoryMovements: await count(inventoryMovements, inventoryMovements.id),
+        serviceTypes: await count(serviceTypes, serviceTypes.id),
+        serviceTypeItems: await count(serviceTypeItems, serviceTypeItems.id),
+        visitItems: await count(visitItems, visitItems.id),
+        workOrderProofs: await count(workOrderProofs, workOrderProofs.id),
+        technicianLocations: await count(technicianLocations, technicianLocations.id),
+      };
+      await db.delete(workOrderProofs).where(ownerWhere(workOrderProofs));
+      await db.delete(visitItems).where(ownerWhere(visitItems));
+      await db.delete(reminders).where(ownerWhere(reminders));
+      await db.delete(cashTransactions).where(ownerWhere(cashTransactions));
+      await db.delete(visits).where(ownerWhere(visits));
+      await db.delete(serviceTypeItems).where(ownerWhere(serviceTypeItems));
+      await db.delete(serviceTypes).where(ownerWhere(serviceTypes));
+      await db.delete(inventoryMovements).where(ownerWhere(inventoryMovements));
+      await db.delete(inventoryItems).where(ownerWhere(inventoryItems));
+      await db.delete(technicianLocations).where(ownerWhere(technicianLocations));
+      await db.delete(customers).where(ownerWhere(customers));
+      await refreshOwnerBackup(ctx.user.id);
+      return { success: true, deleted };
+    }),
     delete: protectedProcedure.input(sensitivePinInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       await requirePin(ctx.user.id, input.pin);
       const db = await databaseOrThrow();

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { cashTransactions, customers, inventoryItems, inventoryMovements, notificationSettings, reminders, visits } from "../drizzle/schema";
+import { cashTransactions, customers, inventoryItems, inventoryMovements, notificationSettings, reminders, visits, serviceTypes, serviceTypeItems, visitItems, workOrderProofs, technicianLocations } from "../drizzle/schema";
 import { appRouter } from "./routers";
 import { classifyCashParty } from "./routers/filterManagement";
 import { getDb } from "./db";
@@ -34,6 +34,38 @@ describe("واجهات إدارة فلاتر المياه", () => {
     expect(classifyCashParty({ category: "راتب فني", recipientName: "أحمد", notes: null })).toBe("technician");
     expect(classifyCashParty({ category: "بنزين", recipientName: "محطة الوقود", notes: null })).toBe("entity");
   });
+  it("يمسح كل البيانات التشغيلية بما فيها الخزينة والمخزن مع الحفاظ على إعدادات المستخدم", async () => {
+    const deletedTables: unknown[] = [];
+    const rowsByTable = new Map<unknown, unknown[]>([
+      [notificationSettings, [{ ownerId: 1, pinHash: TEST_PIN_HASH }]],
+      [customers, [{ id: 11 }]],
+      [visits, [{ id: 12 }]],
+      [reminders, [{ id: 13 }]],
+      [cashTransactions, [{ id: 14 }]],
+      [inventoryItems, [{ id: 15 }]],
+      [inventoryMovements, [{ id: 16 }]],
+      [serviceTypes, [{ id: 17 }]],
+      [serviceTypeItems, [{ id: 18 }]],
+      [visitItems, [{ id: 19 }]],
+      [workOrderProofs, [{ id: 20 }]],
+      [technicianLocations, [{ id: 21 }]],
+    ]);
+    const db = {
+      select: () => ({ from: (table: unknown) => ({ where: () => { const result = Promise.resolve(rowsByTable.get(table) ?? []) as Promise<unknown[]> & { limit?: () => Promise<unknown[]> }; result.limit = async () => rowsByTable.get(table) ?? []; return result; } }) }),
+      delete: (table: unknown) => ({ where: async () => { deletedTables.push(table); } }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const result = await appRouter.createCaller(createContext()).filters.customers.deleteAllData({ pin: TEST_PIN, confirmation: "مسح كل بيانات التطبيق" });
+    expect(result.success).toBe(true);
+    expect(deletedTables).toEqual([workOrderProofs, visitItems, reminders, cashTransactions, visits, serviceTypeItems, serviceTypes, inventoryMovements, inventoryItems, technicianLocations, customers]);
+    expect(deletedTables).not.toContain(notificationSettings);
+  });
+
+  it("يرفض المسح الشامل إذا لم يطابق نص التأكيد المطلوب", async () => {
+    const caller = appRouter.createCaller(createContext());
+    await expect(caller.filters.customers.deleteAllData({ pin: TEST_PIN, confirmation: "مسح العملاء فقط" as "مسح كل بيانات التطبيق" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
   it("ينشئ العميل وأول زيارة والفني والتذكير وإيراد التركيب تلقائيًا", async () => {
     const insertCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
     const db = {
