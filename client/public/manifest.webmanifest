@@ -7,6 +7,12 @@
   "dir": "rtl",
   "start_url": "/",
   "scope": "/",
+  "share_target": {
+    "action": "/customers",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": { "title": "title", "text": "text", "url": "url" }
+  },
   "display": "standalone",
   "background_color": "#f6fbfa",
   "theme_color": "#0f766e",

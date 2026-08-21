@@ -50,6 +50,15 @@ describe("عامل خدمة التطبيق القابل للتثبيت", () => {
     expect(mainSource).toContain("version=1-orders-only");
   });
 
+  it("يستقبل مشاركة موقع واتساب داخل صفحة العملاء", () => {
+    const manifest = readFileSync(path.resolve(import.meta.dirname, "../client/public/manifest.webmanifest"), "utf8");
+    const customersSource = readFileSync(path.resolve(import.meta.dirname, "../client/src/pages/Customers.tsx"), "utf8");
+    expect(manifest).toContain('"action": "/customers"');
+    expect(manifest).toContain('"url": "url"');
+    expect(customersSource).toContain('params.get("url") || params.get("text")');
+    expect(customersSource).toContain("اختيار العميل للموقع المشارك");
+  });
+
   it("يجهز جذر التطبيق داخل غلاف التخزين المحلي", () => {
     const source = readFileSync(path.resolve(import.meta.dirname, "../client/public/sw.js"), "utf8");
     expect(source).toContain('const APP_SHELL = ["/"');
