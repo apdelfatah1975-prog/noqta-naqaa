@@ -1988,3 +1988,5 @@
 
 - [x] Location Button Sweep: verify and cover WorkOrders and TechnicianPreview customer actions.
 - [x] Location Button Sweep: add shared customer location actions to WorkOrders and TechnicianPreview.
+
+- [x] إصلاح عدم ظهور زر «الموقع» في صفحة العملاء على الهاتف والتحقق من ظهوره نصيًا.

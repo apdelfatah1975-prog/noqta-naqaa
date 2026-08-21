@@ -20,6 +20,13 @@ describe("CustomerContactActions", () => {
     expect(screen.getByRole("link", { name: "فتح موقع العميل" }).getAttribute("href")).toContain("google.com/maps");
   });
 
+  it("يعرض حالة الموقع غير المسجل عند طلب إظهار الزر", () => {
+    render(<CustomerContactActions customer={{ phone: null, address: null, latitude: null, longitude: null }} labels showLocationPlaceholder />);
+
+    expect(screen.getByLabelText("موقع العميل غير مسجل")).toBeTruthy();
+    expect(screen.getByText("الموقع غير مسجل")).toBeTruthy();
+  });
+
   it("لا يعرض روابط فارغة عند غياب بيانات التواصل", () => {
     render(<CustomerContactActions customer={{ phone: null, address: null, latitude: null, longitude: null }} labels />);
 

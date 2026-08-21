@@ -12,7 +12,7 @@ type CustomerContact = {
   followUp?: { nextVisitDate?: Date | string | null } | null;
 };
 
-export function CustomerContactActions({ customer, compact = false, labels = false, className = "" }: { customer: CustomerContact; compact?: boolean; labels?: boolean; className?: string }) {
+export function CustomerContactActions({ customer, compact = false, labels = false, showLocationPlaceholder = false, className = "" }: { customer: CustomerContact; compact?: boolean; labels?: boolean; showLocationPlaceholder?: boolean; className?: string }) {
   const phone = customer.phone?.trim();
   const nextVisitDate = customer.followUp?.nextVisitDate;
   const whatsappMessage = nextVisitDate
@@ -29,6 +29,6 @@ export function CustomerContactActions({ customer, compact = false, labels = fal
   return <div className={`flex flex-wrap items-center gap-2.5 ${className}`} aria-label="إجراءات التواصل مع العميل">
     {phone ? <a href={`tel:${phone}`} className={`${baseClass} bg-teal-50 text-teal-800`} title={title || "اتصال بالعميل"} aria-label="اتصال بالعميل">{content(<Phone className={iconClass} />, "اتصال")}</a> : null}
     {whatsappUrl ? <a href={whatsappUrl} target="_blank" rel="noreferrer" className={`${baseClass} bg-emerald-50 text-emerald-800`} title={title || (nextVisitDate ? "إرسال تذكير بموعد الصيانة القادمة عبر واتساب" : "فتح واتساب مع العميل")} aria-label={nextVisitDate ? "إرسال تذكير بموعد الصيانة القادمة عبر واتساب" : "فتح واتساب مع العميل"}>{content(<MessageCircle className={iconClass} />, "واتساب")}</a> : null}
-    {mapUrl ? <a href={mapUrl} target="_blank" rel="noreferrer" className={`${baseClass} bg-sky-50 text-sky-800`} title={title || "فتح موقع العميل"} aria-label="فتح موقع العميل">{content(<MapPinned className={iconClass} />, labels ? "الموقع" : "")}</a> : null}
+    {mapUrl ? <a href={mapUrl} target="_blank" rel="noreferrer" className={`${baseClass} bg-sky-50 text-sky-800`} title={title || "فتح موقع العميل"} aria-label="فتح موقع العميل">{content(<MapPinned className={iconClass} />, labels ? "الموقع" : "")}</a> : showLocationPlaceholder ? <span className={`${baseClass} cursor-not-allowed bg-slate-100 text-slate-400`} title="لم يتم تسجيل موقع العميل" aria-label="موقع العميل غير مسجل" aria-disabled="true">{content(<MapPinned className={iconClass} />, labels ? "الموقع غير مسجل" : "")}</span> : null}
   </div>;
 }
