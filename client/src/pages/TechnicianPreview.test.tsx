@@ -78,6 +78,25 @@ describe("واجهة الفني وأوامر العمل", () => {
     expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ id: 7, status: "completed", visitResult: "تم تغيير الشمعات", collectedAmount: 250, items: [] }));
   });
 
+  it("تسمح بالاختيارات السريعة للنتيجة والتحصيل", () => {
+    orders[0].status = "in_progress";
+    render(<TechnicianPreview />);
+    fireEvent.click(screen.getByRole("button", { name: "تحديث" }));
+    fireEvent.click(screen.getByRole("button", { name: "تمت الصيانة" }));
+    fireEvent.click(screen.getByRole("button", { name: "250" }));
+    expect((screen.getByLabelText("ما تم تنفيذه") as HTMLTextAreaElement).value).toBe("تمت الصيانة");
+    expect((screen.getByLabelText("المبلغ المحصل") as HTMLInputElement).value).toBe("250");
+  });
+
+  it("تسمح باختيار سبب جاهز عند عدم التنفيذ", () => {
+    orders[0].status = "in_progress";
+    render(<TechnicianPreview />);
+    fireEvent.click(screen.getByRole("button", { name: "تحديث" }));
+    fireEvent.click(screen.getByRole("button", { name: "لم يتم التنفيذ" }));
+    fireEvent.click(screen.getByRole("button", { name: "العميل طلب التأجيل" }));
+    expect((screen.getByLabelText("سبب عدم التنفيذ") as HTMLTextAreaElement).value).toBe("العميل طلب التأجيل");
+  });
+
   it("تعرض خيار التسجيل الصوتي مع إبقاء الكتابة متاحة", () => {
     orders[0].status = "in_progress";
     render(<TechnicianPreview />);
