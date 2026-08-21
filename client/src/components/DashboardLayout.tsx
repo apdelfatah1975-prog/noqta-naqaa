@@ -117,7 +117,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
       <div className="min-h-screen bg-[radial-gradient(circle_at_top,#dff6f2,transparent_48%),#f6fbfa] p-5 flex items-center justify-center" dir="rtl">
         <div className="w-full max-w-md rounded-[2rem] bg-card p-8 sm:p-10 text-center shadow-[0_24px_80px_rgba(15,118,110,.14)] border border-emerald-100">
-          <div className="mx-auto mb-7 grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-cyan-400 via-teal-600 to-emerald-700 text-white shadow-lg shadow-teal-700/25 ring-4 ring-cyan-100">
+          <div className="mx-auto mb-7 grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-cyan-400 via-teal-600 to-emerald-700 text-white shadow-lg shadow-teal-700/25 ring-4 ring-cyan-100 transition duration-200 ease-out hover:from-cyan-300 hover:via-teal-500 hover:to-emerald-600 hover:brightness-110 hover:shadow-[0_0_28px_rgba(45,212,191,.55)]">
             <Droplets className="relative z-10 h-8 w-8 drop-shadow-sm" />
             <span className="absolute h-2.5 w-2.5 rounded-full bg-gradient-to-br from-amber-200 to-orange-400 shadow-sm ring-1 ring-white/80" aria-hidden="true" />
           </div>
@@ -254,7 +254,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       <Sidebar side="right" collapsible="icon" className="border-l border-teal-950/8 bg-[#063c3a] text-white">
         <SidebarHeader className="h-24 border-b border-white/10 px-3 py-4">
           <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-            <div className="relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-cyan-200 via-teal-100 to-amber-100 text-teal-800 shadow-lg shadow-black/15 ring-1 ring-cyan-100/90">
+            <div className="relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-cyan-200 via-teal-100 to-amber-100 text-teal-800 shadow-lg shadow-black/15 ring-1 ring-cyan-100/90 transition duration-200 ease-out hover:from-cyan-100 hover:via-teal-50 hover:to-amber-200 hover:brightness-110 hover:shadow-[0_0_22px_rgba(45,212,191,.45)]">
               <span className="absolute inset-1 rounded-xl border border-white/80" aria-hidden="true" />
               <Droplets className="relative z-10 h-6 w-6 drop-shadow-sm" strokeWidth={2.3} />
               <span className="absolute h-1.5 w-1.5 rounded-full bg-gradient-to-br from-amber-200 to-orange-400 shadow-sm ring-1 ring-white/90" aria-hidden="true" />
