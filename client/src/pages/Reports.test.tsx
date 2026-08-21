@@ -53,6 +53,13 @@ describe("تقارير نقطة نقاء", () => {
     });
   });
 
+  it("تعرض زر ملخص المدير وتجهز الملخص المختصر للطباعة", () => {
+    render(<Reports />);
+    const button = screen.getByRole("button", { name: /ملخص المدير/ });
+    expect(button).toBeTruthy();
+    fireEvent.click(button);
+  });
+
   it("تعرض مؤشرات التقرير وتجميعات الفترة", () => {
     render(<Reports />);
     expect(screen.getByText("التقارير")).toBeTruthy();

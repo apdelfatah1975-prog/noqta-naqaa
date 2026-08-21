@@ -381,6 +381,53 @@ export default function Reports() {
       );
   };
 
+  const printManagerSummary = () => {
+    const rows = [
+      { البيان: "الفترة", القيمة: `${dateFrom} إلى ${dateTo}` },
+      { البيان: "الإيرادات", القيمة: money(data.summary.income) },
+      { البيان: "المصروفات", القيمة: money(data.summary.expense) },
+      { البيان: "صافي الفترة", القيمة: money(data.summary.balance) },
+      { البيان: "عدد الزيارات المنفذة", القيمة: number(data.summary.visits) },
+      {
+        البيان: "العملاء الذين تمت زيارتهم",
+        القيمة: number(data.summary.customers),
+      },
+      {
+        البيان: "المتابعات المعلقة",
+        القيمة: number(data.summary.pendingReminders),
+      },
+      { البيان: "الأصناف منخفضة الرصيد", القيمة: number(data.summary.lowStock) },
+      {
+        البيان: "المتبقي للفنيين",
+        القيمة: money(financial.technicianRemaining),
+      },
+      { البيان: "مصروف البنزين", القيمة: money(financial.gasolineExpenses) },
+      {
+        البيان: "مشتريات المخزن",
+        القيمة: money(financial.inventoryPurchaseExpenses),
+      },
+      {
+        البيان: "خلاصة المتابعة",
+        القيمة: actionItems.length
+          ? actionItems.map(item => item.title).join(" — ")
+          : "لا توجد بنود عاجلة",
+      },
+    ];
+    const opened = printArabicPdf(
+      `ملخص المدير - ${dateFrom} إلى ${dateTo}`,
+      rows,
+      [
+        { key: "البيان", label: "البيان" },
+        { key: "القيمة", label: "القيمة" },
+      ]
+    );
+    if (opened) toast.success("تم تجهيز ملخص المدير للطباعة");
+    else
+      toast.error(
+        "تعذر فتح نافذة الملخص؛ اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى"
+      );
+  };
+
   const exportTreasuryExcel = () => {
     const workbook = XLSX.utils.book_new();
     const filterRows = [
@@ -602,11 +649,20 @@ export default function Reports() {
           <Button
             variant="outline"
             className="h-10 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20"
+            onClick={printManagerSummary}
+            disabled={!data}
+          >
+            <FileBarChart className="ml-2 h-4 w-4" />
+            ملخص المدير
+          </Button>
+          <Button
+            variant="outline"
+            className="h-10 rounded-xl border-white/30 bg-white/10 text-white hover:bg-white/20"
             onClick={() => window.print()}
             disabled={!data}
           >
             <Printer className="ml-2 h-4 w-4" />
-            طباعة
+            طباعة كاملة
           </Button>
           <Button
             variant="outline"
