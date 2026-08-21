@@ -35,6 +35,12 @@ export function setAutoRefreshSettings(settings: AutoRefreshSettings): AutoRefre
   return normalized;
 }
 
+export function isEditingFormElement(element: Element | null): boolean {
+  return element instanceof HTMLElement
+    && Boolean(element.closest("main"))
+    && element.matches('input, textarea, select, [contenteditable="true"]');
+}
+
 export function formatLastRefreshTime(timestamp: number | null): string {
   if (!timestamp) return "لم يتم التحديث تلقائيًا بعد";
   return `آخر تحديث: ${new Date(timestamp).toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" })}`;

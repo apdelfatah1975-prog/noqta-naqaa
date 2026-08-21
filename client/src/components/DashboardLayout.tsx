@@ -56,7 +56,7 @@ import { AutomaticReminderNotifications } from "./AutomaticReminderNotifications
 import { InstallAppButton } from "./InstallAppButton";
 import { OfflineSyncManager } from "./OfflineSyncManager";
 import { countPendingReminders, countPendingWorkOrders } from "@/lib/notificationBadges";
-import { formatLastRefreshTime, getAutoRefreshSettings, setAutoRefreshSettings, type AutoRefreshIntervalMinutes } from "@/lib/autoRefresh";
+import { formatLastRefreshTime, getAutoRefreshSettings, isEditingFormElement, setAutoRefreshSettings, type AutoRefreshIntervalMinutes } from "@/lib/autoRefresh";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "الرئيسية", path: "/" },
@@ -147,6 +147,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [autoRefreshSettings, setAutoRefreshSettingsState] = React.useState(getAutoRefreshSettings);
   const [lastAutoRefreshAt, setLastAutoRefreshAt] = React.useState<number | null>(null);
+  const [autoRefreshPausedForForm, setAutoRefreshPausedForForm] = React.useState(false);
+  const autoRefreshPausedRef = React.useRef(false);
   const visibleMenuItems = user?.role === "admin"
     ? menuItems
     : menuItems.filter(item => {
@@ -185,7 +187,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             : { bar: "from-teal-500 via-cyan-500 to-sky-500", label: "text-teal-800", surface: "bg-teal-50/95", glow: "shadow-[0_8px_28px_rgba(20,184,166,.16)]" };
 
   const refreshData = React.useCallback(async (source: "manual" | "automatic" = "manual") => {
-    if (isRefreshing) return;
+    if (isRefreshing || (source === "automatic" && autoRefreshPausedRef.current)) return;
     setIsRefreshing(true);
     try {
       await Promise.all([
@@ -206,6 +208,28 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       setIsRefreshing(false);
     }
   }, [isRefreshing, utils]);
+
+  React.useEffect(() => {
+    let resumeTimer: number | undefined;
+    const updateFormPause = () => {
+      const focused = document.activeElement;
+      const shouldPause = isEditingFormElement(focused);
+      window.clearTimeout(resumeTimer);
+      resumeTimer = window.setTimeout(() => {
+        const current = document.activeElement;
+        const stillEditing = isEditingFormElement(current);
+        autoRefreshPausedRef.current = stillEditing;
+        setAutoRefreshPausedForForm(stillEditing);
+      }, shouldPause ? 0 : 1200);
+    };
+    document.addEventListener("focusin", updateFormPause, true);
+    document.addEventListener("focusout", updateFormPause, true);
+    return () => {
+      window.clearTimeout(resumeTimer);
+      document.removeEventListener("focusin", updateFormPause, true);
+      document.removeEventListener("focusout", updateFormPause, true);
+    };
+  }, []);
 
   React.useEffect(() => {
     if (!autoRefreshSettings.enabled) return;
@@ -322,7 +346,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                   <DropdownMenuRadioItem value="15">كل 15 دقيقة</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem disabled className="text-xs text-muted-foreground">{autoRefreshSettings.enabled ? `مفعّل — ${formatLastRefreshTime(lastAutoRefreshAt)}` : "متوقف — فعّله من هنا"}</DropdownMenuItem>
+                <DropdownMenuItem disabled className="text-xs text-muted-foreground">{autoRefreshPausedForForm ? "موقوف مؤقتًا أثناء إدخال البيانات" : autoRefreshSettings.enabled ? `مفعّل — ${formatLastRefreshTime(lastAutoRefreshAt)}` : "متوقف — فعّله من هنا"}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <InstallAppButton compact={isMobile} />

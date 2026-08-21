@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { formatLastRefreshTime, getAutoRefreshSettings, setAutoRefreshSettings } from "./autoRefresh";
+import { formatLastRefreshTime, getAutoRefreshSettings, isEditingFormElement, setAutoRefreshSettings } from "./autoRefresh";
 
 describe("autoRefresh settings", () => {
   beforeEach(() => window.localStorage.clear());
@@ -18,5 +18,17 @@ describe("autoRefresh settings", () => {
   it("formats the last refresh time and handles an empty value", () => {
     expect(formatLastRefreshTime(null)).toBe("لم يتم التحديث تلقائيًا بعد");
     expect(formatLastRefreshTime(new Date("2026-08-21T09:30:00Z").getTime())).toContain("آخر تحديث:");
+  });
+
+  it("detects form editing only inside the admin content area", () => {
+    const main = document.createElement("main");
+    const input = document.createElement("input");
+    const button = document.createElement("button");
+    main.append(input, button);
+    document.body.append(main);
+
+    expect(isEditingFormElement(input)).toBe(true);
+    expect(isEditingFormElement(button)).toBe(false);
+    expect(isEditingFormElement(null)).toBe(false);
   });
 });
