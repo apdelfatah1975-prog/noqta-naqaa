@@ -89,11 +89,6 @@ export default function Home() {
   }, [data]);
   const displayData = data ?? offlineDashboard;
   const isLoading = !displayData && dashboardLoading;
-  const { data: cash } = trpc.filters.cash.summary.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
-    networkMode: "offlineFirst",
-  });
   const { data: backupStatus, isLoading: backupLoading } = trpc.filters.backup.status.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
@@ -107,18 +102,18 @@ export default function Home() {
     upcoming: displayData?.upcomingVisits.length ?? 0,
     due: displayData?.dueReminders.length ?? 0,
     inventory: displayData?.inventory.totalItems ?? 0,
-    cash: Math.round(cash?.balance ?? 0),
+    cash: Math.round(displayData?.cash?.balance ?? 0),
   };
   const nextVisit = displayData?.upcomingVisits[0];
   const nextDueReminder = displayData?.dueReminders[0];
   const workOrderSummary = displayData?.workOrderSummary;
   function saveLocalSnapshot() {
-    if (!displayData && !cash) {
+    if (!displayData) {
       toast.error("لا توجد بيانات متاحة للحفظ المحلي بعد");
       return;
     }
     if (displayData) cacheOfflineDashboard(displayData);
-    if (cash && offlineOwnerId) cacheOfflineCash(offlineOwnerId, cash);
+    if (displayData?.cash && offlineOwnerId) cacheOfflineCash(offlineOwnerId, displayData.cash);
     setOfflineDashboard(displayData ?? null);
     toast.success("تم حفظ البيانات الحالية على الجهاز بنجاح");
   }
@@ -128,7 +123,7 @@ export default function Home() {
     displayData?.upcomingVisits?.forEach(visit => rows.push({ القسم: "زيارات قادمة", العميل: visit.customer?.name || "—", التاريخ: formatDateTime(visit.visitDate), التفاصيل: visitTypeLabels[visit.visitType as keyof typeof visitTypeLabels] || visit.visitType || "—" }));
     displayData?.dueReminders?.forEach(reminder => rows.push({ القسم: "متابعات مستحقة", العميل: reminder.customer?.name || "—", التاريخ: formatDateTime(reminder.reminderDate), التفاصيل: `متأخر ${reminder.daysOverdue ?? 0} يوم` }));
     displayData?.inventory?.items?.forEach(item => rows.push({ القسم: "المخزن", العميل: item.name, التاريخ: `رقم ${item.id}`, التفاصيل: `الرصيد ${item.currentBalance} — الحد الأدنى ${item.reorderLevel ?? 2}` }));
-    rows.push({ القسم: "الخزينة", العميل: "الرصيد الحالي", التاريخ: "—", التفاصيل: `${Math.round(cash?.balance ?? 0)}` });
+    rows.push({ القسم: "الخزينة", العميل: "الرصيد الحالي", التاريخ: "—", التفاصيل: `${Math.round(displayData?.cash?.balance ?? 0)}` });
     const opened = printArabicPdf("تقرير ملخص التطبيق", rows, [
       { key: "القسم", label: "القسم" },
       { key: "العميل", label: "العميل / الصنف" },

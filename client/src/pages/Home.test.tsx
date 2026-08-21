@@ -50,6 +50,7 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
         upcomingVisits: [],
         upcomingFollowUps: [],
         dueReminders: [],
+        cash: { incomeTotal: 250, expenseTotal: 0, balance: 250, summaries: [] },
         inventory: { totalItems: 0, lowStockCount: 0, lowStock: [] },
       },
     });
@@ -71,6 +72,7 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
         upcomingFollowUps: [],
         dueReminders: [{ id: 22, customerId: 8, reminderDate: new Date(), daysOverdue: 2, customer: { name: "عميل مستحق", customerCode: "٨" } }],
         customerCount: 4,
+        cash: { incomeTotal: 250, expenseTotal: 0, balance: 250, summaries: [] },
         inventory: { totalItems: 0, lowStockCount: 0, lowStock: [] },
       },
     });
@@ -89,6 +91,7 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
         upcomingVisits: [],
         upcomingFollowUps: [],
         dueReminders: [],
+        cash: { incomeTotal: 250, expenseTotal: 0, balance: 250, summaries: [] },
         inventory: { totalItems: 0, lowStockCount: 0, lowStock: [] },
         workOrderSummary: { total: 8, assigned: 2, inProgress: 3, completed: 2, notCompleted: 1 },
       },
@@ -116,6 +119,7 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
         upcomingVisits: [],
         upcomingFollowUps: [],
         dueReminders: [],
+        cash: { incomeTotal: 250, expenseTotal: 0, balance: 250, summaries: [] },
         inventory: {
           totalItems: 1,
           lowStockCount: 1,
@@ -136,6 +140,7 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
         upcomingVisits: [],
         upcomingFollowUps: [],
         dueReminders: [],
+        cash: { incomeTotal: 250, expenseTotal: 0, balance: 250, summaries: [] },
         inventory: {
           totalItems: 1,
           lowStockCount: 0,
