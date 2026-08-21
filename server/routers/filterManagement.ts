@@ -628,6 +628,9 @@ export const filterManagementRouter = router({
     monthly: protectedProcedure.input(z.object({
       dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      technician: z.string().trim().max(160).optional(),
+      transactionType: z.enum(["all", "income", "expense"]).default("all"),
+      category: z.string().trim().max(160).optional(),
     })).query(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
       const from = new Date(`${input.dateFrom}T00:00:00`);
@@ -647,8 +650,22 @@ export const filterManagementRouter = router({
       const customerIds = Array.from(new Set(periodVisits.map(visit => visit.customerId)));
       const periodCustomers = customerIds.length ? await db.select().from(customers).where(and(eq(customers.ownerId, ownerId), inArray(customers.id, customerIds))) : [];
       const customerNames = new Map(periodCustomers.map(customer => [customer.id, customer.name]));
+      const sourceVisitIds = Array.from(new Set(periodCash.map(transaction => transaction.sourceVisitId).filter((id): id is number => Boolean(id))));
+      const sourceVisits = sourceVisitIds.length ? await db.select({ id: visits.id, technicianName: visits.technicianName }).from(visits).where(and(eq(visits.ownerId, ownerId), inArray(visits.id, sourceVisitIds))) : [];
+      const technicianByVisitId = new Map(sourceVisits.map(visit => [visit.id, visit.technicianName]));
+      const periodCashWithTechnician = periodCash.map(transaction => {
+        const technicianName = transaction.sourceVisitId ? technicianByVisitId.get(transaction.sourceVisitId) : undefined;
+        return technicianName !== undefined ? { ...transaction, recipientName: technicianName } : transaction;
+      });
+      const filteredPeriodCash = periodCashWithTechnician.filter(transaction =>
+        (!input.technician || (transaction.recipientName ?? "").trim() === input.technician)
+        && (!input.transactionType || input.transactionType === "all" || transaction.transactionType === input.transactionType)
+        && (!input.category || (transaction.category ?? "") === input.category)
+      );
       const income = periodCash.filter(transaction => transaction.transactionType === "income").reduce((sum, transaction) => sum + transaction.amount, 0);
       const expense = periodCash.filter(transaction => transaction.transactionType === "expense").reduce((sum, transaction) => sum + transaction.amount, 0);
+      const filteredIncome = filteredPeriodCash.filter(transaction => transaction.transactionType === "income").reduce((sum, transaction) => sum + transaction.amount, 0);
+      const filteredExpense = filteredPeriodCash.filter(transaction => transaction.transactionType === "expense").reduce((sum, transaction) => sum + transaction.amount, 0);
       const financial = calculateCompanyFinancialOverview(periodCash);
       const treasuryBalance = calculateCashSummaries(allCash).SAR.balance;
       const groupMoney = (rows: typeof periodCash, key: (row: typeof periodCash[number]) => string) => Array.from(rows.reduce((map, row) => map.set(key(row) || "غير مصنف", (map.get(key(row) || "غير مصنف") ?? 0) + row.amount), new Map<string, number>())).map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total);
@@ -660,6 +677,17 @@ export const filterManagementRouter = router({
         financial: { serviceIncome: financial.serviceIncome, externalIncome: financial.externalIncome, totalIncome: financial.totalIncome, technicianPayments: financial.technicianPayments, technicianRequired: financial.technicianRequired, technicianRemaining: financial.technicianRemaining, otherExpenses: financial.otherExpenses, gasolineExpenses: financial.gasolineExpenses, inventoryPurchaseExpenses: financial.inventoryPurchaseExpenses, generalExpenses: financial.generalExpenses, uncategorizedExpenses: financial.uncategorizedExpenses, companyNet: financial.companyNet, technicianPaymentsByName: financial.technicianPaymentsByName },
         incomeByCategory: groupMoney(periodCash.filter(transaction => transaction.transactionType === "income"), row => row.category),
         expenseByCategory: groupMoney(periodCash.filter(transaction => transaction.transactionType === "expense"), row => row.category),
+        treasury: {
+          transactions: filteredPeriodCash,
+          incomeTotal: filteredIncome,
+          expenseTotal: filteredExpense,
+          balance: filteredIncome - filteredExpense,
+          selectedTechnician: input.technician ?? "",
+          selectedTransactionType: input.transactionType,
+          selectedCategory: input.category ?? "",
+          availableTechnicians: Array.from(new Set(periodCashWithTechnician.map(row => row.recipientName).filter((name): name is string => Boolean(name?.trim())))).sort((a, b) => a.localeCompare(b, "ar")),
+          availableCategories: Array.from(new Set(periodCashWithTechnician.map(row => row.category).filter((category): category is string => Boolean(category?.trim())))).sort((a, b) => a.localeCompare(b, "ar")),
+        },
         visitsByType: groupVisits,
         visitsByTechnician: technicianVisits,
         inventory: { incomingQuantity: periodMovements.filter(movement => movement.movementType === "incoming").reduce((sum, movement) => sum + movement.quantity, 0), outgoingQuantity: periodMovements.filter(movement => movement.movementType === "outgoing").reduce((sum, movement) => sum + movement.quantity, 0), purchaseCost: periodMovements.filter(movement => movement.movementType === "incoming").reduce((sum, movement) => sum + movement.quantity * movement.unitCost, 0), items: inventory.items.map(item => ({ name: item.name, currentBalance: item.currentBalance })) },

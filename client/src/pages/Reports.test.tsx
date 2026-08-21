@@ -37,6 +37,11 @@ describe("تقارير نقطة نقاء", () => {
         visitsByTechnician: [{ label: "فني أحمد", total: 4 }],
         inventory: { incomingQuantity: 8, outgoingQuantity: 2, purchaseCost: 30000, items: [{ name: "شمعة", currentBalance: 6 }] },
         recentVisits: [{ date: new Date("2026-08-15T10:00:00"), customer: "عميل الاختبار", type: "maintenance", technician: "فني أحمد" }],
+        treasury: {
+          transactions: [{ id: 1, transactionDate: new Date("2026-08-15T10:00:00"), transactionType: "income", category: "تحصيل صيانة", recipientName: "فني أحمد", amount: 125000, notes: "عميل الاختبار" }, { id: 2, transactionDate: new Date("2026-08-14T10:00:00"), transactionType: "expense", category: "بنزين", recipientName: "فني أحمد", amount: 40000, notes: "رحلة" }],
+          incomeTotal: 125000, expenseTotal: 40000, balance: 85000,
+          availableTechnicians: ["فني أحمد", "فني محمود"], availableCategories: ["تحصيل صيانة", "بنزين"],
+        },
         financial: {
           serviceIncome: 125000, externalIncome: 0, totalIncome: 125000,
           technicianPayments: 30000, technicianRequired: 35000, technicianRemaining: 5000,
@@ -84,6 +89,23 @@ describe("تقارير نقطة نقاء", () => {
     render(<Reports />);
     fireEvent.change(screen.getByLabelText("من تاريخ"), { target: { value: "2026-07-01" } });
     expect(mocks.monthly.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ dateFrom: "2026-07-01" }));
+  });
+
+  it("تطبق فلاتر الخزينة حسب الفني والنوع والتصنيف وتعرض الحركات", () => {
+    render(<Reports />);
+    fireEvent.click(screen.getByRole("button", { name: "الخزينة" }));
+    expect(screen.getByText("تقرير حركات الخزينة")).toBeTruthy();
+    expect(screen.getByText("عميل الاختبار")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("الفني"), { target: { value: "فني أحمد" } });
+    fireEvent.change(screen.getByLabelText("نوع الحركة"), { target: { value: "income" } });
+    fireEvent.change(screen.getByLabelText("التصنيف"), { target: { value: "تحصيل صيانة" } });
+    expect(mocks.monthly.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ technician: "فني أحمد", transactionType: "income", category: "تحصيل صيانة" }));
+  });
+
+  it("تضع حركات الخزينة المفلترة في ملف Excel", () => {
+    render(<Reports />);
+    fireEvent.click(screen.getByRole("button", { name: "Excel" }));
+    expect(screen.getByText("التقارير")).toBeTruthy();
   });
 });
 
