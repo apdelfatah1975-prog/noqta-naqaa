@@ -690,13 +690,13 @@ export default function Reports() {
           تحديد فترة التقرير
         </div>
         <div className="flex flex-wrap gap-2">
-          <SectionButton active={false} onClick={() => setPreset("today")}>
+          <SectionButton active={false} onClick={() => setPreset("today")} description="عرض حركات اليوم فقط">
             اليوم
           </SectionButton>
-          <SectionButton active={false} onClick={() => setPreset("week")}>
+          <SectionButton active={false} onClick={() => setPreset("week")} description="من اليوم حتى آخر أسبوع">
             آخر 7 أيام
           </SectionButton>
-          <SectionButton active={false} onClick={() => setPreset("month")}>
+          <SectionButton active={false} onClick={() => setPreset("month")} description="من أول الشهر الحالي حتى اليوم">
             هذا الشهر
           </SectionButton>
         </div>
