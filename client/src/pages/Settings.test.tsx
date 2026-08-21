@@ -50,7 +50,7 @@ describe("صفحة الإعدادات", () => {
     expect(screen.getByText("الرقم السري للحماية")).toBeTruthy();
     expect(screen.getByText("اختبار أداء التطبيق")).toBeTruthy();
     expect(screen.getByRole("button", { name: "إنشاء 1000 عميل تجريبي" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "حذف العملاء التجريبيين" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "حذف كل البيانات التجريبية" })).toBeTruthy();
 
     fireEvent.change(screen.getByPlaceholderText("اتركه فارغًا عند الإعداد لأول مرة"), { target: { value: "1234" } });
     fireEvent.change(screen.getByPlaceholderText("4 أحرف أو أرقام على الأقل"), { target: { value: "5678" } });
