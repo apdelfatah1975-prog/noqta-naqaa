@@ -76,7 +76,8 @@
 
 /// <reference types="@types/google.maps" />
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { LocateFixed, Minus, Plus } from "lucide-react";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { cn } from "@/lib/utils";
 
@@ -124,6 +125,17 @@ export function MapView({
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+
+  function changeZoom(delta: number) {
+    const currentZoom = map.current?.getZoom();
+    if (currentZoom !== undefined) map.current?.setZoom(Math.max(1, Math.min(21, currentZoom + delta)));
+  }
+
+  function recenter() {
+    map.current?.setCenter(initialCenter);
+    map.current?.setZoom(initialZoom);
+  }
 
   const init = usePersistFn(async () => {
     await loadMapScript();
@@ -140,6 +152,7 @@ export function MapView({
       streetViewControl: true,
       mapId: "DEMO_MAP_ID",
     });
+    setMapReady(true);
     if (onMapReady) {
       onMapReady(map.current);
     }
@@ -150,6 +163,13 @@ export function MapView({
   }, [init]);
 
   return (
-    <div ref={mapContainer} className={cn("w-full h-[500px]", className)} />
+    <div className={cn("relative w-full h-[500px]", className)}>
+      <div ref={mapContainer} className="h-full w-full" />
+      <div className="absolute left-3 top-3 z-10 flex flex-col gap-2" dir="ltr" aria-label="أدوات التحكم بالخريطة">
+        <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/95 text-slate-800 shadow-md transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => changeZoom(1)} disabled={!mapReady} aria-label="تكبير الخريطة" title="تكبير الخريطة"><Plus className="h-5 w-5" /></button>
+        <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/95 text-slate-800 shadow-md transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => changeZoom(-1)} disabled={!mapReady} aria-label="تصغير الخريطة" title="تصغير الخريطة"><Minus className="h-5 w-5" /></button>
+        <button type="button" className="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-teal-200 bg-teal-700/95 text-white shadow-md transition hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 disabled:cursor-not-allowed disabled:opacity-50" onClick={recenter} disabled={!mapReady} aria-label="إعادة توسيط الخريطة على موقع العميل" title="إعادة التوسيط"><LocateFixed className="h-5 w-5" /></button>
+      </div>
+    </div>
   );
 }
