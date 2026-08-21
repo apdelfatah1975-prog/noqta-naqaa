@@ -52,9 +52,13 @@ describe("عامل خدمة التطبيق القابل للتثبيت", () => {
 
   it("يستقبل مشاركة موقع واتساب داخل صفحة العملاء", () => {
     const manifest = readFileSync(path.resolve(import.meta.dirname, "../client/public/manifest.webmanifest"), "utf8");
+    const indexHtml = readFileSync(path.resolve(import.meta.dirname, "../client/index.html"), "utf8");
+    const mainSource = readFileSync(path.resolve(import.meta.dirname, "../client/src/main.tsx"), "utf8");
     const customersSource = readFileSync(path.resolve(import.meta.dirname, "../client/src/pages/Customers.tsx"), "utf8");
     expect(manifest).toContain('"action": "/customers"');
     expect(manifest).toContain('"url": "url"');
+    expect(indexHtml).toContain('/manifest.webmanifest?v=share-target-2');
+    expect(mainSource).toContain('/sw.js?version=20-share-target');
     expect(customersSource).toContain('params.get("url") || params.get("text")');
     expect(customersSource).toContain("اختيار العميل للموقع المشارك");
   });
