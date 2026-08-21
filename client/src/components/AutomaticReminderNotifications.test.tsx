@@ -5,14 +5,18 @@ import { AutomaticReminderNotifications } from "./AutomaticReminderNotifications
 
 const mocks = vi.hoisted(() => ({
   alerts: vi.fn(),
+  workOrders: vi.fn(),
   permission: vi.fn(),
   show: vi.fn(),
   soundEnabled: vi.fn(),
   playTone: vi.fn(),
+  vibrationEnabled: vi.fn(),
+  vibrate: vi.fn(),
+  showWorkOrder: vi.fn(),
 }));
 
 vi.mock("@/lib/trpc", () => ({
-  trpc: { filters: { reminders: { alerts: { useQuery: mocks.alerts } } } },
+  trpc: { filters: { reminders: { alerts: { useQuery: mocks.alerts } }, workOrders: { list: { useQuery: mocks.workOrders } } } },
 }));
 
 vi.mock("@/lib/deviceNotifications", () => ({
@@ -20,6 +24,9 @@ vi.mock("@/lib/deviceNotifications", () => ({
   isReminderSoundEnabled: mocks.soundEnabled,
   playReminderTone: mocks.playTone,
   showDeviceReminderNotification: mocks.show,
+  showDeviceWorkOrderNotification: mocks.showWorkOrder,
+  isNotificationVibrationEnabled: mocks.vibrationEnabled,
+  vibrateNotification: mocks.vibrate,
 }));
 
 describe("التنبيه التلقائي للمواعيد", () => {
@@ -28,6 +35,9 @@ describe("التنبيه التلقائي للمواعيد", () => {
     mocks.permission.mockReturnValue("granted");
     mocks.show.mockResolvedValue(true);
     mocks.soundEnabled.mockReturnValue(true);
+    mocks.vibrationEnabled.mockReturnValue(true);
+    mocks.vibrate.mockReturnValue(true);
+    mocks.workOrders.mockReturnValue({ data: [] });
     mocks.alerts.mockReturnValue({
       data: [{ id: 9, alertDate: new Date("2026-08-15T09:00:00.000Z"), customer: { name: "أحمد" } }],
     });
@@ -43,6 +53,7 @@ describe("التنبيه التلقائي للمواعيد", () => {
 
     await waitFor(() => expect(mocks.show).toHaveBeenCalledWith("أحمد", expect.stringMatching(/^water-alert-9-\d{4}-\d{2}-\d{2}$/)));
     expect(mocks.playTone).toHaveBeenCalledOnce();
+    expect(mocks.vibrate).toHaveBeenCalledOnce();
   });
 
   it("يشغل الصوت حتى إذا لم يمنح المستخدم إذن إشعار الجهاز", async () => {

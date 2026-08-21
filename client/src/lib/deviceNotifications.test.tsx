@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getDeviceNotificationPermission, requestDeviceNotificationPermission, showDeviceReminderNotification } from "./deviceNotifications";
+import { getDeviceNotificationPermission, isNotificationVibrationEnabled, requestDeviceNotificationPermission, setNotificationVibrationEnabled, showDeviceReminderNotification, vibrateNotification } from "./deviceNotifications";
 
 const serviceWorkerDescriptor = Object.getOwnPropertyDescriptor(navigator, "serviceWorker");
 
@@ -34,6 +34,18 @@ describe("حالة إذن إشعارات الجهاز", () => {
 
     expect(getDeviceNotificationPermission()).toBe("unsupported");
     await expect(requestDeviceNotificationPermission()).resolves.toBe("unsupported");
+  });
+
+  it("يشغل الاهتزاز عندما يكون مفعّلًا ويمنعه عند إيقافه", () => {
+    const vibrate = vi.fn(() => true);
+    vi.stubGlobal("navigator", { ...navigator, vibrate });
+    setNotificationVibrationEnabled(true);
+    expect(isNotificationVibrationEnabled()).toBe(true);
+    expect(vibrateNotification()).toBe(true);
+    expect(vibrate).toHaveBeenCalledWith([120, 70, 180]);
+    setNotificationVibrationEnabled(false);
+    expect(isNotificationVibrationEnabled()).toBe(false);
+    expect(vibrateNotification()).toBe(false);
   });
 
   it("يرسل إشعار الموعد عبر عامل الخدمة عند منح الإذن", async () => {
