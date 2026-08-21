@@ -1990,3 +1990,5 @@
 - [x] Location Button Sweep: add shared customer location actions to WorkOrders and TechnicianPreview.
 
 - [x] إصلاح عدم ظهور زر «الموقع» في صفحة العملاء على الهاتف والتحقق من ظهوره نصيًا.
+
+- [x] إضافة أيقونة خريطة صغيرة بجانب نص زر «الموقع» والتحقق من ظهورها على الهاتف.

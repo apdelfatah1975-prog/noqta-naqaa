@@ -24,6 +24,9 @@ describe("CustomerContactActions", () => {
     render(<CustomerContactActions customer={{ phone: null, address: null, latitude: null, longitude: null }} labels showLocationPlaceholder />);
 
     expect(screen.getByLabelText("موقع العميل غير مسجل")).toBeTruthy();
+    const locationState = screen.getByLabelText("موقع العميل غير مسجل");
+    expect(locationState).toBeTruthy();
+    expect(locationState.querySelector("svg")).toBeTruthy();
     expect(screen.getByText("الموقع غير مسجل")).toBeTruthy();
   });
 
