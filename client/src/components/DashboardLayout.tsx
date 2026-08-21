@@ -49,6 +49,7 @@ import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { AutomaticReminderNotifications } from "./AutomaticReminderNotifications";
 import { InstallAppButton } from "./InstallAppButton";
 import { OfflineSyncManager } from "./OfflineSyncManager";
+import { countPendingReminders, countPendingWorkOrders } from "@/lib/notificationBadges";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "الرئيسية", path: "/" },
@@ -151,6 +152,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
+  const dueReminders = trpc.filters.reminders.due.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000, refetchIntervalInBackground: true });
+  const workOrders = trpc.filters.workOrders.list.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000, refetchIntervalInBackground: true });
+  const notificationCountFor = (path: string) => {
+    if (path === "/reminders") return countPendingReminders(dueReminders.data);
+    if (path === "/work-orders") return countPendingWorkOrders(workOrders.data);
+    return 0;
+  };
   const activeMenuItem = menuItems.find(item => item.path === location)
     ?? (location.startsWith("/customers/") ? menuItems[1] : undefined)
     ?? menuItems[0];
@@ -284,7 +292,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       </SidebarInset>
       {isMobile ? <nav aria-label="التنقل السريع" className="fixed inset-x-0 bottom-0 z-40 min-h-[5.75rem] border-t border-teal-950/10 bg-white/95 px-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(13,82,76,.10)] backdrop-blur-lg">
         <div className="mx-auto flex h-full max-w-full gap-1 overflow-x-auto overscroll-x-contain px-1 [scrollbar-width:thin]">
-          {mobileNavItems.map(item => { const active = activeMenuItem.path === item.path; return <button key={item.path} type="button" onClick={() => setLocation(item.path)} className={`flex min-h-[4.5rem] min-w-[78px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-bold leading-4 transition active:scale-95 ${active ? "bg-teal-700 text-white shadow-md ring-2 ring-teal-200/80" : "text-slate-500 hover:bg-slate-50 hover:text-teal-700"}`} aria-current={active ? "page" : undefined}><item.icon className="h-5 w-5" /><span className="max-w-[76px] text-center">{item.label}</span></button>; })}
+          {mobileNavItems.map(item => { const active = activeMenuItem.path === item.path; const notificationCount = notificationCountFor(item.path); return <button key={item.path} type="button" onClick={() => setLocation(item.path)} className={`relative flex min-h-[4.5rem] min-w-[78px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-bold leading-4 transition active:scale-95 ${active ? "bg-teal-700 text-white shadow-md ring-2 ring-teal-200/80" : "text-slate-500 hover:bg-slate-50 hover:text-teal-700"}`} aria-current={active ? "page" : undefined}><span className="relative"><item.icon className="h-5 w-5" />{notificationCount > 0 ? <span className={`absolute -right-3 -top-3 grid min-h-5 min-w-5 place-items-center rounded-full border-2 border-white px-1 text-[10px] font-black leading-none shadow-sm ${active ? "bg-rose-500 text-white" : "bg-rose-600 text-white"}`} aria-label={`${notificationCount} عناصر معلقة`} title={`${notificationCount} عناصر معلقة`}>{notificationCount > 99 ? "99+" : notificationCount}</span> : null}</span><span className="max-w-[76px] text-center">{item.label}</span></button>; })}
         </div>
       </nav> : null}
     </>
