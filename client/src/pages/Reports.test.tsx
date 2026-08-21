@@ -102,10 +102,13 @@ describe("تقارير نقطة نقاء", () => {
     expect(mocks.monthly.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ technician: "فني أحمد", transactionType: "income", category: "تحصيل صيانة" }));
   });
 
-  it("تضع حركات الخزينة المفلترة في ملف Excel", () => {
+  it("تعرض أزرار تصدير معاملات الخزينة إلى Excel وPDF", () => {
     render(<Reports />);
-    fireEvent.click(screen.getByRole("button", { name: "Excel" }));
-    expect(screen.getByText("التقارير")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "الخزينة" }));
+    expect(screen.getByRole("button", { name: "تصدير معاملات PDF" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "تصدير معاملات Excel" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "تصدير معاملات Excel" }));
+    fireEvent.click(screen.getByRole("button", { name: "تصدير معاملات PDF" }));
   });
 });
 

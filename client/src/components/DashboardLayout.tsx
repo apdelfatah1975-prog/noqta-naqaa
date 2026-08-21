@@ -66,7 +66,7 @@ const menuItems = [
   { icon: Settings, label: "الإعدادات", path: "/settings" },
 ];
 
-const mobileNavItems = menuItems.filter(item => ["/", "/customers", "/visits", "/reminders"].includes(item.path));
+const mobileNavItems = menuItems;
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { loading, user } = useAuth();
@@ -266,11 +266,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             ) : null}
           </div>
         </header>
-        <main className="min-h-[calc(100vh-4rem)] min-w-0 overflow-x-hidden px-3 pb-24 pt-4 sm:px-6 sm:pb-24 sm:pt-6 lg:px-8 lg:pb-8 lg:pt-8">{children}</main>
+        <main className="min-h-[calc(100vh-4rem)] min-w-0 overflow-x-hidden px-3 pb-28 pt-4 sm:px-6 sm:pb-28 sm:pt-6 lg:px-8 lg:pb-8 lg:pt-8">{children}</main>
       </SidebarInset>
-      {isMobile ? <nav aria-label="التنقل السريع" className="fixed inset-x-0 bottom-0 z-40 min-h-[5.25rem] border-t border-teal-950/10 bg-white/95 px-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(13,82,76,.10)] backdrop-blur-lg">
-        <div className="mx-auto grid h-full max-w-lg grid-cols-4 gap-0.5">
-          {mobileNavItems.map(item => { const active = activeMenuItem.path === item.path; return <button key={item.path} type="button" onClick={() => setLocation(item.path)} className={`flex min-h-[4rem] min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 text-[13px] font-bold leading-5 tracking-wide transition active:scale-95 ${active ? "bg-teal-50 text-teal-800" : "text-slate-500 hover:bg-slate-50 hover:text-teal-700"}`} aria-current={active ? "page" : undefined}><item.icon className="h-5 w-5" /><span className="whitespace-nowrap">{item.label}</span></button>; })}
+      {isMobile ? <nav aria-label="التنقل السريع" className="fixed inset-x-0 bottom-0 z-40 min-h-[5.75rem] border-t border-teal-950/10 bg-white/95 px-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(13,82,76,.10)] backdrop-blur-lg">
+        <div className="mx-auto flex h-full max-w-full gap-1 overflow-x-auto overscroll-x-contain px-1 [scrollbar-width:thin]">
+          {mobileNavItems.map(item => { const active = activeMenuItem.path === item.path; return <button key={item.path} type="button" onClick={() => setLocation(item.path)} className={`flex min-h-[4.5rem] min-w-[78px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-bold leading-4 transition active:scale-95 ${active ? "bg-teal-50 text-teal-800" : "text-slate-500 hover:bg-slate-50 hover:text-teal-700"}`} aria-current={active ? "page" : undefined}><item.icon className="h-5 w-5" /><span className="max-w-[76px] text-center">{item.label}</span></button>; })}
         </div>
       </nav> : null}
     </>
