@@ -41,7 +41,7 @@ import { calculateInventoryPurchaseAmount, shouldCreateInventoryPurchase } from 
 import { createHeartbeatJob, updateHeartbeatJob } from "../_core/heartbeat";
 import { COOKIE_NAME } from "../../shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
-import { sdk } from "../_core/sdk";
+import { createLocalSessionToken } from "../_core/localAuth";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { createOwnerBackup, refreshOwnerBackup } from "../backup";
 import { storageGet, storagePut } from "../storage";
@@ -484,7 +484,7 @@ export const filterManagementRouter = router({
         user = (await db.select().from(users).where(eq(users.id, user.id)).limit(1))[0];
       }
       if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر تجهيز حساب الفني." });
-      const token = await sdk.createSessionToken(user.openId, { name: user.name ?? account.displayName });
+      const token = await createLocalSessionToken(user);
       ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: 30 * 24 * 60 * 60 * 1000 });
       return { success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
     }),

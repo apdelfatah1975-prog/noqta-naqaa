@@ -2,6 +2,8 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import React from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +28,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
@@ -113,32 +114,53 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,#dff6f2,transparent_48%),#f6fbfa] p-5 flex items-center justify-center" dir="rtl">
-        <div className="w-full max-w-md rounded-[2rem] bg-card p-8 sm:p-10 text-center shadow-[0_24px_80px_rgba(15,118,110,.14)] border border-emerald-100">
-          <div className="relative mx-auto mb-7 grid h-24 w-24 place-items-center rounded-[2rem] bg-gradient-to-br from-cyan-400 via-teal-600 to-emerald-700 pb-1 text-white shadow-lg shadow-teal-700/25 ring-4 ring-cyan-100 transition duration-200 ease-out hover:from-cyan-300 hover:via-teal-500 hover:to-emerald-600 hover:brightness-110 hover:shadow-[0_0_28px_rgba(45,212,191,.55)]">
-            <Droplets className="relative z-10 mt-[-8px] h-10 w-10 drop-shadow-sm" />
-            <span className="absolute bottom-2 z-10 text-[11px] font-black tracking-tight text-white">نقطة نقاء</span>
-            <span className="absolute h-2.5 w-2.5 rounded-full bg-gradient-to-br from-amber-200 to-orange-400 shadow-sm ring-1 ring-white/80" aria-hidden="true" />
-          </div>
-          <h1 className="mt-2 text-2xl font-extrabold tracking-tight">أهلًا بك في نظام الفلاتر</h1>
-          <p className="mt-3 text-sm leading-7 text-muted-foreground">سجّل الدخول للوصول إلى بيانات العملاء والزيارات والمخزن بصورة آمنة.</p>
-          <Button onClick={() => startLogin()} size="lg" className="mt-8 h-12 w-full rounded-xl bg-teal-700 text-base hover:bg-teal-800">
-            تسجيل الدخول
-          </Button>
-          <div className="mt-3 flex justify-center">
-            <InstallAppButton />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return <LocalLoginScreen />;
 
   return (
     <SidebarProvider defaultOpen={true} dir="rtl" className="min-w-0 max-w-full overflow-x-hidden">
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </SidebarProvider>
+  );
+}
+
+function LocalLoginScreen() {
+  const utils = trpc.useUtils();
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [name, setName] = React.useState("");
+  const [isRegister, setIsRegister] = React.useState(false);
+  const login = trpc.auth.login.useMutation({
+    onSuccess: data => {
+      utils.auth.me.setData(undefined, data.user);
+      toast.success("تم تسجيل الدخول بنجاح");
+    },
+    onError: error => toast.error(error.message || "تعذر تسجيل الدخول"),
+  });
+  const register = trpc.auth.register.useMutation({
+    onSuccess: data => { utils.auth.me.setData(undefined, data.user); toast.success("تم إنشاء الحساب وتسجيل الدخول"); },
+    onError: error => toast.error(error.message || "تعذر إنشاء الحساب"),
+  });
+  const pending = login.isPending || register.isPending;
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-[radial-gradient(circle_at_top,#dff6f2,transparent_48%),#f6fbfa] px-3 py-4 sm:p-5" dir="rtl">
+      <div className="w-full max-w-md rounded-[1.5rem] border border-emerald-100 bg-card p-5 shadow-[0_24px_80px_rgba(15,118,110,.14)] sm:rounded-[2rem] sm:p-10">
+        <div className="relative mx-auto mb-5 grid h-20 w-20 place-items-center rounded-[1.5rem] bg-gradient-to-br from-cyan-400 via-teal-600 to-emerald-700 pb-1 text-white shadow-lg shadow-teal-700/25 ring-4 ring-cyan-100 transition duration-200 ease-out hover:brightness-110 sm:mb-7 sm:h-24 sm:w-24 sm:rounded-[2rem]">
+          <Droplets className="relative z-10 mt-[-8px] h-10 w-10 drop-shadow-sm" />
+          <span className="absolute bottom-2 z-10 text-[11px] font-black tracking-tight text-white">نقطة نقاء</span>
+          <span className="absolute h-2.5 w-2.5 rounded-full bg-gradient-to-br from-amber-200 to-orange-400 shadow-sm ring-1 ring-white/80" aria-hidden="true" />
+        </div>
+        <h1 className="text-center text-xl font-extrabold tracking-tight sm:text-2xl">{isRegister ? "إنشاء أول حساب" : "تسجيل الدخول"}</h1>
+        <p className="mx-auto mt-3 max-w-sm text-center text-sm leading-6 text-muted-foreground">{isRegister ? "سيصبح أول حساب مسجل حساب المدير الرئيسي." : "أدخل بيانات الحساب المحلي للوصول إلى نظام نقطة نقاء."}</p>
+        <form className="mt-6 space-y-4" onSubmit={event => { event.preventDefault(); isRegister ? register.mutate({ name, email, password }) : login.mutate({ email, password }); }}>
+          {isRegister ? <div className="space-y-2"><Label htmlFor="local-name">اسم المستخدم</Label><Input id="local-name" value={name} onChange={event => setName(event.target.value)} required minLength={2} /></div> : null}
+          <div className="space-y-2"><Label htmlFor="local-email">البريد الإلكتروني</Label><Input id="local-email" type="email" dir="ltr" autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} required /></div>
+          <div className="space-y-2"><Label htmlFor="local-password">كلمة المرور</Label><Input id="local-password" type="password" dir="ltr" autoComplete={isRegister ? "new-password" : "current-password"} minLength={8} value={password} onChange={event => setPassword(event.target.value)} required /></div>
+          <Button type="submit" disabled={pending} size="lg" className="h-12 w-full rounded-xl bg-teal-700 text-base hover:bg-teal-800">{pending ? "جارٍ المعالجة…" : isRegister ? "إنشاء حساب المدير" : "دخول آمن"}</Button>
+        </form>
+        <button type="button" className="mt-4 text-sm font-bold text-teal-700 hover:underline" onClick={() => setIsRegister(value => !value)}>{isRegister ? "لديك حساب؟ تسجيل الدخول" : "إنشاء أول حساب مدير"}</button>
+        <div className="mt-3 flex justify-center"><InstallAppButton /></div>
+      </div>
+    </div>
   );
 }
 
@@ -313,29 +335,29 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       </Sidebar>
 
       <SidebarInset className="min-w-0 max-w-full bg-[#f6fbfa]">
-        <header className={`relative sticky top-0 z-20 flex h-16 items-center justify-between gap-2 border-b border-teal-950/5 px-3 backdrop-blur-lg sm:px-4 lg:px-8 ${pageAccent.surface} ${pageAccent.glow}`}>
+        <header className={`relative sticky top-0 z-20 flex min-h-14 items-center justify-between gap-1.5 border-b border-teal-950/5 px-2 py-2 backdrop-blur-lg sm:h-16 sm:gap-2 sm:px-4 sm:py-0 lg:px-8 ${pageAccent.surface} ${pageAccent.glow}`}>
           <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-l ${pageAccent.bar}`} aria-hidden="true" />
-          <div className="flex min-w-0 flex-1 items-center gap-2.5">
-            {isMobile ? <SidebarTrigger className="h-10 w-10 rounded-xl border border-teal-950/10 bg-white text-teal-800"><Menu className="h-5 w-5" /></SidebarTrigger> : null}
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2.5">
+            {isMobile ? <SidebarTrigger className="h-9 w-9 shrink-0 rounded-xl border border-teal-950/10 bg-white text-teal-800 sm:h-10 sm:w-10"><Menu className="h-5 w-5" /></SidebarTrigger> : null}
             <div>
-              <p className={`truncate text-sm font-bold leading-6 ${pageAccent.label}`}>نظام الإدارة</p>
-              <h2 className="truncate text-base font-extrabold leading-7 text-foreground">{activeMenuItem.label}</h2>
+              <p className={`truncate text-xs font-bold leading-5 sm:text-sm sm:leading-6 ${pageAccent.label}`}>نظام الإدارة</p>
+              <h2 className="truncate text-sm font-extrabold leading-6 text-foreground sm:text-base sm:leading-7">{activeMenuItem.label}</h2>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
             <button
               type="button"
               onClick={() => void refreshData()}
               disabled={isRefreshing}
               aria-label="تحديث البيانات المحفوظة"
               title="تحديث البيانات المحفوظة"
-              className="grid h-11 w-11 place-items-center rounded-xl border border-teal-950/8 bg-white text-teal-800 transition hover:bg-teal-50 disabled:cursor-wait disabled:opacity-60"
+              className="grid h-9 w-9 place-items-center rounded-xl border border-teal-950/8 bg-white text-teal-800 transition hover:bg-teal-50 disabled:cursor-wait disabled:opacity-60 sm:h-11 sm:w-11"
             >
               <RefreshCw className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`} />
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" aria-label="إعدادات التحديث التلقائي" title="إعدادات التحديث التلقائي" className={`grid h-11 w-11 place-items-center rounded-xl border border-teal-950/8 bg-white transition hover:bg-teal-50 ${autoRefreshSettings.enabled ? "text-teal-800" : "text-slate-500"}`}>
+                <button type="button" aria-label="إعدادات التحديث التلقائي" title="إعدادات التحديث التلقائي" className={`grid h-9 w-9 place-items-center rounded-xl border border-teal-950/8 bg-white transition hover:bg-teal-50 sm:h-11 sm:w-11 ${autoRefreshSettings.enabled ? "text-teal-800" : "text-slate-500"}`}>
                   <Timer className="h-5 w-5" />
                 </button>
               </DropdownMenuTrigger>
@@ -362,7 +384,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             ) : null}
           </div>
         </header>
-        <main className="min-h-[calc(100vh-4rem)] min-w-0 overflow-x-hidden px-3 pb-28 pt-4 sm:px-6 sm:pb-28 sm:pt-6 lg:px-8 lg:pb-8 lg:pt-8">{children}</main>
+        <main className="min-h-[calc(100dvh-3.5rem)] min-w-0 overflow-x-hidden px-2.5 pb-28 pt-3 sm:min-h-[calc(100vh-4rem)] sm:px-6 sm:pb-28 sm:pt-6 lg:px-8 lg:pb-8 lg:pt-8">{children}</main>
       </SidebarInset>
       {isMobile ? <nav aria-label="التنقل السريع" className="fixed inset-x-0 bottom-0 z-40 min-h-[5.75rem] border-t border-teal-950/10 bg-white/95 px-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(13,82,76,.10)] backdrop-blur-lg">
         <div className="mx-auto flex h-full max-w-full gap-1 overflow-x-auto overscroll-x-contain px-1 [scrollbar-width:thin]">
