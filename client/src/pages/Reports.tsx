@@ -35,7 +35,10 @@ const isoDate = (date: Date) => {
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
-const firstOfMonth = () => "2000-01-01";
+const firstOfMonth = () => {
+  const date = new Date();
+  return isoDate(new Date(date.getFullYear(), date.getMonth(), 1));
+};
 const today = () => isoDate(new Date());
 
 export default function Reports() {

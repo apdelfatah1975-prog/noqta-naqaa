@@ -85,6 +85,15 @@ describe("تقارير نقطة نقاء", () => {
     fireEvent.click(screen.getByRole("button", { name: /PDF الفني/ }));
   });
 
+  it("تبدأ الفترة الافتراضية من أول يوم في الشهر الحالي", () => {
+    render(<Reports />);
+    const now = new Date();
+    const expected = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const dateInput = screen.getByLabelText("من تاريخ") as HTMLInputElement;
+    expect(dateInput.value).toBe(expected);
+    expect(dateInput.value).not.toBe("2000-01-01");
+  });
+
   it("تغيّر مدخل الفترة يعيد طلب التقرير بالحد الجديد", () => {
     render(<Reports />);
     fireEvent.change(screen.getByLabelText("من تاريخ"), { target: { value: "2026-07-01" } });
