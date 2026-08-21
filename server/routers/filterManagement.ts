@@ -248,13 +248,15 @@ async function databaseOrThrow() {
   return db;
 }
 
-function compareCustomersByCreation(left: typeof customers.$inferSelect, right: typeof customers.$inferSelect) {
+type CustomerCreationKey = Pick<typeof customers.$inferSelect, "id" | "createdAt">;
+
+function compareCustomersByCreation(left: CustomerCreationKey, right: CustomerCreationKey) {
   const leftTime = left.createdAt instanceof Date ? left.createdAt.getTime() : 0;
   const rightTime = right.createdAt instanceof Date ? right.createdAt.getTime() : 0;
   return leftTime - rightTime || left.id - right.id;
 }
 
-function customerNumberMap(customerRows: Array<typeof customers.$inferSelect>) {
+function customerNumberMap(customerRows: CustomerCreationKey[]) {
   return new Map(customerRows.map((customer, index) => [customer.id, index + 1]));
 }
 
@@ -407,7 +409,7 @@ async function remindersWithCustomers(ownerId: number, onlyDue: boolean, withinD
   const [customerRows, sourceVisits, allCustomers] = await Promise.all([
     db.select().from(customers).where(and(eq(customers.ownerId, ownerId), inArray(customers.id, customerIds))),
     db.select().from(visits).where(and(eq(visits.ownerId, ownerId), inArray(visits.id, visitIds))),
-    db.select().from(customers).where(eq(customers.ownerId, ownerId)),
+    db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).where(eq(customers.ownerId, ownerId)),
   ]);
   const customerById = new Map(customerRows.map(customer => [customer.id, customer]));
   const customerNumbers = customerNumberMap([...allCustomers].sort(compareCustomersByCreation));
@@ -567,10 +569,10 @@ export const filterManagementRouter = router({
       visitCustomerIds.length
         ? db.select().from(customers).where(and(eq(customers.ownerId, ownerId), inArray(customers.id, visitCustomerIds)))
         : Promise.resolve([]),
-      db.select().from(customers).where(eq(customers.ownerId, ownerId)),
-    ]);
-    const customerById = new Map(visitCustomers.map(customer => [customer.id, customer]));
-    const customerNumbers = customerNumberMap([...allCustomers].sort(compareCustomersByCreation));
+db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).where(eq(customers.ownerId, ownerId)),
+      ]);
+      const customerById = new Map(visitCustomers.map(customer => [customer.id, customer]));
+      const customerNumbers = customerNumberMap([...allCustomers].sort(compareCustomersByCreation));
     const chartDays = Array.from({ length: 7 }, (_, index) => {
       const date = new Date(startOfToday);
       date.setDate(date.getDate() - (6 - index));

@@ -3,28 +3,28 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "./_core/hooks/useAuth";
 import type { ReactNode } from "react";
 import { Route, Switch, useLocation } from "wouter";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import DashboardLayout from "./components/DashboardLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import CustomerProfile from "./pages/CustomerProfile";
-import Customers from "./pages/Customers";
-import Cash from "./pages/Cash";
-import Home from "./pages/Home";
-import Inventory from "./pages/Inventory";
-import NotFound from "./pages/NotFound";
-import Reminders from "./pages/Reminders";
-import Reports from "./pages/Reports";
-import TechnicianPayroll from "./pages/TechnicianPayroll";
-import Settings from "./pages/Settings";
-import Visits from "./pages/Visits";
-import TechnicianPreview from "./pages/TechnicianPreview";
-import TechnicianLogin from "./pages/TechnicianLogin";
-import TechnicianLocations from "./pages/TechnicianLocations";
-import AllowedTechnicians from "./pages/AllowedTechnicians";
-import WorkOrders from "./pages/WorkOrders";
-import PublicDemo from "./pages/PublicDemo";
-import PendingOperations from "./pages/PendingOperations";
+const CustomerProfile = lazy(() => import("./pages/CustomerProfile"));
+const Customers = lazy(() => import("./pages/Customers"));
+const Cash = lazy(() => import("./pages/Cash"));
+const Home = lazy(() => import("./pages/Home"));
+const Inventory = lazy(() => import("./pages/Inventory"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Reminders = lazy(() => import("./pages/Reminders"));
+const Reports = lazy(() => import("./pages/Reports"));
+const TechnicianPayroll = lazy(() => import("./pages/TechnicianPayroll"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Visits = lazy(() => import("./pages/Visits"));
+const TechnicianPreview = lazy(() => import("./pages/TechnicianPreview"));
+const TechnicianLogin = lazy(() => import("./pages/TechnicianLogin"));
+const TechnicianLocations = lazy(() => import("./pages/TechnicianLocations"));
+const AllowedTechnicians = lazy(() => import("./pages/AllowedTechnicians"));
+const WorkOrders = lazy(() => import("./pages/WorkOrders"));
+const PublicDemo = lazy(() => import("./pages/PublicDemo"));
+const PendingOperations = lazy(() => import("./pages/PendingOperations"));
 
 function AdminOnly({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -114,7 +114,8 @@ function Router() {
   if (pathname.replace(/\/$/, "") === "/allowed-technicians") return <DashboardLayout><AdminAllowedTechnicians /></DashboardLayout>;
   if (pathname.replace(/\/$/, "") === "/pending-operations") return <DashboardLayout><AdminPendingOperations /></DashboardLayout>;
   return (
-    <DashboardLayout>
+    <Suspense fallback={<section className="mx-auto flex min-h-[40vh] max-w-xl items-center justify-center px-6 py-16 text-center" dir="rtl"><div className="rounded-2xl border border-teal-100 bg-white px-6 py-5 shadow-sm"><div className="mx-auto mb-3 h-8 w-8 animate-pulse rounded-full bg-teal-100" /><p className="font-bold text-slate-800">جارٍ فتح الصفحة…</p></div></section>}>
+      <DashboardLayout>
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/customers/:id" component={CustomerProfile} />
@@ -131,7 +132,8 @@ function Router() {
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>
-    </DashboardLayout>
+      </DashboardLayout>
+    </Suspense>
   );
 }
 
@@ -141,7 +143,9 @@ export default function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster richColors position="top-center" />
-          <Router />
+          <Suspense fallback={<section className="mx-auto flex min-h-screen items-center justify-center px-6 py-16 text-center" dir="rtl"><div className="rounded-2xl border border-teal-100 bg-white px-6 py-5 shadow-sm"><div className="mx-auto mb-3 h-8 w-8 animate-pulse rounded-full bg-teal-100" /><p className="font-bold text-slate-800">جارٍ فتح التطبيق…</p></div></section>}>
+            <Router />
+          </Suspense>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
