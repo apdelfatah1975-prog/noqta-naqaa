@@ -38,6 +38,7 @@ import {
   FileBarChart,
   WalletCards,
   Droplets,
+  Sparkles,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -252,8 +253,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       <Sidebar side="right" collapsible="icon" className="border-l border-teal-950/8 bg-[#063c3a] text-white">
         <SidebarHeader className="h-24 border-b border-white/10 px-3 py-4">
           <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-teal-800 shadow-lg shadow-black/10">
-              <Droplets className="h-6 w-6" strokeWidth={2.3} />
+            <div className="relative grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-white via-teal-50 to-cyan-100 text-teal-800 shadow-lg shadow-black/15 ring-1 ring-white/60">
+              <span className="absolute inset-1 rounded-xl border border-teal-200/70" aria-hidden="true" />
+              <Droplets className="relative z-10 h-6 w-6 drop-shadow-sm" strokeWidth={2.3} />
+              <Sparkles className="absolute -right-1 -top-1 z-20 h-3.5 w-3.5 text-cyan-200 drop-shadow-sm" strokeWidth={2.4} aria-hidden="true" />
             </div>
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
               <p className="font-extrabold leading-5">نقطة نقاء</p>
