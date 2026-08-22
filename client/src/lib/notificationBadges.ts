@@ -5,5 +5,6 @@ export function countPendingReminders(reminders: Array<unknown> | null | undefin
 }
 
 export function countPendingWorkOrders(orders: Array<{ status: string }> | null | undefined): number {
-  return orders?.filter(order => pendingWorkOrderStatuses.has(order.status)).length ?? 0;
+  if (!Array.isArray(orders)) return 0;
+  return orders.filter(order => pendingWorkOrderStatuses.has(order.status)).length;
 }
