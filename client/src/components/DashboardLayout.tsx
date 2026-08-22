@@ -57,6 +57,7 @@ import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { AutomaticReminderNotifications } from "./AutomaticReminderNotifications";
 import { InstallAppButton } from "./InstallAppButton";
 import { OfflineSyncManager } from "./OfflineSyncManager";
+import { OfflineStatusIndicator } from "./OfflineStatusIndicator";
 import { countPendingReminders, countPendingWorkOrders } from "@/lib/notificationBadges";
 import { formatLastRefreshTime, getAutoRefreshSettings, isEditingFormElement, setAutoRefreshSettings, type AutoRefreshIntervalMinutes } from "@/lib/autoRefresh";
 
@@ -344,7 +345,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               <h2 className="truncate text-sm font-extrabold leading-6 text-foreground sm:text-base sm:leading-7">{activeMenuItem.label}</h2>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+          <div className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-1.5">
+            <OfflineStatusIndicator />
             <button
               type="button"
               onClick={() => void refreshData()}

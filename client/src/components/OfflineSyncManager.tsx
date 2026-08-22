@@ -50,6 +50,7 @@ export function OfflineSyncManager() {
     if (!user || !navigator.onLine || syncingRef.current) return;
     syncingRef.current = true;
     setSyncing(true);
+    window.dispatchEvent(new CustomEvent("purepoint-offline-sync-start"));
     setSyncFailed(false);
     let syncedCount = 0;
     let batchFailed = false;
@@ -193,6 +194,7 @@ export function OfflineSyncManager() {
     }
     setSyncing(false);
     syncingRef.current = false;
+    window.dispatchEvent(new CustomEvent("purepoint-offline-sync-finished"));
     refreshCount();
     if (syncedCount > 0 && !batchFailed) {
       toast.success(`تمت مزامنة ${syncedCount} ${syncedCount === 1 ? "عملية" : "عمليات"} بنجاح بعد عودة الإنترنت.`);
@@ -209,21 +211,31 @@ export function OfflineSyncManager() {
   }, [deleteCash, deleteInventoryItem, deleteInventoryMovement, deleteVisit, refreshCount, syncCash, syncCustomer, syncInventoryItem, syncInventoryMovement, syncVisit, syncWorkOrderUpdate, user, utils]);
 
   useEffect(() => {
-    const goOnline = () => { setOnline(true); void syncPendingOperations(); };
+    const requestBackgroundSync = () => {
+      if (!("serviceWorker" in navigator) || !navigator.onLine) return;
+      void navigator.serviceWorker.ready.then(registration => {
+        const syncManager = (registration as ServiceWorkerRegistration & { sync?: { register: (tag: string) => Promise<void> } }).sync;
+        return syncManager?.register("purepoint-offline-sync");
+      }).catch(() => undefined);
+    };
+    const goOnline = () => { setOnline(true); requestBackgroundSync(); void syncPendingOperations(); };
     const goOffline = () => setOnline(false);
-    const retryRequested = () => { void syncPendingOperations(); };
-    const queueChanged = () => refreshCount();
+    const retryRequested = () => { requestBackgroundSync(); void syncPendingOperations(); };
+    const serviceWorkerMessage = (event: MessageEvent) => { if (event.data?.type === "purepoint-offline-sync-request") void syncPendingOperations(); };
+    const queueChanged = () => { refreshCount(); requestBackgroundSync(); };
     refreshCount();
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
     window.addEventListener("purepoint-offline-sync-request", retryRequested);
     window.addEventListener("purepoint-offline-queue-changed", queueChanged);
-    if (navigator.onLine) void syncPendingOperations();
+    navigator.serviceWorker?.addEventListener("message", serviceWorkerMessage);
+    if (navigator.onLine) { requestBackgroundSync(); void syncPendingOperations(); }
     return () => {
       window.removeEventListener("online", goOnline);
       window.removeEventListener("offline", goOffline);
       window.removeEventListener("purepoint-offline-sync-request", retryRequested);
       window.removeEventListener("purepoint-offline-queue-changed", queueChanged);
+      navigator.serviceWorker?.removeEventListener("message", serviceWorkerMessage);
     };
   }, [refreshCount, syncPendingOperations]);
 

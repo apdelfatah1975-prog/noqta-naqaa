@@ -64,6 +64,15 @@ self.addEventListener("fetch", event => {
   );
 });
 
+self.addEventListener("sync", event => {
+  if (event.tag !== "purepoint-offline-sync") return;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(openClients => {
+      openClients.forEach(client => client.postMessage({ type: "purepoint-offline-sync-request" }));
+    }),
+  );
+});
+
 self.addEventListener("notificationclick", event => {
   event.notification.close();
   const targetUrl = event.notification.data?.url || "/reminders";
