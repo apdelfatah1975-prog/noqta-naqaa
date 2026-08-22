@@ -84,6 +84,36 @@ describe("واجهات إدارة فلاتر المياه", () => {
     expect(insertCalls.filter(call => call.table === reminders)).toHaveLength(1);
   });
 
+  it("يمرر قياسات TDS الاختيارية إلى INSERT الزيارة", async () => {
+    const insertCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({ limit: async () => [{ id: 7, ownerId: 1, name: "عميل اختبار" }] }),
+        }),
+      }),
+      insert: (table: unknown) => ({
+        values: async (values: Record<string, unknown>) => {
+          insertCalls.push({ table, values });
+          return [{ insertId: table === visits ? 56 : 0 }];
+        },
+      }),
+      update: () => ({
+        set: () => ({ where: async () => undefined }),
+      }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+    await caller.filters.visits.create({
+      customerId: 7,
+      visitType: "maintenance",
+      visitDate: new Date("2026-01-01T09:00:00.000Z"),
+      tdsIn: 420,
+      tdsOut: 38,
+    });
+    expect(insertCalls.find(call => call.table === visits)?.values).toMatchObject({ tdsIn: 420, tdsOut: 38 });
+  });
+
   it("ينشئ تذكيرًا بعد 120 يومًا عند تسجيل تركيب أو صيانة فقط", async () => {
     const insertCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
     const reminderUpdates: Array<{ table: unknown; values: Record<string, unknown> }> = [];
