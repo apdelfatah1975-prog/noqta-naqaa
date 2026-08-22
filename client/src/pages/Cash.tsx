@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { cacheOfflineCash, getOfflineCash, getOfflineSession, queueOfflineCash, queueOfflineDelete } from "@/lib/offlineSync";
 import { moveToTrash } from "@/lib/trashBin";
 import { formatAppMoney } from "@/lib/appSettings";
+import { extractArray } from "@/lib/dataNormalization";
 
 type Currency = "SAR";
 type IncomeFilter = "all" | "service" | "installation" | "maintenance";
@@ -25,7 +26,7 @@ function filterCashLocally(source: any, filters: { incomeFilter: IncomeFilter; c
   if (!source) return source;
   const normalize = (value: unknown) => String(value ?? "").trim().toLocaleLowerCase("ar");
   const searchTerm = normalize(filters.search);
-  const transactions = (source.transactions ?? []).filter((transaction: any) => {
+  const transactions = extractArray<any>(source.transactions).filter((transaction: any) => {
     const type = transaction.transactionType;
     const category = String(transaction.category ?? "");
     const recipient = String(transaction.recipientName ?? "");
@@ -81,6 +82,10 @@ export default function Cash() {
   } as unknown as NonNullable<typeof cashQuery.data>;
   const locallyFilteredCash = useMemo(() => cachedCash ? filterCashLocally(cachedCash, cashQueryInput) : null, [cachedCash, cashQueryInput]);
   const data = cashQuery.data ?? locallyFilteredCash ?? emptyCash;
+  const safeTransactions = extractArray<any>((data as any)?.transactions);
+  const safeAvailableCategories = extractArray<string>((data as any)?.availableCategories);
+  const safeAvailableTechnicians = extractArray<string>((data as any)?.availableTechnicians);
+  const safeAvailableItemNames = extractArray<string>((data as any)?.availableItemNames);
   const isLoading = cashQuery.isLoading && !cashQuery.data && !cachedCash;
   useEffect(() => {
     if (cashQuery.data && owner) cacheOfflineCash(owner.id, cashQuery.data);
@@ -155,7 +160,7 @@ export default function Cash() {
         const sign = transactionType === "income" ? 1 : -1;
         const currentSummary = current.summaries?.SAR ?? { incomeTotal: 0, expenseTotal: 0, balance: 0 };
         const nextSummary = { ...currentSummary, incomeTotal: currentSummary.incomeTotal + (transactionType === "income" ? input.amount : 0), expenseTotal: currentSummary.expenseTotal + (transactionType === "expense" ? input.amount : 0), balance: currentSummary.balance + sign * input.amount };
-        cacheOfflineCash(owner.id, { ...current, transactions: [localTransaction, ...current.transactions], incomeTotal: nextSummary.incomeTotal, expenseTotal: nextSummary.expenseTotal, balance: nextSummary.balance, summaries: { ...current.summaries, SAR: nextSummary } });
+        cacheOfflineCash(owner.id, { ...current, transactions: [localTransaction, ...extractArray<any>(current.transactions)], incomeTotal: nextSummary.incomeTotal, expenseTotal: nextSummary.expenseTotal, balance: nextSummary.balance, summaries: { ...current.summaries, SAR: nextSummary } });
       }
       toast.success("تم حفظ العملية محليًا وستتم مزامنتها عند عودة الإنترنت");
       setOpen(false); setAmount(""); setCategory(""); setRecipientName(""); setNotes("");

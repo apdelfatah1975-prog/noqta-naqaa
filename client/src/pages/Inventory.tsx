@@ -13,6 +13,7 @@ import { cacheOfflineCash, cacheOfflineInventory, getOfflineCash, getOfflineInve
 import { moveToTrash } from "@/lib/trashBin";
 import { canRemoveInventoryCategory, getInventoryCategoryOptions, INVENTORY_CATEGORY_OPTIONS, INVENTORY_CATEGORY_STORAGE_KEY, readCustomInventoryCategories } from "@/lib/inventoryCategories";
 import { formatAppMoney } from "@/lib/appSettings";
+import { extractArray } from "@/lib/dataNormalization";
 
 function shouldCreateOfflinePurchase(quantity: number, unitCost: number) { return quantity > 0 && unitCost > 0; }
 
@@ -28,8 +29,8 @@ export default function Inventory() {
   const rawInventory = inventoryQuery.data ?? cachedInventory;
   const data = {
     ...(rawInventory && typeof rawInventory === "object" ? rawInventory : {}),
-    items: Array.isArray((rawInventory as any)?.items) ? (rawInventory as any).items : [],
-    movements: Array.isArray((rawInventory as any)?.movements) ? (rawInventory as any).movements : [],
+    items: extractArray<any>((rawInventory as any)?.items),
+    movements: extractArray<any>((rawInventory as any)?.movements),
   } as NonNullable<typeof inventoryQuery.data>;
   const isLoading = inventoryQuery.isLoading && !inventoryQuery.data && !cachedInventory;
   const isError = false;
@@ -177,7 +178,7 @@ export default function Inventory() {
     };
     cacheOfflineCash(owner.id, {
       ...current,
-      transactions: [localTransaction, ...(current.transactions ?? [])],
+      transactions: [localTransaction, ...extractArray<any>(current.transactions)],
       expenseTotal: nextSummary.expenseTotal,
       balance: nextSummary.balance,
       summaries: { ...current.summaries, SAR: nextSummary },
@@ -194,7 +195,7 @@ export default function Inventory() {
     if (Object.keys(errors).length) { firstInvalidField(event.currentTarget as HTMLFormElement); return; }
     const input = { name: itemName, category: itemCategory.trim() || "عام", unit: itemUnit.trim() || "قطعة", reorderLevel: Number(reorderLevel || 0), defaultUnitCost: Math.round(Number(defaultUnitCost || 0)), openingQuantity: Number(openingQuantity || 0), notes: itemNotes || null };
     if (!navigator.onLine && owner) {
-      const existingItem = (data.items as any[]).find(item => String(item.name).trim().toLocaleLowerCase() === item.name.trim().toLocaleLowerCase());
+      const existingItem = extractArray<any>(data.items).find(item => String(item.name).trim().toLocaleLowerCase() === item.name.trim().toLocaleLowerCase());
       if (existingItem) {
         if (input.openingQuantity <= 0) {
           toast.info("الصنف موجود بالفعل؛ أدخل كمية أكبر من صفر لإضافة وارد.");

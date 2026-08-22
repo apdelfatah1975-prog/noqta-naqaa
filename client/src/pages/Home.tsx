@@ -178,11 +178,6 @@ export default function Home() {
           <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">كل عملياتك في مكان واحد</h1>
           <p className="mt-2 text-sm text-teal-50/80">تابع الزيارات والعملاء والمخزن بسرعة ووضوح.</p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button onClick={() => setLocation("/cash?entry=expense")} variant="outline" className="h-11 rounded-xl border-white/40 bg-white/10 px-5 font-bold text-white hover:bg-white/20 hover:text-white">
-            <CircleDollarSign className="ml-2 h-5 w-5" /> تسجيل مصروف
-          </Button>
-        </div>
       </section>
 
       <section className={`soft-card flex flex-col gap-3 border px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${online ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/80"}`} role="status" aria-live="polite">
@@ -196,17 +191,27 @@ export default function Home() {
         <button type="button" onClick={saveLocalSnapshot} className={`rounded-full px-3 py-1.5 text-xs font-extrabold transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${pendingCount > 0 ? "bg-sky-100 text-sky-800 hover:bg-sky-200" : online ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" : "bg-amber-100 text-amber-800 hover:bg-amber-200"}`} aria-label="حفظ البيانات الحالية محليًا">{pendingCount > 0 ? "حفظ محلي الآن" : online ? "حفظ محلي" : "حفظ محلي الآن"}</button>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        <button type="button" onClick={() => setLocation("/customers/new")} aria-label="تسجيل عميل جديد" className="soft-card group flex items-center gap-4 border border-teal-200 bg-gradient-to-l from-teal-50 to-white p-5 text-right transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(13,82,76,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-teal-700 text-white shadow-lg shadow-teal-900/10"><UserPlus className="h-5 w-5" /></span>
-          <span className="min-w-0 flex-1"><span className="block text-base font-extrabold text-teal-950">تسجيل عميل جديد</span><span className="mt-1 block text-xs font-semibold text-teal-700">فتح نموذج العميل مباشرة</span></span>
-          <ChevronLeft className="h-5 w-5 text-teal-700 transition group-hover:translate-x-[-2px]" />
-        </button>
-        <button type="button" onClick={() => setLocation("/customers/visit")} aria-label="تسجيل زيارة جديدة" className="soft-card group flex items-center gap-4 border border-sky-200 bg-gradient-to-l from-sky-50 to-white p-5 text-right transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(14,116,144,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-900/10"><ClipboardList className="h-5 w-5" /></span>
-          <span className="min-w-0 flex-1"><span className="block text-base font-extrabold text-sky-950">تسجيل زيارة جديدة</span><span className="mt-1 block text-xs font-semibold text-sky-700">فتح نموذج الزيارة مباشرة</span></span>
-          <ChevronLeft className="h-5 w-5 text-sky-700 transition group-hover:translate-x-[-2px]" />
-        </button>
+      <section aria-labelledby="quick-actions-title">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div><h2 id="quick-actions-title" className="text-lg font-extrabold text-teal-950">إجراءات سريعة</h2><p className="mt-1 text-xs font-semibold text-muted-foreground">ابدأ العملية الأساسية من مكان واحد</p></div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <button type="button" onClick={() => setLocation("/customers/new")} aria-label="تسجيل عميل جديد" className="soft-card group flex min-h-28 items-center gap-3 border border-teal-200 bg-gradient-to-l from-teal-50 to-white p-4 text-right transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(13,82,76,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-teal-700 text-white shadow-lg shadow-teal-900/10"><UserPlus className="h-5 w-5" /></span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-extrabold text-teal-950 sm:text-base">تسجيل عميل جديد</span><span className="mt-1 block text-xs font-semibold text-teal-700">فتح نموذج العميل</span></span>
+            <ChevronLeft className="h-5 w-5 shrink-0 text-teal-700 transition group-hover:translate-x-[-2px]" />
+          </button>
+          <button type="button" onClick={() => setLocation("/customers/visit")} aria-label="تسجيل زيارة جديدة" className="soft-card group flex min-h-28 items-center gap-3 border border-sky-200 bg-gradient-to-l from-sky-50 to-white p-4 text-right transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(14,116,144,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-900/10"><ClipboardList className="h-5 w-5" /></span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-extrabold text-sky-950 sm:text-base">تسجيل زيارة جديدة</span><span className="mt-1 block text-xs font-semibold text-sky-700">فتح نموذج الزيارة</span></span>
+            <ChevronLeft className="h-5 w-5 shrink-0 text-sky-700 transition group-hover:translate-x-[-2px]" />
+          </button>
+          <button type="button" onClick={() => setLocation("/cash?entry=expense")} aria-label="تسجيل مصروف" className="soft-card group flex min-h-28 items-center gap-3 border border-amber-200 bg-gradient-to-l from-amber-50 to-white p-4 text-right transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(180,83,9,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-900/10"><CircleDollarSign className="h-5 w-5" /></span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-extrabold text-amber-950 sm:text-base">تسجيل مصروف</span><span className="mt-1 block text-xs font-semibold text-amber-800">تسجيل حركة مالية</span></span>
+            <ChevronLeft className="h-5 w-5 shrink-0 text-amber-700 transition group-hover:translate-x-[-2px]" />
+          </button>
+        </div>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">

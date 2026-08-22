@@ -416,7 +416,7 @@ export function getOfflineInventory<T>(ownerId: number) {
 }
 
 export function getPendingVisitDeletes(ownerId: number) {
-  return readJson<PendingOfflineDelete[]>(queueKey(VISIT_DELETE_QUEUE_PREFIX, ownerId), []);
+  return extractArray<PendingOfflineDelete>(readJson<unknown>(queueKey(VISIT_DELETE_QUEUE_PREFIX, ownerId), []));
 }
 
 export function removePendingVisitDelete(ownerId: number, clientOperationId: string) {
@@ -424,7 +424,7 @@ export function removePendingVisitDelete(ownerId: number, clientOperationId: str
 }
 
 export function getPendingCash(ownerId: number) {
-  return readJson<Array<PendingCashTransaction | PendingOfflineDelete>>(queueKey(CASH_QUEUE_PREFIX, ownerId), []);
+  return extractArray<PendingCashTransaction | PendingOfflineDelete>(readJson<unknown>(queueKey(CASH_QUEUE_PREFIX, ownerId), []));
 }
 
 export function queueOfflineCash(ownerId: number, input: Omit<PendingCashTransaction, "clientOperationId" | "createdAt" | "entity">) {
@@ -438,7 +438,7 @@ export function removePendingCash(ownerId: number, clientOperationId: string) {
 }
 
 export function getPendingInventory(ownerId: number) {
-  return readJson<Array<PendingInventoryItem | PendingInventoryMovement | PendingOfflineDelete>>(queueKey(INVENTORY_QUEUE_PREFIX, ownerId), []);
+  return extractArray<PendingInventoryItem | PendingInventoryMovement | PendingOfflineDelete>(readJson<unknown>(queueKey(INVENTORY_QUEUE_PREFIX, ownerId), []));
 }
 
 export function queueOfflineInventoryItem(ownerId: number, input: Omit<PendingInventoryItem, "clientOperationId" | "createdAt" | "entity" | "localId">) {
