@@ -63,4 +63,13 @@ describe("التنبيه التلقائي للمواعيد", () => {
     await waitFor(() => expect(mocks.playTone).toHaveBeenCalledOnce());
     expect(mocks.show).not.toHaveBeenCalled();
   });
+
+  it("يعامل الاستجابات غير المصفوفية كقوائم فارغة دون انهيار", async () => {
+    mocks.alerts.mockReturnValue({ data: { unexpected: true } });
+    mocks.workOrders.mockReturnValue({ data: { unexpected: true } });
+
+    expect(() => render(<AutomaticReminderNotifications />)).not.toThrow();
+    await waitFor(() => expect(mocks.show).not.toHaveBeenCalled());
+    expect(mocks.showWorkOrder).not.toHaveBeenCalled();
+  });
 });

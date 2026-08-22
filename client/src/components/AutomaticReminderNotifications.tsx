@@ -9,7 +9,8 @@ import {
   vibrateNotification,
 } from "@/lib/deviceNotifications";
 import { trpc } from "@/lib/trpc";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { extractArray } from "@/lib/dataNormalization";
 
 const WORK_ORDER_SEEN_KEY = "purepoint-work-order-notification-seen";
 
@@ -32,11 +33,13 @@ export function AutomaticReminderNotifications() {
     refetchInterval: 60_000,
     refetchIntervalInBackground: true,
   });
+  const safeReadyAlerts = useMemo(() => extractArray<typeof readyAlerts extends (infer T)[] | undefined ? T : unknown>(readyAlerts), [readyAlerts]);
+  const safeWorkOrders = useMemo(() => extractArray<WorkOrderNotificationRow>(workOrders), [workOrders]);
 
   useEffect(() => {
-    if (!readyAlerts?.length) return;
+    if (!safeReadyAlerts.length) return;
     const permissionGranted = getDeviceNotificationPermission() === "granted";
-    for (const alert of readyAlerts) {
+    for (const alert of safeReadyAlerts) {
       const dayKey = new Date().toLocaleDateString("en-CA");
       const key = `water-alert-${alert.id}-${dayKey}`;
       const soundKey = `${key}-sound`;
@@ -52,11 +55,14 @@ export function AutomaticReminderNotifications() {
         if (sent) localStorage.setItem(key, "sent");
       });
     }
-  }, [readyAlerts]);
+  }, [safeReadyAlerts]);
 
   useEffect(() => {
-    if (!workOrders) return;
-    const pendingOrders = (workOrders as WorkOrderNotificationRow[]).filter(isPendingWorkOrder);
+    if (!safeWorkOrders.length) {
+      localStorage.setItem(WORK_ORDER_SEEN_KEY, "");
+      return;
+    }
+    const pendingOrders = safeWorkOrders.filter(isPendingWorkOrder);
     const currentIds = pendingOrders.map(order => String(order.id));
     const stored = localStorage.getItem(WORK_ORDER_SEEN_KEY);
     const previousIds = stored ? new Set(stored.split(",").filter(Boolean)) : null;
@@ -75,7 +81,7 @@ export function AutomaticReminderNotifications() {
         if (sent) localStorage.setItem(key, "sent");
       });
     }
-  }, [workOrders]);
+  }, [safeWorkOrders]);
 
   return null;
 }
