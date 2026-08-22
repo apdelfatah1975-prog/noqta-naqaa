@@ -218,6 +218,20 @@
       "when": 1787348417486,
       "tag": "0030_flippant_glorian",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "5",
+      "when": 1787366461502,
+      "tag": "0031_add_technician_menu_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1787366832114,
+      "tag": "0032_repair_technician_menu_permissions",
+      "breakpoints": true
     }
   ]
 }

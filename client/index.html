@@ -16,7 +16,7 @@
     <script>
       // اختَر manifest الفني قبل تشغيل التطبيق حتى لا يثبت الهاتف نسخة الإدارة عند فتح رابط الفني.
       if (window.location.pathname.startsWith('/technician-')) {
-        document.querySelector('link[rel="manifest"]').setAttribute('href', '/technician-manifest.webmanifest');
+        document.querySelector('link[rel="manifest"]').setAttribute('href', '/technician-app/technician-manifest.webmanifest');
       }
     </script>
     <link rel="icon" href="/app-icon.svg" type="image/svg+xml" />

@@ -79,3 +79,13 @@
 أضيف مسار `GET /api/ping` في خادم Express، وهو يعيد JSON خفيفاً يتضمن `ok: true` واسم الخدمة والطابع الزمني ولا يلمس قاعدة البيانات. كما أضيف ملف `.github/workflows/keep-render-awake.yml` بجدولة GitHub Actions كل عشر دقائق (`*/10 * * * *`) مع إعادة المحاولة ومهلة اتصال محددة، ويستهدف `https://purepoint.onrender.com/api/ping`.
 
 نجح الاختبار المحلي للمسار، وفحص TypeScript، واختبارات Vitest، وبناء الإنتاج. ملف GitHub Action موجود في المشروع، لكن تشغيله فعلياً على مستودع `apdelfatah1975-prog/noqta-naqaa` يتطلب رفعه إلى ذلك المستودع؛ جلسة التطوير الحالية لا تملك صلاحية GitHub تلقائية. كما أن هذا النوع من الطلبات يقلل الخمول لكنه لا يلغي سياسات Render أو حدود الخطة المجانية إذا غيّرتها المنصة.
+
+## GitHub keep-awake workflow — تحديث 22 أغسطس 2026
+- تم تثبيت ملف `keep-render-awake.yml` داخل `.github/workflows` في الفرع `main` ضمن الالتزام `7778c5a55d8f2db10fb64262cde22908944d6d02`.
+- تم رفع أرشيف `PurePoint-source-ping.tar.gz` ضمن الالتزام نفسه، ويحتوي على `GET /api/ping` في `server/_core/index.ts` و`server/ping.ts`.
+- رابط الالتزام: https://github.com/apdelfatah1975-prog/noqta-naqaa/commit/7778c5a55d8f2db10fb64262cde22908944d6d02
+- تنبيه: Render ما زال يقرأ اسم `PurePoint-source-latest.tar.gz` حسب `render.yaml`؛ لذلك يلزم استبدال هذا الملف بالنسخة المحدثة أو تعديل `render.yaml` قبل أن يظهر `/api/ping` في الخدمة المنشورة.
+
+## فحص تثبيت تطبيق الفني — 2026-08-22
+
+تم فحص النسخة المنشورة. الرابطان `/technician-app/technician-manifest.webmanifest` و`/technician-app/sw.js` يعيدان HTTP 200. يستخدم manifest مسار بدء `/technician-app/login` ونطاق `/technician-app/` ووضع `standalone`. ملف Service Worker يقتصر على نطاق `/technician-app/`. لذلك يلزم فتح الرابط في Chrome مباشرة، لا داخل متصفح واتساب أو متصفح مضمّن، ثم اختيار التثبيت من قائمة المتصفح.
