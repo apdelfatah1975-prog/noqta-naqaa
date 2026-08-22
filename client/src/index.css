@@ -143,8 +143,11 @@
   .field-label { font-size: 1rem !important; line-height: 1.7 !important; letter-spacing: 0.012em !important; }
   .field-input { min-height: 3rem; height: 3rem; font-size: 1rem !important; line-height: 1.6 !important; letter-spacing: 0.012em !important; }
   .field-textarea { min-height: 7rem; font-size: 1rem !important; line-height: 1.8 !important; letter-spacing: 0.012em !important; }
-  button, [role="button"], a[href], select { letter-spacing: 0.008em; }
+  button, [role="button"], a[href], select { min-height: 3rem; font-size: 1rem; font-weight: 700; letter-spacing: 0.008em; }
+  button svg, [role="button"] svg, a[href] svg { flex-shrink: 0; }
   .mobile-readable { font-size: 1rem !important; line-height: 1.75 !important; letter-spacing: 0.012em !important; }
+  .dashboard-card, .soft-card { padding-inline: 1rem; }
+  input, textarea, select { font-weight: 600; }
 }
 
 
