@@ -1,0 +1,16 @@
+{
+  "name": "نقطة نقاء - أوامر الفني",
+  "short_name": "أوامر الفني",
+  "description": "تطبيق مستقل لعرض أوامر الشغل المسندة للفني وتحديث حالتها",
+  "start_url": "/technician-app/login",
+  "scope": "/technician-app/",
+  "display": "standalone",
+  "dir": "rtl",
+  "lang": "ar",
+  "theme_color": "#0f766e",
+  "background_color": "#f7faf9",
+  "icons": [
+    { "src": "/technician-app/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/technician-app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
