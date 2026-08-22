@@ -99,6 +99,27 @@ describe("تفاصيل المنصرف في المخزون", () => {
     expect(dialog.getByText("محمد الفني")).toBeTruthy();
   });
 
+  it("يغلق نافذة تفاصيل الصنف بزر الإغلاق العائم", () => {
+    render(<Inventory />);
+    fireEvent.click(screen.getAllByRole("button", { name: "شمعة كربون 10 بوصة" })[0]);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "إغلاق تفاصيل الصنف" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("يغلق نافذة تفاصيل الصنف عند النقر خارج البطاقة", async () => {
+    render(<Inventory />);
+    fireEvent.click(screen.getAllByRole("button", { name: "شمعة كربون 10 بوصة" })[0]);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    const overlay = document.querySelector('[data-slot="dialog-overlay"]');
+    expect(overlay).toBeTruthy();
+    // Radix installs its document-level listener on the next task after mount.
+    await new Promise(resolve => setTimeout(resolve, 0));
+    // Dispatching on body matches a real pointerdown outside the dialog content.
+    fireEvent.pointerDown(document.body);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
   it("يعرض مسار إضافة الوارد للصنف الموجود لتحديث رصيده", () => {
     render(<Inventory />);
     expect(screen.getAllByRole("button", { name: "إضافة وارد" }).length).toBeGreaterThan(0);

@@ -11,6 +11,8 @@ import React from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
+const normalizeList = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : []);
+
 function inventoryVisual(category?: string | null, name?: string) {
   const value = `${category ?? ""} ${name ?? ""}`;
   if (value.includes("مبرد") || value.includes("ثلاج")) return { icon: Refrigerator, tone: "bg-sky-100 text-sky-700", label: "مبردة" };
@@ -87,7 +89,17 @@ export default function Home() {
     cacheOfflineDashboard(data);
     setOfflineDashboard(data);
   }, [data]);
-  const displayData = data ?? offlineDashboard;
+  const sourceData = data ?? offlineDashboard;
+  const displayData = sourceData ? {
+    ...sourceData,
+    todayVisits: normalizeList<DashboardData["todayVisits"][number]>(sourceData.todayVisits),
+    upcomingVisits: normalizeList<DashboardData["upcomingVisits"][number]>(sourceData.upcomingVisits),
+    dueReminders: normalizeList<DashboardData["dueReminders"][number]>(sourceData.dueReminders),
+    inventory: {
+      ...sourceData.inventory,
+      items: normalizeList<DashboardData["inventory"]["items"][number]>(sourceData.inventory?.items),
+    },
+  } : null;
   const isLoading = !displayData && dashboardLoading;
   const { data: backupStatus, isLoading: backupLoading } = trpc.filters.backup.status.useQuery(undefined, {
     retry: false,

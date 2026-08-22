@@ -133,7 +133,9 @@ export default function Customers() {
     window.addEventListener("purepoint-settings-changed", onSettingsChange);
     return () => window.removeEventListener("purepoint-settings-changed", onSettingsChange);
   }, []);
-  const displayedCustomers = customers ?? offlineCustomers.map(customer => ({
+  const safeCustomers = Array.isArray(customers) ? customers : [];
+  const safeOfflineCustomers = Array.isArray(offlineCustomers) ? offlineCustomers : [];
+  const displayedCustomers = Array.isArray(customers) ? safeCustomers : safeOfflineCustomers.map(customer => ({
     ...customer,
     address: customer.address ?? null,
     latitude: customer.latitude ?? null,
@@ -152,11 +154,12 @@ export default function Customers() {
     totalCollectedAmount: 0,
     collectedCurrency: "SAR" as const,
   }));
-  const renderedCustomers = useMemo(() => displayedCustomers?.slice(0, visibleCount), [displayedCustomers, visibleCount]);
+  const renderedCustomers = useMemo(() => (Array.isArray(displayedCustomers) ? displayedCustomers.slice(0, visibleCount) : []), [displayedCustomers, visibleCount]);
   useEffect(() => { setVisibleCount(100); }, [search, followUpStatus, sortBy]);
   const activeFilterLabel = ({ all: "كل العملاء", overdue: "العملاء المتأخرون", today: "عملاء موعد اليوم", within_5_days: "المتابعة خلال ٥ أيام", more_than_5_days: "أكثر من ٥ أيام", upcoming: "المتابعة خلال ٥ أيام", regular: "أكثر من ٥ أيام" } as const)[followUpStatus];
   const statusCards = useMemo(() => {
-    const source = statusCustomers ?? (followUpStatus === "all" ? displayedCustomers : offlineCustomers);
+    const safeStatusCustomers = Array.isArray(statusCustomers) ? statusCustomers : null;
+    const source = safeStatusCustomers ?? (followUpStatus === "all" ? (Array.isArray(displayedCustomers) ? displayedCustomers : []) : safeOfflineCustomers);
     const counts = { all: source.length, overdue: 0, today: 0, within_5_days: 0, more_than_5_days: 0 };
     source.forEach(customer => {
       const followUp = (customer as { followUp?: { daysRemaining: number } | null }).followUp;
@@ -170,7 +173,13 @@ export default function Customers() {
     return counts;
   }, [statusCustomers, displayedCustomers, offlineCustomers, followUpStatus]);
 
-  useEffect(() => { if (customers) { cacheOfflineCustomers(customers); setOfflineCustomers(getOfflineCustomers()); } }, [customers]);
+  useEffect(() => {
+    if (Array.isArray(customers)) {
+      cacheOfflineCustomers(customers);
+      const cached = getOfflineCustomers();
+      setOfflineCustomers(Array.isArray(cached) ? cached : []);
+    }
+  }, [customers]);
   useEffect(() => { if (serviceCatalog) { cacheOfflineServiceCatalog(serviceCatalog); setOfflineServiceCatalog(serviceCatalog); } }, [serviceCatalog]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

@@ -45,8 +45,16 @@ export default function Reminders() {
     setOfflineReminders(next);
     cacheOfflineReminders(next);
   }, [dueReminders, alertReminders]);
-  const visibleDueReminders = dueReminders ?? offlineReminders.due ?? [];
-  const visibleAlertReminders = alertReminders ?? offlineReminders.alerts ?? [];
+  const visibleDueReminders = Array.isArray(dueReminders)
+    ? dueReminders
+    : Array.isArray(offlineReminders.due)
+      ? offlineReminders.due
+      : [];
+  const visibleAlertReminders = Array.isArray(alertReminders)
+    ? alertReminders
+    : Array.isArray(offlineReminders.alerts)
+      ? offlineReminders.alerts
+      : [];
   const utils = trpc.useUtils();
   const [, setLocation] = useLocation();
   const [whatsappState, setWhatsAppState] = useState<WhatsAppState>(readWhatsAppState);

@@ -123,6 +123,10 @@ export default function Reports() {
     availableTechnicians: [],
     availableCategories: [],
   };
+  const incomeByCategory = Array.isArray(data.incomeByCategory) ? data.incomeByCategory : [];
+  const expenseByCategory = Array.isArray(data.expenseByCategory) ? data.expenseByCategory : [];
+  const treasuryTransactions = Array.isArray(treasury.transactions) ? treasury.transactions : [];
+  const inventoryItems = Array.isArray(data.inventory?.items) ? data.inventory.items : [];
   useEffect(() => {
     if (query.data && user)
       cacheOfflineReport(user.id, dateFrom, dateTo, query.data);
@@ -152,7 +156,7 @@ export default function Reports() {
     XLSX.utils.book_append_sheet(
       workbook,
       XLSX.utils.json_to_sheet(
-        data.incomeByCategory.map(row => ({
+        incomeByCategory.map(row => ({
           البند: row.label,
           الإجمالي: row.total,
         }))
@@ -162,7 +166,7 @@ export default function Reports() {
     XLSX.utils.book_append_sheet(
       workbook,
       XLSX.utils.json_to_sheet(
-        treasury.transactions.map((row: any) => ({
+        treasuryTransactions.map((row: any) => ({
           التاريخ: dateLabel(row.transactionDate),
           النوع: row.transactionType === "income" ? "إيراد" : "مصروف",
           التصنيف: row.category || "غير مصنف",
@@ -447,7 +451,7 @@ export default function Reports() {
       { البيان: "إجمالي الإيرادات", القيمة: treasury.incomeTotal },
       { البيان: "إجمالي المصروفات", القيمة: treasury.expenseTotal },
       { البيان: "الصافي", القيمة: treasury.balance },
-      { البيان: "عدد الحركات", القيمة: treasury.transactions.length },
+      { البيان: "عدد الحركات", القيمة: treasuryTransactions.length },
     ];
     XLSX.utils.book_append_sheet(
       workbook,
@@ -457,7 +461,7 @@ export default function Reports() {
     XLSX.utils.book_append_sheet(
       workbook,
       XLSX.utils.json_to_sheet(
-        treasury.transactions.map((row: any) => ({
+        treasuryTransactions.map((row: any) => ({
           التاريخ: dateLabel(row.transactionDate),
           النوع: row.transactionType === "income" ? "إيراد" : "مصروف",
           التصنيف: row.category || "غير مصنف",
@@ -489,8 +493,8 @@ export default function Reports() {
       { البيان: "إجمالي الإيرادات", القيمة: money(treasury.incomeTotal) },
       { البيان: "إجمالي المصروفات", القيمة: money(treasury.expenseTotal) },
       { البيان: "الصافي", القيمة: money(treasury.balance) },
-      { البيان: "عدد الحركات", القيمة: number(treasury.transactions.length) },
-      ...treasury.transactions.map((row: any) => ({
+      { البيان: "عدد الحركات", القيمة: number(treasuryTransactions.length) },
+      ...treasuryTransactions.map((row: any) => ({
         البيان: `${dateLabel(row.transactionDate)} — ${row.transactionType === "income" ? "إيراد" : "مصروف"} — ${row.category || "غير مصنف"} — ${row.recipientName || "غير محدد"}`,
         القيمة: `${money(row.amount)} — ${row.notes || "بدون ملاحظات"}`,
       })),
@@ -621,8 +625,8 @@ export default function Reports() {
         }
       : null,
   ].filter(Boolean) as Array<{ tone: string; title: string; text: string }>;
-  const incomeBars = data.incomeByCategory.slice(0, 5);
-  const expenseBars = data.expenseByCategory.slice(0, 5);
+  const incomeBars = incomeByCategory.slice(0, 5);
+  const expenseBars = expenseByCategory.slice(0, 5);
   const periodReconciliation = data.summary.income - data.summary.expense;
   const treasuryBalance = data.summary.treasuryBalance ?? 0;
   const reconciliationMatches = periodReconciliation === data.summary.balance;
@@ -1101,7 +1105,7 @@ export default function Reports() {
                 />
                 <Metric
                   label="صافي الحركات"
-                  helper={`${number(treasury.transactions.length)} حركة بعد الفلترة`}
+                  helper={`${number(treasuryTransactions.length)} حركة بعد الفلترة`}
                   value={money(treasury.balance)}
                 />
               </div>
@@ -1118,8 +1122,8 @@ export default function Reports() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {treasury.transactions.length ? (
-                      treasury.transactions.map((row: any) => (
+                    {treasuryTransactions.length ? (
+                      treasuryTransactions.map((row: any) => (
                         <tr key={row.id}>
                           <td className="px-3 py-3">
                             {dateLabel(row.transactionDate)}
@@ -1312,7 +1316,7 @@ export default function Reports() {
               <div className="grid gap-6 lg:grid-cols-2">
                 <ReportList
                   title="الإيرادات حسب البند"
-                  rows={data.incomeByCategory}
+                  rows={incomeByCategory}
                   moneyRows
                 />
                 <ReportList
@@ -1408,7 +1412,7 @@ export default function Reports() {
                 />
               </div>
               <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {data.inventory.items.map(item => (
+                {inventoryItems.map(item => (
                   <div
                     key={item.name}
                     className="rounded-xl bg-teal-50/60 p-3 text-sm"

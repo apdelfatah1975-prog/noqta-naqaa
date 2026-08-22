@@ -7,6 +7,8 @@ import { cacheOfflineWorkOrders, getOfflineWorkOrders } from "@/lib/offlineSync"
 import { formatAppMoney } from "@/lib/appSettings";
 import { CustomerContactActions } from "@/components/CustomerContactActions";
 
+const normalizeList = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : []);
+
 const serviceOptions = [
   { value: "installation", label: "تركيب فلتر" },
   { value: "maintenance", label: "صيانة" },
@@ -36,9 +38,9 @@ export default function WorkOrders() {
     setOfflineWorkOrders(next);
     cacheOfflineWorkOrders(next);
   }, [customersQuery.data, techniciansQuery.data, ordersQuery.data]);
-  const visibleCustomers = customersQuery.data ?? offlineWorkOrders.customers ?? [];
-  const visibleTechnicians = techniciansQuery.data ?? offlineWorkOrders.technicians ?? [];
-  const visibleOrders = ordersQuery.data ?? offlineWorkOrders.orders ?? [];
+  const visibleCustomers = normalizeList<NonNullable<typeof customersQuery.data>[number]>(customersQuery.data ?? offlineWorkOrders.customers);
+  const visibleTechnicians = normalizeList<NonNullable<typeof techniciansQuery.data>[number]>(techniciansQuery.data ?? offlineWorkOrders.technicians);
+  const visibleOrders = normalizeList<NonNullable<typeof ordersQuery.data>[number]>(ordersQuery.data ?? offlineWorkOrders.orders);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const selectedOrder = visibleOrders.find(order => order.id === selectedOrderId) ?? null;
   const utils = trpc.useUtils();

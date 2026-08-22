@@ -224,11 +224,13 @@ export function clearOfflineState() {
 }
 
 export function cacheOfflineCustomers(customers: OfflineCustomer[]) {
-  writeJson(CUSTOMERS_KEY, customers.map(({ id, manualCode, name, phone, address, latitude, longitude, notes }) => ({ id, manualCode, name, phone, address, latitude, longitude, notes })));
+  const safeCustomers = Array.isArray(customers) ? customers : [];
+  writeJson(CUSTOMERS_KEY, safeCustomers.map(({ id, manualCode, name, phone, address, latitude, longitude, notes }) => ({ id, manualCode, name, phone, address, latitude, longitude, notes })));
 }
 
-export function getOfflineCustomers() {
-  return readJson<OfflineCustomer[]>(CUSTOMERS_KEY, []);
+export function getOfflineCustomers(): OfflineCustomer[] {
+  const cached = readJson<unknown>(CUSTOMERS_KEY, []);
+  return Array.isArray(cached) ? cached as OfflineCustomer[] : [];
 }
 
 export function cacheOfflineServiceCatalog(catalog: OfflineServiceCatalog) {
@@ -239,36 +241,54 @@ export function getOfflineServiceCatalog() {
   return readJson<OfflineServiceCatalog | null>(SERVICE_CATALOG_KEY, null);
 }
 
+const OFFLINE_LIST_FIELDS = [
+  "customers", "technicians", "orders", "due", "alerts", "transactions", "items", "movements",
+  "visits", "reminders", "serviceTypes", "availableCategories", "availableTechnicians", "availableItemNames",
+] as const;
+
+function normalizeCachedSnapshot<T>(value: unknown): T | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const snapshot = { ...(value as Record<string, unknown>) };
+  for (const field of OFFLINE_LIST_FIELDS) {
+    if (field in snapshot && !Array.isArray(snapshot[field])) snapshot[field] = [];
+  }
+  return snapshot as T;
+}
+
+function normalizeCachedList<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value as T[] : [];
+}
+
 export function cacheOfflineReminders<T>(value: T) {
-  writeJson(REMINDERS_KEY, value);
+  writeJson(REMINDERS_KEY, normalizeCachedSnapshot<T>(value));
 }
 
 export function getOfflineReminders<T>() {
-  return readJson<T | null>(REMINDERS_KEY, null);
+  return normalizeCachedSnapshot<T>(readJson<unknown>(REMINDERS_KEY, null));
 }
 
 export function cacheOfflineWorkOrders<T>(value: T) {
-  writeJson(WORK_ORDERS_KEY, value);
+  writeJson(WORK_ORDERS_KEY, normalizeCachedSnapshot<T>(value));
 }
 
 export function getOfflineWorkOrders<T>() {
-  return readJson<T | null>(WORK_ORDERS_KEY, null);
+  return normalizeCachedSnapshot<T>(readJson<unknown>(WORK_ORDERS_KEY, null));
 }
 
 export function cacheOfflineVisits(visits: OfflineVisit[]) {
-  writeJson(VISITS_KEY, visits);
+  writeJson(VISITS_KEY, normalizeCachedList<OfflineVisit>(visits));
 }
 
 export function getOfflineVisits() {
-  return readJson<OfflineVisit[]>(VISITS_KEY, []);
+  return normalizeCachedList<OfflineVisit>(readJson<unknown>(VISITS_KEY, []));
 }
 
 export function cacheOfflineDashboard<T>(dashboard: T) {
-  writeJson(DASHBOARD_KEY, dashboard);
+  writeJson(DASHBOARD_KEY, normalizeCachedSnapshot<T>(dashboard));
 }
 
 export function getOfflineDashboard<T>() {
-  return readJson<T | null>(DASHBOARD_KEY, null);
+  return normalizeCachedSnapshot<T>(readJson<unknown>(DASHBOARD_KEY, null));
 }
 
 export function getPendingCustomers(ownerId: number) {
@@ -349,11 +369,11 @@ export function removePendingWorkOrderProof(ownerId: number, clientOperationId: 
 }
 
 export function cacheOfflineReport<T>(ownerId: number, dateFrom: string, dateTo: string, value: T) {
-  writeJson(`${REPORT_KEY_PREFIX}-${ownerId}-${dateFrom}-${dateTo}`, value);
+  writeJson(`${REPORT_KEY_PREFIX}-${ownerId}-${dateFrom}-${dateTo}`, normalizeCachedSnapshot<T>(value));
 }
 
 export function getOfflineReport<T>(ownerId: number, dateFrom: string, dateTo: string) {
-  return readJson<T | null>(`${REPORT_KEY_PREFIX}-${ownerId}-${dateFrom}-${dateTo}`, null);
+  return normalizeCachedSnapshot<T>(readJson<unknown>(`${REPORT_KEY_PREFIX}-${ownerId}-${dateFrom}-${dateTo}`, null));
 }
 
 export function getLatestOfflineReport<T extends { period?: { dateFrom?: string; dateTo?: string } }>(ownerId: number) {
@@ -375,19 +395,19 @@ export function getLatestOfflineReport<T extends { period?: { dateFrom?: string;
 }
 
 export function cacheOfflineCash<T>(ownerId: number, value: T) {
-  writeJson(ownerDataKey(CASH_KEY_PREFIX, ownerId), value);
+  writeJson(ownerDataKey(CASH_KEY_PREFIX, ownerId), normalizeCachedSnapshot<T>(value));
 }
 
 export function getOfflineCash<T>(ownerId: number) {
-  return readJson<T | null>(ownerDataKey(CASH_KEY_PREFIX, ownerId), null);
+  return normalizeCachedSnapshot<T>(readJson<unknown>(ownerDataKey(CASH_KEY_PREFIX, ownerId), null));
 }
 
 export function cacheOfflineInventory<T>(ownerId: number, value: T) {
-  writeJson(ownerDataKey(INVENTORY_KEY_PREFIX, ownerId), value);
+  writeJson(ownerDataKey(INVENTORY_KEY_PREFIX, ownerId), normalizeCachedSnapshot<T>(value));
 }
 
 export function getOfflineInventory<T>(ownerId: number) {
-  return readJson<T | null>(ownerDataKey(INVENTORY_KEY_PREFIX, ownerId), null);
+  return normalizeCachedSnapshot<T>(readJson<unknown>(ownerDataKey(INVENTORY_KEY_PREFIX, ownerId), null));
 }
 
 export function getPendingVisitDeletes(ownerId: number) {
