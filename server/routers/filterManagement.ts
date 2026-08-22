@@ -124,6 +124,7 @@ const visitItemInput = z.object({
 
 const visitInput = z.object({
   customerId: z.number().int().positive(),
+  phone: z.string().trim().max(32).optional().nullable(),
   visitType: z.enum(visitTypes),
   visitDate: z.date(),
   technicianName: z.string().trim().max(160).optional().nullable(),
@@ -1113,7 +1114,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         }
       }
       const customer = await getOwnedCustomer(ctx.user.id, input.customerId);
-      const { clientOperationId, collectedAmount, collectedCurrency, items, ...visitData } = input;
+      const { clientOperationId, collectedAmount, collectedCurrency, items, phone: _phone, ...visitData } = input;
       const inventoryRows = items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ctx.user.id), inArray(inventoryItems.id, items.map(item => item.inventoryItemId)))) : [];
       const inventoryById = new Map(inventoryRows.map(item => [item.id, item]));
       for (const requested of items) {
