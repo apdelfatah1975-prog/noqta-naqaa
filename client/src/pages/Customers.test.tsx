@@ -204,6 +204,13 @@ describe("ترابط تعديل بيانات العميل", () => {
     localStorage.removeItem("purepoint-offline-customers");
   });
 
+  it("يتعامل مع استجابة العملاء المغلفة داخل data دون انهيار القائمة", () => {
+    mocks.list.mockReturnValue({ data: { data: [{ id: 21, name: "عميل مغلف", phone: "01000000021", address: "عنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000021", followUp: null }] }, isLoading: false, isError: false });
+    render(<Customers />);
+    expect(screen.getAllByText("عميل مغلف")[0]).toBeTruthy();
+    expect(screen.queryByText(/map is not a function|slice is not a function/)).toBeNull();
+  });
+
   it("يمسح الكود اليدوي عند اختيار التوليد التلقائي", () => {
     render(<Customers />);
     fireEvent.click(screen.getByText("إضافة عميل"));

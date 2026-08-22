@@ -8,7 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { customerExcelHeaders, customerRowsForExcel, downloadCustomerImportIssues, downloadCustomerImportTemplate, downloadRowsAsExcel, parseCustomerClipboard, parseCustomerExcel, parseCustomerPdf, withArabicHeaders, type CustomerImportIssue, type CustomerImportRow } from "@/lib/excelExport";
 import { printArabicPdf } from "@/lib/pdfExport";
-import { cacheOfflineCustomers, cacheOfflineInventory, cacheOfflineServiceCatalog, getOfflineCustomers, getOfflineInventory, getOfflineServiceCatalog, getOfflineSession, hasOfflineCustomerName, queueOfflineCustomer, queueOfflineVisit } from "@/lib/offlineSync";
+import { cacheOfflineCustomers, cacheOfflineInventory, cacheOfflineServiceCatalog, getOfflineCustomers, getOfflineInventory, getOfflineServiceCatalog, getOfflineSession, hasOfflineCustomerName, queueOfflineCustomer, queueOfflineVisit, type OfflineServiceCatalog } from "@/lib/offlineSync";
 import { moveToTrash } from "@/lib/trashBin";
 import { formatAppMoney, getAppSettings, saveAppSettings } from "@/lib/appSettings";
 import { parseWhatsAppLocationText } from "@/lib/locationParser";
@@ -27,6 +27,13 @@ function toDateTimeLocal() { const date = new Date(); date.setMinutes(date.getMi
 function parseLocation(value: string) { const parsed = parseWhatsAppLocationText(value); return { latitude: parsed.latitude, longitude: parsed.longitude }; }
 function followUpBadge(daysRemaining: number) { if (daysRemaining < 0) return { label: "متأخر", className: "border-rose-200 bg-rose-100 text-rose-800 hover:bg-rose-100", ariaLabel: "العميل متأخر عن موعد المتابعة" }; if (daysRemaining <= 5) return { label: daysRemaining === 0 ? "قريب · اليوم" : "قريب", className: "border-amber-200 bg-amber-100 text-amber-900 hover:bg-amber-100", ariaLabel: daysRemaining === 0 ? "موعد متابعة العميل قريب وهو اليوم" : "موعد متابعة العميل قريب" }; return { label: "أكثر من ٥ أيام", className: "border-emerald-200 bg-emerald-100 text-emerald-800 hover:bg-emerald-100", ariaLabel: "موعد متابعة العميل بعد أكثر من خمسة أيام" }; }
 const emptyCustomer: CustomerForm = { manualCode: "", name: "", phone: "", address: "", location: "", notes: "", firstVisitType: "installation", firstVisitDate: toDateTimeLocal(), firstTechnicianName: "", firstSalesAgentName: "", firstFilterCount: "1", firstVisitResult: "", firstVisitNotes: "", firstCollectedAmount: "", firstVisitItems: [] };
+
+function normalizeServiceCatalog(response: unknown): OfflineServiceCatalog | null {
+  const source = response && typeof response === "object" && !Array.isArray(response) ? response as Record<string, unknown> : null;
+  const nested = source?.data && typeof source.data === "object" && !Array.isArray(source.data) ? source.data as Record<string, unknown> : source;
+  if (!nested || !Array.isArray(nested.types) || !Array.isArray(nested.mappings) || !Array.isArray(nested.items)) return null;
+  return { types: nested.types as OfflineServiceCatalog["types"], mappings: nested.mappings as OfflineServiceCatalog["mappings"], items: nested.items as OfflineServiceCatalog["items"] };
+}
 
 export function addOrIncrementVisitItem(items: UsedVisitItem[], item: CatalogItem, quantity = 1): UsedVisitItem[] {
   const available = item.currentBalance;
@@ -89,8 +96,8 @@ export default function Customers() {
   const visibleTechnicians = extractArray<NonNullable<typeof techniciansQuery.data>[number]>(techniciansQuery?.data);
   const salesAgentNames = Object.keys(getAppSettings().salesAgents).sort((a, b) => a.localeCompare(b, "ar"));
   const serviceCatalogQuery = trpc.filters.serviceTypes?.list?.useQuery?.();
-  const serviceCatalog = serviceCatalogQuery?.data;
-  const [offlineServiceCatalog, setOfflineServiceCatalog] = useState(() => getOfflineServiceCatalog());
+  const serviceCatalog = normalizeServiceCatalog(serviceCatalogQuery?.data);
+  const [offlineServiceCatalog, setOfflineServiceCatalog] = useState<OfflineServiceCatalog | null>(() => normalizeServiceCatalog(getOfflineServiceCatalog()));
   const effectiveServiceCatalog = serviceCatalog ?? offlineServiceCatalog;
   const [offlineCustomers, setOfflineCustomers] = useState(() => getOfflineCustomers());
   const utils = trpc.useUtils();
@@ -134,9 +141,10 @@ export default function Customers() {
     window.addEventListener("purepoint-settings-changed", onSettingsChange);
     return () => window.removeEventListener("purepoint-settings-changed", onSettingsChange);
   }, []);
-  const safeCustomers = Array.isArray(customers) ? customers : [];
+  const safeCustomers = useMemo(() => extractArray<NonNullable<typeof customers>[number]>(customers), [customers]);
+  const safeStatusCustomers = useMemo(() => extractArray<NonNullable<typeof customers>[number]>(statusCustomers), [statusCustomers]);
   const safeOfflineCustomers = Array.isArray(offlineCustomers) ? offlineCustomers : [];
-  const displayedCustomers = Array.isArray(customers) ? safeCustomers : safeOfflineCustomers.map(customer => ({
+  const displayedCustomers = (Array.isArray(customers) || safeCustomers.length > 0) ? safeCustomers : safeOfflineCustomers.map(customer => ({
     ...customer,
     address: customer.address ?? null,
     latitude: customer.latitude ?? null,
@@ -159,8 +167,8 @@ export default function Customers() {
   useEffect(() => { setVisibleCount(100); }, [search, followUpStatus, sortBy]);
   const activeFilterLabel = ({ all: "كل العملاء", overdue: "العملاء المتأخرون", today: "عملاء موعد اليوم", within_5_days: "المتابعة خلال ٥ أيام", more_than_5_days: "أكثر من ٥ أيام", upcoming: "المتابعة خلال ٥ أيام", regular: "أكثر من ٥ أيام" } as const)[followUpStatus];
   const statusCards = useMemo(() => {
-    const safeStatusCustomers = Array.isArray(statusCustomers) ? statusCustomers : null;
-    const source = safeStatusCustomers ?? (followUpStatus === "all" ? (Array.isArray(displayedCustomers) ? displayedCustomers : []) : safeOfflineCustomers);
+    const statusSource = Array.isArray(statusCustomers) || safeStatusCustomers.length > 0 ? safeStatusCustomers : null;
+    const source = statusSource ?? (followUpStatus === "all" ? (Array.isArray(displayedCustomers) ? displayedCustomers : []) : safeOfflineCustomers);
     const counts = { all: source.length, overdue: 0, today: 0, within_5_days: 0, more_than_5_days: 0 };
     source.forEach(customer => {
       const followUp = (customer as { followUp?: { daysRemaining: number } | null }).followUp;

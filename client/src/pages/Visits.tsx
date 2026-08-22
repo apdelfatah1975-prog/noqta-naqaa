@@ -29,8 +29,10 @@ export default function Visits() {
   const offlineVisits = getOfflineVisits();
   const offlineUser = getOfflineSession();
   const online = navigator.onLine;
-  const visibleCustomers = useMemo(() => extractArray(customers).length ? extractArray(customers) : !online ? extractArray(offlineCustomers) : [], [customers, offlineCustomers, online]);
-  const visits = useMemo(() => extractArray(visitList).length ? extractArray(visitList) : !online ? extractArray(offlineVisits) : [], [offlineVisits, online, visitList]);
+  const normalizedCustomers = useMemo(() => extractArray<VisitRow>(customers), [customers]);
+  const normalizedVisits = useMemo(() => extractArray<VisitRow>(visitList), [visitList]);
+  const visibleCustomers = useMemo(() => normalizedCustomers.length ? normalizedCustomers : !online ? extractArray<VisitRow>(offlineCustomers) : [], [normalizedCustomers, offlineCustomers, online]);
+  const visits = useMemo(() => normalizedVisits.length ? normalizedVisits : !online ? extractArray<VisitRow>(offlineVisits) : [], [normalizedVisits, offlineVisits, online]);
   const pendingVisits = useMemo(() => {
     if (!(!online && offlineUser)) return [];
     const queued = getPendingVisits(offlineUser.id);
@@ -48,16 +50,16 @@ export default function Visits() {
   const deleteVisit = trpc.filters.visits.delete.useMutation({ onSuccess: () => { setDeleteId(null); toast.success("تم حذف الزيارة ونقل نسختها إلى سلة المحذوفات"); }, onError: error => toast.error(error.message || "تعذر حذف الزيارة.") });
   const updateVisit = trpc.filters.visits.updateDetails.useMutation({ onSuccess: async () => { setEditVisit(null); await utils.filters.visits.list.invalidate(); toast.success("تم تصحيح تسجيل الزيارة والخزينة"); }, onError: error => toast.error(error.message || "تعذر تصحيح تسجيل الزيارة.") });
 
-  useEffect(() => { if (Array.isArray(customers)) cacheOfflineCustomers(customers); }, [customers]);
+  useEffect(() => { if (normalizedCustomers.length > 0 || Array.isArray(customers)) cacheOfflineCustomers(normalizedCustomers); }, [customers, normalizedCustomers]);
   useEffect(() => {
     const onSettingsChange = (event: Event) => setCompactMobile(Boolean((event as CustomEvent<{ compactVisitsOnMobile?: boolean }>).detail?.compactVisitsOnMobile));
     window.addEventListener("purepoint-settings-changed", onSettingsChange);
     return () => window.removeEventListener("purepoint-settings-changed", onSettingsChange);
   }, []);
   useEffect(() => {
-    if (!Array.isArray(visitList)) return;
-    cacheOfflineVisits(visitList.map(visit => ({ id: visit.id, customerId: visit.customerId, visitType: visit.visitType, visitDate: new Date(visit.visitDate).toISOString(), technicianName: visit.technicianName, visitResult: visit.visitResult, notes: visit.notes, collectedAmount: visit.collectedAmount, })));
-  }, [visitList]);
+    if (normalizedVisits.length === 0 && !Array.isArray(visitList)) return;
+    cacheOfflineVisits(normalizedVisits.map(visit => ({ id: visit.id, customerId: visit.customerId, visitType: visit.visitType, visitDate: new Date(visit.visitDate).toISOString(), technicianName: visit.technicianName, visitResult: visit.visitResult, notes: visit.notes, collectedAmount: visit.collectedAmount, })));
+  }, [normalizedVisits, visitList]);
 
   const customerMap = useMemo(() => new Map(visibleCustomers.map(customer => [customer.id, customer])), [visibleCustomers]);
   const rows = useMemo(() => filterVisitRows([
