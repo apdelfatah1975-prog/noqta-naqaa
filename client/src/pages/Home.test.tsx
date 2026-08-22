@@ -105,10 +105,10 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     expect(mocks.setLocation).toHaveBeenCalledWith("/work-orders");
   });
 
-  it("تفتح بطاقة تسجيل الزيارة من الإجراء السريع في الصفحة الرئيسية", () => {
+  it("لا تعرض أزرار تسجيل العميل أو الزيارة في الصفحة الرئيسية", () => {
     render(<Home />);
-    fireEvent.click(screen.getByRole("button", { name: "تسجيل زيارة جديدة" }));
-    expect(mocks.setLocation).toHaveBeenCalledWith("/customers/visit");
+    expect(screen.queryByRole("button", { name: "تسجيل عميل جديد" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "تسجيل زيارة جديدة" })).toBeNull();
   });
 
   it("تنبه المستخدم تلقائيًا عند وصول صنف إلى الحد الأدنى", () => {
