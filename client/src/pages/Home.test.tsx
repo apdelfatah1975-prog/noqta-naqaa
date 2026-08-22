@@ -105,10 +105,16 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     expect(mocks.setLocation).toHaveBeenCalledWith("/work-orders");
   });
 
-  it("لا تعرض أزرار تسجيل العميل أو الزيارة في الصفحة الرئيسية", () => {
+  it("تعرض بطاقتي التسجيل وتوجههما للمسارات الصحيحة عند النقر", () => {
     render(<Home />);
-    expect(screen.queryByRole("button", { name: "تسجيل عميل جديد" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "تسجيل زيارة جديدة" })).toBeNull();
+    const customerButton = screen.getByRole("button", { name: "تسجيل عميل جديد" });
+    const visitButton = screen.getByRole("button", { name: "تسجيل زيارة جديدة" });
+    expect(customerButton.hasAttribute("disabled")).toBe(false);
+    expect(visitButton.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(customerButton);
+    expect(mocks.setLocation).toHaveBeenCalledWith("/customers/new");
+    fireEvent.click(visitButton);
+    expect(mocks.setLocation).toHaveBeenCalledWith("/customers/visit");
   });
 
   it("تنبه المستخدم تلقائيًا عند وصول صنف إلى الحد الأدنى", () => {

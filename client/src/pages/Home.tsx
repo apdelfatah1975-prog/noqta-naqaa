@@ -6,7 +6,7 @@ import { printArabicPdf } from "@/lib/pdfExport";
 import { AppSettings, getAppSettings } from "@/lib/appSettings";
 import { getTrashItems } from "@/lib/trashBin";
 import { ReminderAlertBanner } from "@/components/ReminderAlertBanner";
-import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, ClipboardList, CloudDownload, CloudOff, CloudUpload, Download, Droplets, Filter, Info, PackageSearch, Printer, Refrigerator, RefreshCw, Snowflake, Trash2, Upload, UsersRound } from "lucide-react";
+import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, ClipboardList, CloudDownload, CloudOff, CloudUpload, Download, Droplets, Filter, Info, PackageSearch, Printer, Refrigerator, RefreshCw, Snowflake, Trash2, Upload, UserPlus, UsersRound } from "lucide-react";
 import React from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -89,16 +89,19 @@ export default function Home() {
     setOfflineDashboard(data);
   }, [data]);
   const sourceData = data ?? offlineDashboard;
-  const displayData = sourceData ? {
+  const displayData = React.useMemo<DashboardData | null>(() => sourceData ? {
     ...sourceData,
     todayVisits: extractArray<DashboardData["todayVisits"][number]>(sourceData.todayVisits),
     upcomingVisits: extractArray<DashboardData["upcomingVisits"][number]>(sourceData.upcomingVisits),
     dueReminders: extractArray<DashboardData["dueReminders"][number]>(sourceData.dueReminders),
     inventory: {
-      ...sourceData.inventory,
+      ...(sourceData.inventory && typeof sourceData.inventory === "object" ? sourceData.inventory : {}),
+      totalItems: sourceData.inventory?.totalItems ?? 0,
+      lowStockCount: sourceData.inventory?.lowStockCount ?? 0,
+      lowStock: extractArray<DashboardData["inventory"]["lowStock"][number]>(sourceData.inventory?.lowStock),
       items: extractArray<DashboardData["inventory"]["items"][number]>(sourceData.inventory?.items),
     },
-  } : null;
+  } : null, [sourceData]);
   const isLoading = !displayData && dashboardLoading;
   const { data: backupStatus, isLoading: backupLoading } = trpc.filters.backup.status.useQuery(undefined, {
     retry: false,
@@ -176,6 +179,19 @@ export default function Home() {
           </div>
         </div>
         <button type="button" onClick={saveLocalSnapshot} className={`rounded-full px-3 py-1.5 text-xs font-extrabold transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${pendingCount > 0 ? "bg-sky-100 text-sky-800 hover:bg-sky-200" : online ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" : "bg-amber-100 text-amber-800 hover:bg-amber-200"}`} aria-label="حفظ البيانات الحالية محليًا">{pendingCount > 0 ? "حفظ محلي الآن" : online ? "حفظ محلي" : "حفظ محلي الآن"}</button>
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2">
+        <button type="button" onClick={() => setLocation("/customers/new")} aria-label="تسجيل عميل جديد" className="soft-card group flex items-center gap-4 border border-teal-200 bg-gradient-to-l from-teal-50 to-white p-5 text-right transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(13,82,76,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-teal-700 text-white shadow-lg shadow-teal-900/10"><UserPlus className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-base font-extrabold text-teal-950">تسجيل عميل جديد</span><span className="mt-1 block text-xs font-semibold text-teal-700">فتح نموذج العميل مباشرة</span></span>
+          <ChevronLeft className="h-5 w-5 text-teal-700 transition group-hover:translate-x-[-2px]" />
+        </button>
+        <button type="button" onClick={() => setLocation("/customers/visit")} aria-label="تسجيل زيارة جديدة" className="soft-card group flex items-center gap-4 border border-sky-200 bg-gradient-to-l from-sky-50 to-white p-5 text-right transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(14,116,144,.13)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-sky-600 text-white shadow-lg shadow-sky-900/10"><ClipboardList className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-base font-extrabold text-sky-950">تسجيل زيارة جديدة</span><span className="mt-1 block text-xs font-semibold text-sky-700">فتح نموذج الزيارة مباشرة</span></span>
+          <ChevronLeft className="h-5 w-5 text-sky-700 transition group-hover:translate-x-[-2px]" />
+        </button>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
