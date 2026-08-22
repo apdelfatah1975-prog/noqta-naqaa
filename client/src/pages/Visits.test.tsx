@@ -24,4 +24,9 @@ describe("filterVisitRows", () => {
   it("returns all rows when filters are empty", () => {
     expect(filterVisitRows(rows, { type: "all" })).toHaveLength(2);
   });
+
+  it("does not crash when visits data is null or a non-array object", () => {
+    expect(filterVisitRows(null as unknown as any[], {})).toEqual([]);
+    expect(filterVisitRows({ items: rows } as unknown as any[], {})).toEqual([]);
+  });
 });

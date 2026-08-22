@@ -28,9 +28,13 @@ export default function Visits() {
   const offlineVisits = getOfflineVisits();
   const offlineUser = getOfflineSession();
   const online = navigator.onLine;
-  const visibleCustomers = customers ?? (!online ? offlineCustomers : []);
-  const visits = visitList ?? (!online ? offlineVisits : []);
-  const pendingVisits = !online && offlineUser ? getPendingVisits(offlineUser.id) : [];
+  const visibleCustomers = useMemo(() => Array.isArray(customers) ? customers : !online && Array.isArray(offlineCustomers) ? offlineCustomers : [], [customers, offlineCustomers, online]);
+  const visits = useMemo(() => Array.isArray(visitList) ? visitList : !online && Array.isArray(offlineVisits) ? offlineVisits : [], [offlineVisits, online, visitList]);
+  const pendingVisits = useMemo(() => {
+    if (!(!online && offlineUser)) return [];
+    const queued = getPendingVisits(offlineUser.id);
+    return Array.isArray(queued) ? queued : [];
+  }, [offlineUser, online]);
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -43,14 +47,15 @@ export default function Visits() {
   const deleteVisit = trpc.filters.visits.delete.useMutation({ onSuccess: () => { setDeleteId(null); toast.success("تم حذف الزيارة ونقل نسختها إلى سلة المحذوفات"); }, onError: error => toast.error(error.message || "تعذر حذف الزيارة.") });
   const updateVisit = trpc.filters.visits.updateDetails.useMutation({ onSuccess: async () => { setEditVisit(null); await utils.filters.visits.list.invalidate(); toast.success("تم تصحيح تسجيل الزيارة والخزينة"); }, onError: error => toast.error(error.message || "تعذر تصحيح تسجيل الزيارة.") });
 
-  useEffect(() => { if (customers) cacheOfflineCustomers(customers); }, [customers]);
+  useEffect(() => { if (Array.isArray(customers)) cacheOfflineCustomers(customers); }, [customers]);
   useEffect(() => {
     const onSettingsChange = (event: Event) => setCompactMobile(Boolean((event as CustomEvent<{ compactVisitsOnMobile?: boolean }>).detail?.compactVisitsOnMobile));
     window.addEventListener("purepoint-settings-changed", onSettingsChange);
     return () => window.removeEventListener("purepoint-settings-changed", onSettingsChange);
   }, []);
   useEffect(() => {
-    if (visitList) cacheOfflineVisits(visitList.map(visit => ({ id: visit.id, customerId: visit.customerId, visitType: visit.visitType, visitDate: new Date(visit.visitDate).toISOString(), technicianName: visit.technicianName, visitResult: visit.visitResult, notes: visit.notes, collectedAmount: visit.collectedAmount, })));
+    if (!Array.isArray(visitList)) return;
+    cacheOfflineVisits(visitList.map(visit => ({ id: visit.id, customerId: visit.customerId, visitType: visit.visitType, visitDate: new Date(visit.visitDate).toISOString(), technicianName: visit.technicianName, visitResult: visit.visitResult, notes: visit.notes, collectedAmount: visit.collectedAmount, })));
   }, [visitList]);
 
   const customerMap = useMemo(() => new Map(visibleCustomers.map(customer => [customer.id, customer])), [visibleCustomers]);
@@ -78,13 +83,14 @@ export default function Visits() {
 
     <VisitHistory compactMobile={compactMobile} onToggleCompact={() => { const next = !compactMobile; setCompactMobile(next); saveAppSettings({ compactVisitsOnMobile: next }); }} rows={rows} search={search} onSearchChange={setSearch} typeFilter={typeFilter} onTypeFilterChange={setTypeFilter} dateFrom={dateFrom} onDateFromChange={setDateFrom} dateTo={dateTo} onDateToChange={setDateTo} onClearFilters={clearFilters} onOpenCustomer={customer => setLocation(`/customers/${customer.id}`)} onDelete={visit => setDeleteId(visit.id)} onEdit={visit => setEditVisit(visit)} />
     {editVisit ? <EditVisitDialog visit={editVisit} busy={updateVisit.isPending} onClose={() => setEditVisit(null)} onSubmit={values => updateVisit.mutate(values)} /> : null}
-    <PinVerificationDialog open={deleteId !== null} onOpenChange={open => { if (!open) setDeleteId(null); }} busy={deleteVisit.isPending} title="تأكيد حذف الزيارة" description="ستُنقل نسخة الزيارة إلى سلة المحذوفات قبل حذفها من السجل." onConfirm={pin => { if (!selectedVisit || !deleteId) return; moveToTrash({ entityType: "visit", entityLabel: `زيارة: ${selectedVisit.customer?.name ?? "عميل"}`, payload: selectedVisit }); if (!navigator.onLine && offlineUser) { queueOfflineDelete(offlineUser.id, { entity: "visit", id: deleteId, pin }); cacheOfflineVisits(getOfflineVisits().filter(visit => visit.id !== deleteId)); setDeleteId(null); toast.success("تم حذف الزيارة محليًا ونقل نسختها إلى السلة"); } else { deleteVisit.mutate({ id: deleteId, pin }); } }} />
+    <PinVerificationDialog open={deleteId !== null} onOpenChange={open => { if (!open) setDeleteId(null); }} busy={deleteVisit.isPending} title="تأكيد حذف الزيارة" description="ستُنقل نسخة الزيارة إلى سلة المحذوفات قبل حذفها من السجل." onConfirm={pin => { if (!selectedVisit || !deleteId) return; moveToTrash({ entityType: "visit", entityLabel: `زيارة: ${selectedVisit.customer?.name ?? "عميل"}`, payload: selectedVisit }); if (!navigator.onLine && offlineUser) { queueOfflineDelete(offlineUser.id, { entity: "visit", id: deleteId, pin }); const cachedVisits = getOfflineVisits(); cacheOfflineVisits((Array.isArray(cachedVisits) ? cachedVisits : []).filter(visit => visit.id !== deleteId)); setDeleteId(null); toast.success("تم حذف الزيارة محليًا ونقل نسختها إلى السلة"); } else { deleteVisit.mutate({ id: deleteId, pin }); } }} />
   </div>;
 }
 
 export function filterVisitRows(rows: VisitRow[], filters: { search?: string; type?: string; dateFrom?: string; dateTo?: string }) {
-  const search = filters.search?.trim().toLowerCase() ?? "";
-  return rows.filter(visit => {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const search = filters?.search?.trim().toLowerCase() ?? "";
+  return safeRows.filter(visit => {
     const customer = visit.customer;
     const result = visit.visitResult ?? visit.visitOutcome ?? visit.result ?? "";
     const text = `${customer?.name ?? ""} ${customer?.manualCode ?? ""} ${customer?.phone ?? ""} ${customer?.address ?? ""} ${visit.notes ?? ""} ${result} ${visit.technicianName ?? ""}`.toLowerCase();
@@ -95,7 +101,8 @@ export function filterVisitRows(rows: VisitRow[], filters: { search?: string; ty
 
 function groupVisitsByCustomer(rows: VisitRow[]): CustomerVisitGroup[] {
   const groups = new Map<string, CustomerVisitGroup>();
-  rows.forEach(visit => {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  safeRows.forEach(visit => {
     const customer = visit.customer;
     const key = customer?.id ? `customer-${customer.id}` : `unknown-${customer?.name ?? "unknown"}`;
     const existing = groups.get(key);

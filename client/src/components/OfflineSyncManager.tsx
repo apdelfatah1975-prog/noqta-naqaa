@@ -250,9 +250,22 @@ export function OfflineSyncManager() {
         ? `تعذر مزامنة ${pendingCount} عملية. ستتم المحاولة لاحقًا.`
         : `${pendingCount} عملية بانتظار المزامنة`;
   return (
-    <div className={`fixed bottom-4 left-4 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-xl px-4 py-3 text-xs font-bold shadow-lg ${!online ? "bg-amber-500 text-amber-950" : syncFailed ? "bg-red-600 text-white" : "bg-teal-700 text-white"}`} role="status" aria-live="polite" title="حالة المزامنة">
-      {online ? <CloudUpload className="h-4 w-4" /> : <CloudOff className="h-4 w-4" />}
-      <span>{message}</span>
+    <div className={`fixed bottom-4 left-4 z-50 flex max-w-[calc(100vw-2rem)] flex-wrap items-center gap-2 rounded-xl px-4 py-3 text-xs font-bold shadow-lg ${!online ? "bg-amber-500 text-amber-950" : syncFailed ? "bg-red-600 text-white" : "bg-teal-700 text-white"}`} role="status" aria-live="polite" aria-busy={syncing} title="حالة المزامنة">
+      {online ? <CloudUpload className={`h-4 w-4 shrink-0 ${syncing ? "motion-safe:animate-spin motion-reduce:animate-none" : ""}`} /> : <CloudOff className="h-4 w-4 shrink-0" />}
+      <span className="min-w-0 flex-1">{message}</span>
+      {syncing && (
+        <span className="basis-full space-y-1" aria-label="تقدم المزامنة">
+          <span className="block h-1.5 w-full overflow-hidden rounded-full bg-white/25">
+            <span className="block h-full w-2/5 rounded-full bg-white motion-safe:animate-pulse motion-reduce:animate-none" />
+          </span>
+          <span className="flex items-center gap-1 text-[10px] font-semibold text-white/85">
+            <span className="h-1 w-1 rounded-full bg-white motion-safe:animate-bounce motion-reduce:animate-none" />
+            <span className="h-1 w-1 rounded-full bg-white motion-safe:animate-bounce motion-reduce:animate-none [animation-delay:120ms]" />
+            <span className="h-1 w-1 rounded-full bg-white motion-safe:animate-bounce motion-reduce:animate-none [animation-delay:240ms]" />
+            <span>يتم إرسال العمليات المحفوظة بالتتابع</span>
+          </span>
+        </span>
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import React from "react";
 import { Cloud, CloudOff, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { countOfflineQueue, type OfflineConnectionState } from "@/lib/offlineDatabase";
@@ -34,8 +35,8 @@ export function OfflineStatusIndicator() {
   const isSyncing = connection === "syncing";
   const label = isSyncing ? "جارٍ المزامنة" : isOffline ? "غير متصل - يعمل محليًا" : pendingCount ? `متصل - ${pendingCount} عملية بانتظار المزامنة` : "متصل";
   return (
-    <div className={`inline-flex max-w-[min(72vw,22rem)] items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-extrabold sm:text-xs ${isOffline ? "border-amber-200 bg-amber-50 text-amber-800" : isSyncing ? "border-sky-200 bg-sky-50 text-sky-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`} role="status" aria-live="polite" title={label}>
-      {isSyncing ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : isOffline ? <CloudOff className="h-3.5 w-3.5" /> : <Cloud className="h-3.5 w-3.5" />}
+    <div className={`inline-flex max-w-[min(72vw,22rem)] items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-extrabold sm:text-xs ${isOffline ? "border-amber-200 bg-amber-50 text-amber-800" : isSyncing ? "border-sky-200 bg-sky-50 text-sky-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`} role="status" aria-live="polite" aria-busy={isSyncing} title={label}>
+      {isSyncing ? <RefreshCw className="h-3.5 w-3.5 motion-safe:animate-spin motion-reduce:animate-none" /> : isOffline ? <CloudOff className="h-3.5 w-3.5" /> : <Cloud className="h-3.5 w-3.5" />}
       <span className="truncate">{label}</span>
     </div>
   );
