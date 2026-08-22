@@ -25,8 +25,8 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     const technicianStandalone = window.location.pathname.startsWith("/technician-app");
     const serviceWorkerUrl = technicianStandalone
-      ? "/technician-app/sw.js?version=1-orders-only"
-      : "/sw.js?version=20-share-target";
+      ? "/technician-app/sw.js?version=19-technician-isolated"
+      : "/sw.js?version=19-shell-refresh";
     void navigator.serviceWorker.register(serviceWorkerUrl, {
       scope: technicianStandalone ? "/technician-app/" : "/",
     }).then(registration => {

@@ -1,7 +1,5 @@
-const CACHE_NAME = "purepoint-shell-v18-technician-isolated";
+const CACHE_NAME = "purepoint-shell-v19";
 const APP_SHELL = ["/",
-
-  "/technician-preview",
   "/offline.html",
   "/manifest.webmanifest",
   "/technician-manifest.webmanifest",
@@ -32,36 +30,38 @@ self.addEventListener("fetch", event => {
   if (event.request.mode === "navigate") {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
-      const cachedRoute = requestUrl.pathname === "/" ? undefined : await cache.match(event.request);
-      const cachedGlobalPath = await caches.match(requestUrl.pathname);
-      const cachedPath = await cache.match(requestUrl.pathname);
-      const cachedShell = cachedPath || cachedRoute || (requestUrl.pathname === "/" ? undefined : cachedGlobalPath);
-
-      const refresh = fetch(event.request).then(response => {
+      const cachedRoot = requestUrl.pathname === "/" ? caches.match("/") : cache.match("/");
+      try {
+        const response = await fetch(event.request, { cache: "no-store" });
         if (response.ok) {
-          void cache.put(event.request, response.clone());
-          if (requestUrl.pathname === "/") void cache.put("/", response.clone());
+          await cache.put(event.request, response.clone());
+          if (requestUrl.pathname === "/") await cache.put("/", response.clone());
         }
         return response;
-      }).catch(() => cachedShell || caches.match("/offline.html"));
-
-      // عند الاتصال، اعرض النسخة الجديدة فورًا وحدّث الكاش؛ استخدم الكاش فقط عند انقطاع الشبكة.
-      return refresh.catch(() => cachedShell || caches.match("/offline.html"));
+      } catch {
+        const cachedRoute = requestUrl.pathname === "/" ? undefined : await cache.match(event.request);
+        return cachedRoute || (await cachedRoot) || (await caches.match("/offline.html"));
+      }
     })());
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      const refresh = fetch(event.request).then(response => {
-        if (response.ok) {
-          void caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
-        }
+  // Never let an old hashed JS/CSS asset block a newly deployed application.
+  if (requestUrl.pathname.startsWith("/assets/") || requestUrl.pathname.endsWith(".js") || requestUrl.pathname.endsWith(".css")) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      try {
+        const response = await fetch(event.request, { cache: "no-store" });
+        if (response.ok) await cache.put(event.request, response.clone());
         return response;
-      });
-      return cached || refresh;
-    }),
-  );
+      } catch {
+        return (await cache.match(event.request)) || Response.error();
+      }
+    })());
+    return;
+  }
+
+  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
 });
 
 self.addEventListener("sync", event => {

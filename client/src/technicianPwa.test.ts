@@ -18,11 +18,18 @@ describe("تثبيت تطبيق الفني المعزول", () => {
     expect(manifest.short_name).toBe("أوامر الفني");
   });
 
+  it("يوفر ملف العامل الخدمي داخل مسار الفنيين الفعلي", async () => {
+    const technicianServiceWorker = readProjectFile("../public/technician-app/sw.js");
+    expect(technicianServiceWorker).toContain("purepoint-shell-v19");
+    expect(technicianServiceWorker).toContain("requestUrl.pathname.startsWith(\"/api/\")");
+  });
+
   it("يرفع إصدار الكاش ويشغّل العامل الخدمي المعزول", async () => {
     const serviceWorker = readProjectFile("../public/sw.js");
     const main = readProjectFile("./main.tsx");
 
-    expect(serviceWorker).toContain("purepoint-shell-v17-technician-isolated");
-    expect(main).toContain("version=17-technician-isolated");
+    expect(serviceWorker).toContain("purepoint-shell-v19");
+    expect(main).toContain("version=19-technician-isolated");
+    expect(main).toContain("version=19-shell-refresh");
   });
 });

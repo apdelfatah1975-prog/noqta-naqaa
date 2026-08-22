@@ -1,16 +1,65 @@
-const CACHE_NAME = "purepoint-technician-orders-v2";
-const SCOPE_PREFIX = "/technician-app/";
+const CACHE_NAME = "purepoint-shell-v19";
+const APP_SHELL = [
+  "/",
+  "/offline.html",
+  "/manifest.webmanifest",
+  "/technician-manifest.webmanifest",
+  "/app-icon.svg",
+];
 
-self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("install", event => {
+  self.skipWaiting();
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
+});
 
 self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys
-        .filter(key => key !== CACHE_NAME && key.includes("technician"))
-        .map(key => caches.delete(key))
-    )).then(() => self.clients.claim())
+    Promise.all([
+      clients.claim(),
+      caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))),
+    ]),
   );
+});
+
+self.addEventListener("fetch", event => {
+  if (event.request.method !== "GET") return;
+
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin || requestUrl.pathname.startsWith("/api/")) return;
+
+  if (event.request.mode === "navigate") {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      try {
+        const response = await fetch(event.request, { cache: "no-store" });
+        if (response.ok) {
+          await cache.put(event.request, response.clone());
+          if (requestUrl.pathname === "/") await cache.put("/", response.clone());
+        }
+        return response;
+      } catch {
+        return (await cache.match(event.request)) || (await cache.match("/")) || (await cache.match("/offline.html"));
+      }
+    })());
+    return;
+  }
+
+  // Never let an old hashed JS/CSS asset block a newly deployed application.
+  if (requestUrl.pathname.startsWith("/assets/") || requestUrl.pathname.endsWith(".js") || requestUrl.pathname.endsWith(".css")) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      try {
+        const response = await fetch(event.request, { cache: "no-store" });
+        if (response.ok) await cache.put(event.request, response.clone());
+        return response;
+      } catch {
+        return (await cache.match(event.request)) || Response.error();
+      }
+    })());
+    return;
+  }
+
+  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
 });
 
 self.addEventListener("sync", event => {
@@ -22,19 +71,14 @@ self.addEventListener("sync", event => {
   );
 });
 
-self.addEventListener("fetch", event => {
-  const request = event.request;
-  if (request.method !== "GET") return;
-
-  event.respondWith(
-    fetch(request)
-      .then(response => {
-        if (response.ok && new URL(request.url).pathname.startsWith(SCOPE_PREFIX)) {
-          const copy = response.clone();
-          void caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-        }
-        return response;
-      })
-      .catch(() => caches.match(request).then(cached => cached || caches.match("/technician-app/login")))
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/reminders";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(openClients => {
+      const matchingClient = openClients.find(client => new URL(client.url).origin === self.location.origin);
+      if (matchingClient) return matchingClient.focus().then(() => matchingClient.navigate(targetUrl));
+      return clients.openWindow(targetUrl);
+    }),
   );
 });
