@@ -99,6 +99,14 @@ function AdminTechnicianLocations() { return <AdminOnly><TechnicianLocations /><
 function AdminAllowedTechnicians() { return <AdminOnly><AllowedTechnicians /></AdminOnly>; }
 function AdminPendingOperations() { return <AdminOnly><PendingOperations /></AdminOnly>; }
 
+function LocalPageBoundary({ children }: { children: ReactNode }) {
+  return <ErrorBoundary>{children}</ErrorBoundary>;
+}
+function SafeHome() { return <LocalPageBoundary><Home /></LocalPageBoundary>; }
+function SafeCustomers() { return <LocalPageBoundary><Customers /></LocalPageBoundary>; }
+function SafeVisits() { return <LocalPageBoundary><Visits /></LocalPageBoundary>; }
+function SafeWorkOrders() { return <LocalPageBoundary><AdminOnly><WorkOrders /></AdminOnly></LocalPageBoundary>; }
+
 function Router() {
   const [location] = useLocation();
   const pathname = typeof window !== "undefined" ? window.location.pathname : location;
@@ -109,7 +117,7 @@ function Router() {
   if (cleanPath === "/technician-login") return <TechnicianLogin />;
   if (cleanPath === "/technician-preview") return <ProtectedTechnician />;
   if (cleanPath === "/technician-pending-operations") return <TechnicianPendingOperations />;
-  if (pathname.replace(/\/$/, "") === "/work-orders") return <DashboardLayout><AdminOnly><WorkOrders /></AdminOnly></DashboardLayout>;
+  if (pathname.replace(/\/$/, "") === "/work-orders") return <DashboardLayout><SafeWorkOrders /></DashboardLayout>;
   if (pathname.replace(/\/$/, "") === "/technician-locations") return <DashboardLayout><AdminTechnicianLocations /></DashboardLayout>;
   if (pathname.replace(/\/$/, "") === "/allowed-technicians") return <DashboardLayout><AdminAllowedTechnicians /></DashboardLayout>;
   if (pathname.replace(/\/$/, "") === "/pending-operations") return <DashboardLayout><AdminPendingOperations /></DashboardLayout>;
@@ -117,10 +125,10 @@ function Router() {
     <Suspense fallback={<section className="mx-auto flex min-h-[40vh] max-w-xl items-center justify-center px-6 py-16 text-center" dir="rtl"><div className="rounded-2xl border border-teal-100 bg-white px-6 py-5 shadow-sm"><div className="mx-auto mb-3 h-8 w-8 animate-pulse rounded-full bg-teal-100" /><p className="font-bold text-slate-800">جارٍ فتح الصفحة…</p></div></section>}>
       <DashboardLayout>
       <Switch>
-        <Route path="/" component={Home} />
+        <Route path="/" component={SafeHome} />
         <Route path="/customers/:id" component={CustomerProfile} />
-        <Route path="/customers" component={Customers} />
-        <Route path="/visits" component={Visits} />
+        <Route path="/customers" component={SafeCustomers} />
+        <Route path="/visits" component={SafeVisits} />
         <Route path="/reminders" component={Reminders} />
         <Route path="/inventory" component={AdminInventory} />
         <Route path="/cash" component={AdminCash} />

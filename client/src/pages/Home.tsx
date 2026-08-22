@@ -10,8 +10,7 @@ import { ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronLeft, CircleDol
 import React from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-
-const normalizeList = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : []);
+import { extractArray } from "@/lib/dataNormalization";
 
 function inventoryVisual(category?: string | null, name?: string) {
   const value = `${category ?? ""} ${name ?? ""}`;
@@ -50,7 +49,7 @@ export default function Home() {
   const [trashCount, setTrashCount] = React.useState(() => getTrashItems().length);
   const restoreInputRef = React.useRef<HTMLInputElement>(null);
   React.useEffect(() => {
-    const lowStockItems = data?.inventory?.items?.filter(item => item.currentBalance <= (item.reorderLevel ?? 2)) ?? [];
+    const lowStockItems = extractArray<{ id: number; name: string; currentBalance: number; reorderLevel?: number | null }>(data?.inventory?.items).filter(item => item.currentBalance <= (item.reorderLevel ?? 2));
     if (!lowStockItems.length || typeof window === "undefined") return;
     const signature = lowStockItems.slice(0, 8).map(item => `${item.id}:${item.currentBalance}:${item.reorderLevel ?? 2}`).join("|");
     const storageKey = "purepoint-low-stock-alert";
@@ -92,12 +91,12 @@ export default function Home() {
   const sourceData = data ?? offlineDashboard;
   const displayData = sourceData ? {
     ...sourceData,
-    todayVisits: normalizeList<DashboardData["todayVisits"][number]>(sourceData.todayVisits),
-    upcomingVisits: normalizeList<DashboardData["upcomingVisits"][number]>(sourceData.upcomingVisits),
-    dueReminders: normalizeList<DashboardData["dueReminders"][number]>(sourceData.dueReminders),
+    todayVisits: extractArray<DashboardData["todayVisits"][number]>(sourceData.todayVisits),
+    upcomingVisits: extractArray<DashboardData["upcomingVisits"][number]>(sourceData.upcomingVisits),
+    dueReminders: extractArray<DashboardData["dueReminders"][number]>(sourceData.dueReminders),
     inventory: {
       ...sourceData.inventory,
-      items: normalizeList<DashboardData["inventory"]["items"][number]>(sourceData.inventory?.items),
+      items: extractArray<DashboardData["inventory"]["items"][number]>(sourceData.inventory?.items),
     },
   } : null;
   const isLoading = !displayData && dashboardLoading;

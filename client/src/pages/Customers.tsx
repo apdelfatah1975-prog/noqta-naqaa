@@ -12,6 +12,7 @@ import { cacheOfflineCustomers, cacheOfflineInventory, cacheOfflineServiceCatalo
 import { moveToTrash } from "@/lib/trashBin";
 import { formatAppMoney, getAppSettings, saveAppSettings } from "@/lib/appSettings";
 import { parseWhatsAppLocationText } from "@/lib/locationParser";
+import { extractArray } from "@/lib/dataNormalization";
 import { AlertCircle, CheckCircle2, Clock3, Download, FileSpreadsheet, Loader2, Pencil, Plus, Search, Trash2, Upload, UsersRound } from "lucide-react";
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -85,7 +86,7 @@ export default function Customers() {
     networkMode: "offlineFirst",
   });
   const techniciansQuery = trpc.filters.technicians?.list?.useQuery?.(undefined, { retry: false, staleTime: 60_000 });
-  const visibleTechnicians = techniciansQuery?.data ?? [];
+  const visibleTechnicians = extractArray<NonNullable<typeof techniciansQuery.data>[number]>(techniciansQuery?.data);
   const salesAgentNames = Object.keys(getAppSettings().salesAgents).sort((a, b) => a.localeCompare(b, "ar"));
   const serviceCatalogQuery = trpc.filters.serviceTypes?.list?.useQuery?.();
   const serviceCatalog = serviceCatalogQuery?.data;

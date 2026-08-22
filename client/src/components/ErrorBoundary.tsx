@@ -31,7 +31,8 @@ class ErrorBoundary extends Component<Props, State> {
               className="text-destructive mb-6 flex-shrink-0"
             />
 
-            <h2 className="text-xl mb-4">An unexpected error occurred.</h2>
+            <h2 className="text-xl mb-4 font-bold" dir="rtl">حدث خطأ مؤقت في عرض هذه الصفحة</h2>
+            <p className="mb-4 text-center text-muted-foreground" dir="rtl">لم تُفقد البيانات. أعد تحميل بيانات الصفحة للمحاولة مرة أخرى.</p>
 
             <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
               <pre className="text-sm text-muted-foreground whitespace-break-spaces">
@@ -48,7 +49,7 @@ class ErrorBoundary extends Component<Props, State> {
               )}
             >
               <RotateCcw size={16} />
-              Reload Page
+              إعادة تحميل البيانات
             </button>
           </div>
         </div>

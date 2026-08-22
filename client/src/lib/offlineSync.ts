@@ -1,5 +1,6 @@
 const SESSION_KEY = "purepoint-offline-session";
 import * as XLSX from "xlsx";
+import { extractArray } from "@/lib/dataNormalization";
 
 const CUSTOMERS_KEY = "purepoint-offline-customers";
 const VISITS_KEY = "purepoint-offline-visits";
@@ -292,7 +293,7 @@ export function getOfflineDashboard<T>() {
 }
 
 export function getPendingCustomers(ownerId: number) {
-  return readJson<PendingCustomer[]>(queueKey(CUSTOMER_QUEUE_PREFIX, ownerId), []);
+  return extractArray<PendingCustomer>(readJson<unknown>(queueKey(CUSTOMER_QUEUE_PREFIX, ownerId), []));
 }
 
 function normalizeCustomerName(name: string) {
@@ -327,7 +328,7 @@ export function replaceOfflineCustomerId(localId: number, serverId: number) {
 }
 
 export function getPendingVisits(ownerId: number) {
-  return readJson<PendingVisit[]>(queueKey(VISIT_QUEUE_PREFIX, ownerId), []);
+  return extractArray<PendingVisit>(readJson<unknown>(queueKey(VISIT_QUEUE_PREFIX, ownerId), []));
 }
 
 export function queueOfflineVisit(ownerId: number, visit: Omit<PendingVisit, "clientOperationId" | "createdAt">) {
@@ -341,7 +342,7 @@ export function removePendingVisit(ownerId: number, clientOperationId: string) {
 }
 
 export function getPendingWorkOrderUpdates(ownerId: number) {
-  return readJson<PendingWorkOrderUpdate[]>(queueKey(WORK_ORDER_QUEUE_PREFIX, ownerId), []);
+  return extractArray<PendingWorkOrderUpdate>(readJson<unknown>(queueKey(WORK_ORDER_QUEUE_PREFIX, ownerId), []));
 }
 
 export function queueOfflineWorkOrderUpdate(ownerId: number, input: Omit<PendingWorkOrderUpdate, "clientOperationId" | "createdAt">) {
@@ -355,7 +356,7 @@ export function removePendingWorkOrderUpdate(ownerId: number, clientOperationId:
 }
 
 export function getPendingWorkOrderProofs(ownerId: number) {
-  return readJson<PendingWorkOrderProof[]>(queueKey(WORK_ORDER_PROOF_QUEUE_PREFIX, ownerId), []);
+  return extractArray<PendingWorkOrderProof>(readJson<unknown>(queueKey(WORK_ORDER_PROOF_QUEUE_PREFIX, ownerId), []));
 }
 
 export function queueOfflineWorkOrderProof(ownerId: number, input: Omit<PendingWorkOrderProof, "clientOperationId" | "createdAt">) {

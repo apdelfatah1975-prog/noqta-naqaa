@@ -7,6 +7,7 @@ import { downloadRowsAsExcel, visitExcelHeaders, visitRowsForExcel, withArabicHe
 import { printArabicPdf } from "@/lib/pdfExport";
 import { trpc } from "@/lib/trpc";
 import { formatAppMoney, getAppSettings, saveAppSettings } from "@/lib/appSettings";
+import { extractArray } from "@/lib/dataNormalization";
 import { ChevronDown, ChevronUp, ClipboardList, Download, Pencil, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
@@ -28,12 +29,12 @@ export default function Visits() {
   const offlineVisits = getOfflineVisits();
   const offlineUser = getOfflineSession();
   const online = navigator.onLine;
-  const visibleCustomers = useMemo(() => Array.isArray(customers) ? customers : !online && Array.isArray(offlineCustomers) ? offlineCustomers : [], [customers, offlineCustomers, online]);
-  const visits = useMemo(() => Array.isArray(visitList) ? visitList : !online && Array.isArray(offlineVisits) ? offlineVisits : [], [offlineVisits, online, visitList]);
+  const visibleCustomers = useMemo(() => extractArray(customers).length ? extractArray(customers) : !online ? extractArray(offlineCustomers) : [], [customers, offlineCustomers, online]);
+  const visits = useMemo(() => extractArray(visitList).length ? extractArray(visitList) : !online ? extractArray(offlineVisits) : [], [offlineVisits, online, visitList]);
   const pendingVisits = useMemo(() => {
     if (!(!online && offlineUser)) return [];
     const queued = getPendingVisits(offlineUser.id);
-    return Array.isArray(queued) ? queued : [];
+    return extractArray(queued);
   }, [offlineUser, online]);
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
@@ -83,7 +84,7 @@ export default function Visits() {
 
     <VisitHistory compactMobile={compactMobile} onToggleCompact={() => { const next = !compactMobile; setCompactMobile(next); saveAppSettings({ compactVisitsOnMobile: next }); }} rows={rows} search={search} onSearchChange={setSearch} typeFilter={typeFilter} onTypeFilterChange={setTypeFilter} dateFrom={dateFrom} onDateFromChange={setDateFrom} dateTo={dateTo} onDateToChange={setDateTo} onClearFilters={clearFilters} onOpenCustomer={customer => setLocation(`/customers/${customer.id}`)} onDelete={visit => setDeleteId(visit.id)} onEdit={visit => setEditVisit(visit)} />
     {editVisit ? <EditVisitDialog visit={editVisit} busy={updateVisit.isPending} onClose={() => setEditVisit(null)} onSubmit={values => updateVisit.mutate(values)} /> : null}
-    <PinVerificationDialog open={deleteId !== null} onOpenChange={open => { if (!open) setDeleteId(null); }} busy={deleteVisit.isPending} title="تأكيد حذف الزيارة" description="ستُنقل نسخة الزيارة إلى سلة المحذوفات قبل حذفها من السجل." onConfirm={pin => { if (!selectedVisit || !deleteId) return; moveToTrash({ entityType: "visit", entityLabel: `زيارة: ${selectedVisit.customer?.name ?? "عميل"}`, payload: selectedVisit }); if (!navigator.onLine && offlineUser) { queueOfflineDelete(offlineUser.id, { entity: "visit", id: deleteId, pin }); const cachedVisits = getOfflineVisits(); cacheOfflineVisits((Array.isArray(cachedVisits) ? cachedVisits : []).filter(visit => visit.id !== deleteId)); setDeleteId(null); toast.success("تم حذف الزيارة محليًا ونقل نسختها إلى السلة"); } else { deleteVisit.mutate({ id: deleteId, pin }); } }} />
+    <PinVerificationDialog open={deleteId !== null} onOpenChange={open => { if (!open) setDeleteId(null); }} busy={deleteVisit.isPending} title="تأكيد حذف الزيارة" description="ستُنقل نسخة الزيارة إلى سلة المحذوفات قبل حذفها من السجل." onConfirm={pin => { if (!selectedVisit || !deleteId) return; moveToTrash({ entityType: "visit", entityLabel: `زيارة: ${selectedVisit.customer?.name ?? "عميل"}`, payload: selectedVisit }); if (!navigator.onLine && offlineUser) { queueOfflineDelete(offlineUser.id, { entity: "visit", id: deleteId, pin }); const cachedVisits = getOfflineVisits(); cacheOfflineVisits(extractArray(cachedVisits).filter(visit => visit.id !== deleteId)); setDeleteId(null); toast.success("تم حذف الزيارة محليًا ونقل نسختها إلى السلة"); } else { deleteVisit.mutate({ id: deleteId, pin }); } }} />
   </div>;
 }
 
