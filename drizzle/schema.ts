@@ -113,6 +113,8 @@ export const visits = mysqlTable(
     technicianName: varchar("technicianName", { length: 160 }),
     salesAgentName: varchar("salesAgentName", { length: 160 }),
     filterCount: int("filterCount").default(1).notNull(),
+    tdsIn: int("tdsIn"),
+    tdsOut: int("tdsOut"),
     status: mysqlEnum("status", ["assigned", "en_route", "arrived", "in_progress", "completed", "postponed", "cancelled"]).default("assigned").notNull(),
     assignedTechnicianId: int("assignedTechnicianId").references(() => users.id, { onDelete: "set null" }),
     arrivedAt: timestamp("arrivedAt"),

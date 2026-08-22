@@ -66,6 +66,8 @@ export type OfflineVisit = {
   technicianName?: string | null;
   salesAgentName?: string | null;
   filterCount?: number;
+  tdsIn?: number | null;
+  tdsOut?: number | null;
   visitResult?: string | null;
   notes?: string | null;
   collectedAmount?: number;
@@ -103,6 +105,8 @@ export type PendingVisit = {
   technicianName?: string | null;
   salesAgentName?: string | null;
   filterCount?: number;
+  tdsIn?: number | null;
+  tdsOut?: number | null;
   visitResult?: string | null;
   notes: string | null;
   collectedAmount?: number;

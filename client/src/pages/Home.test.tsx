@@ -108,7 +108,7 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
   it("تفتح بطاقة تسجيل الزيارة من الإجراء السريع في الصفحة الرئيسية", () => {
     render(<Home />);
     fireEvent.click(screen.getByRole("button", { name: "تسجيل زيارة جديدة" }));
-    expect(mocks.setLocation).toHaveBeenCalledWith("/customers?visit=1");
+    expect(mocks.setLocation).toHaveBeenCalledWith("/customers/visit");
   });
 
   it("تنبه المستخدم تلقائيًا عند وصول صنف إلى الحد الأدنى", () => {

@@ -192,18 +192,19 @@ export default function Customers() {
   useEffect(() => { if (serviceCatalog) { cacheOfflineServiceCatalog(serviceCatalog); setOfflineServiceCatalog(serviceCatalog); } }, [serviceCatalog]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const pathname = window.location.pathname.replace(/\/$/, "");
     const requestedStatus = params.get("followUpStatus");
     if (["all", "overdue", "today", "within_5_days", "more_than_5_days", "upcoming", "regular"].includes(requestedStatus || "")) {
       setFollowUpStatus(requestedStatus as "all" | "overdue" | "today" | "within_5_days" | "more_than_5_days" | "upcoming" | "regular");
     }
-    const queryRequestsNew = params.get("new") === "1";
-    const queryRequestsVisit = params.get("visit") === "1";
+    const queryRequestsNew = params.get("new") === "1" || pathname === "/customers/new";
+    const queryRequestsVisit = params.get("visit") === "1" || pathname === "/customers/visit";
     const requestedCustomerId = params.get("customerId");
-    if (queryRequestsNew || location.includes("new=1")) {
+    if (queryRequestsNew || location.includes("new=1") || location === "/customers/new") {
       setForm({ ...emptyCustomer, firstVisitItems: getDefaultVisitItems("installation") });
       setDialogOpen(true);
       window.history.replaceState({}, "", "/customers");
-    } else if (queryRequestsVisit || location.includes("visit=1")) {
+    } else if (queryRequestsVisit || location.includes("visit=1") || location === "/customers/visit") {
       const requestedCustomer = requestedCustomerId ? displayedCustomers?.find(item => String(item.id) === requestedCustomerId) : null;
       if (requestedCustomer) {
         openVisit(requestedCustomer);

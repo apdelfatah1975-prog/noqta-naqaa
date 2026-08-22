@@ -126,6 +126,8 @@ function Router() {
       <DashboardLayout>
       <Switch>
         <Route path="/" component={SafeHome} />
+        <Route path="/customers/new" component={SafeCustomers} />
+        <Route path="/customers/visit" component={SafeCustomers} />
         <Route path="/customers/:id" component={CustomerProfile} />
         <Route path="/customers" component={SafeCustomers} />
         <Route path="/visits" component={SafeVisits} />
