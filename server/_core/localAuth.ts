@@ -5,6 +5,7 @@ import type { Request, Response } from "express";
 import type { User } from "../../drizzle/schema";
 import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const";
 import { getSessionCookieOptions } from "./cookies";
+import { getJwtSecretKey } from "./jwtSecret";
 
 const scryptAsync = promisify(scryptCallback);
 const SESSION_AUDIENCE = "purepoint-local-session";
@@ -24,11 +25,7 @@ export async function verifyPassword(password: string, encodedHash: string): Pro
 }
 
 function secretKey() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("JWT_SECRET must be at least 32 characters long.");
-  }
-  return new TextEncoder().encode(secret);
+  return getJwtSecretKey();
 }
 
 export async function createLocalSessionToken(user: Pick<User, "id" | "email" | "role" | "name">) {
