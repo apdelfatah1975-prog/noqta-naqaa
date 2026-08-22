@@ -1,1 +1,1 @@
-ALTER TABLE `allowedTechnicianAccounts` ADD `menuPermissions` text DEFAULT ('["workOrders"]') NOT NULL;
+ALTER TABLE `allowedTechnicianAccounts` ADD COLUMN IF NOT EXISTS `menuPermissions` text NOT NULL DEFAULT '["workOrders"]';
