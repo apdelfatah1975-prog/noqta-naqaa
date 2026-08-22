@@ -14,7 +14,7 @@ import { formatAppMoney, getAppSettings, saveAppSettings } from "@/lib/appSettin
 import { parseWhatsAppLocationText } from "@/lib/locationParser";
 import { extractArray } from "@/lib/dataNormalization";
 import { AlertCircle, CheckCircle2, Clock3, Download, FileSpreadsheet, Loader2, Pencil, Plus, Search, Trash2, Upload, UsersRound } from "lucide-react";
-import React, { FormEvent, useEffect, useMemo, useState } from "react";
+import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -100,6 +100,8 @@ export default function Customers() {
   const [offlineServiceCatalog, setOfflineServiceCatalog] = useState<OfflineServiceCatalog | null>(() => normalizeServiceCatalog(getOfflineServiceCatalog()));
   const effectiveServiceCatalog = serviceCatalog ?? offlineServiceCatalog;
   const [offlineCustomers, setOfflineCustomers] = useState(() => getOfflineCustomers());
+  const cachedCustomersSignature = useRef<string | null>(null);
+  const cachedCatalogSignature = useRef<string | null>(null);
   const utils = trpc.useUtils();
   const [location, setLocation] = useLocation();
   const createCustomer = trpc.filters.customers.create.useMutation({ onSuccess: () => { utils.filters.customers.list.invalidate(); utils.filters.dashboard.invalidate(); toast.success("تمت إضافة العميل بنجاح"); setDialogOpen(false); }, onError: error => toast.error(error.message || "تعذر إضافة العميل. يرجى المحاولة مرة أخرى.") });
@@ -183,13 +185,20 @@ export default function Customers() {
   }, [statusCustomers, displayedCustomers, offlineCustomers, followUpStatus]);
 
   useEffect(() => {
-    if (Array.isArray(customers)) {
-      cacheOfflineCustomers(customers);
-      const cached = getOfflineCustomers();
-      setOfflineCustomers(Array.isArray(cached) ? cached : []);
-    }
+    if (!Array.isArray(customers)) return;
+    const signature = JSON.stringify(customers.map(customer => ({ id: customer.id, updatedAt: customer.updatedAt, name: customer.name, phone: customer.phone, address: customer.address, latitude: customer.latitude, longitude: customer.longitude, notes: customer.notes })));
+    if (cachedCustomersSignature.current === signature) return;
+    cachedCustomersSignature.current = signature;
+    cacheOfflineCustomers(customers);
   }, [customers]);
-  useEffect(() => { if (serviceCatalog) { cacheOfflineServiceCatalog(serviceCatalog); setOfflineServiceCatalog(serviceCatalog); } }, [serviceCatalog]);
+  useEffect(() => {
+    if (!serviceCatalog) return;
+    const signature = JSON.stringify(serviceCatalog);
+    if (cachedCatalogSignature.current === signature) return;
+    cachedCatalogSignature.current = signature;
+    cacheOfflineServiceCatalog(serviceCatalog);
+    setOfflineServiceCatalog(serviceCatalog);
+  }, [serviceCatalog]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pathname = window.location.pathname.replace(/\/$/, "");

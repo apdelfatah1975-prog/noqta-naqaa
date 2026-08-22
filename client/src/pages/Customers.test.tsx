@@ -319,6 +319,16 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(screen.getByText(/للعميل: عميل آخر/)).toBeTruthy();
   });
 
+  it("لا يدخل في حلقة تحديث عند إعادة تصيير قائمة العملاء بنفس الاستجابة", () => {
+    const view = render(<Customers />);
+    expect(() => {
+      view.rerender(<Customers />);
+      view.rerender(<Customers />);
+      view.rerender(<Customers />);
+    }).not.toThrow();
+    expect(screen.getAllByText("عميل قديم").length).toBeGreaterThan(0);
+  });
+
   it("يفعّل فلتر الحالة عند النقر على أيقونة العميل", () => {
     mocks.list.mockReturnValue({
       data: [
