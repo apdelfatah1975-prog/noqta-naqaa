@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { cacheOfflineCash, cacheOfflineDashboard, downloadOfflineBackup, getOfflineBackupKeyCount, getOfflineDashboard, getOfflineSession, getPendingOperationCount, restoreOfflineBackupFromExcel } from "@/lib/offlineSync";
+import { cacheOfflineCash, cacheOfflineDashboard, downloadOfflineBackup, getOfflineBackupKeyCount, getOfflineCash, getOfflineDashboard, getOfflineInventory, getOfflineSession, getPendingOperationCount, restoreOfflineBackupFromExcel } from "@/lib/offlineSync";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { printArabicPdf } from "@/lib/pdfExport";
 import { AppSettings, getAppSettings } from "@/lib/appSettings";
@@ -83,11 +83,22 @@ export default function Home() {
     };
   }, [offlineOwnerId]);
   const [offlineDashboard, setOfflineDashboard] = React.useState<DashboardData | null>(() => getOfflineDashboard<DashboardData>());
+  const [localCacheVersion, setLocalCacheVersion] = React.useState(0);
+  const utils = trpc.useUtils();
   React.useEffect(() => {
     if (!data) return;
     cacheOfflineDashboard(data);
     setOfflineDashboard(data);
   }, [data]);
+  React.useEffect(() => {
+    const refreshFromLocalCache = () => {
+      setOfflineDashboard(getOfflineDashboard<DashboardData>());
+      setLocalCacheVersion(version => version + 1);
+      void utils.filters.dashboard.invalidate();
+    };
+    window.addEventListener("purepoint-offline-queue-changed", refreshFromLocalCache);
+    return () => window.removeEventListener("purepoint-offline-queue-changed", refreshFromLocalCache);
+  }, [utils]);
   const sourceData = data ?? offlineDashboard;
   const displayData = React.useMemo<DashboardData | null>(() => sourceData ? {
     ...sourceData,
@@ -101,7 +112,7 @@ export default function Home() {
       lowStock: extractArray<DashboardData["inventory"]["lowStock"][number]>(sourceData.inventory?.lowStock),
       items: extractArray<DashboardData["inventory"]["items"][number]>(sourceData.inventory?.items),
     },
-  } : null, [sourceData]);
+  } : null, [sourceData, localCacheVersion]);
   const isLoading = !displayData && dashboardLoading;
   const { data: backupStatus, isLoading: backupLoading } = trpc.filters.backup.status.useQuery(undefined, {
     retry: false,
@@ -111,12 +122,16 @@ export default function Home() {
   const backupMutation = trpc.filters.backup.createNow.useMutation();
   const backupUtils = trpc.useUtils();
   const [, setLocation] = useLocation();
+  const cachedCash = offlineOwnerId ? getOfflineCash<DashboardData["cash"]>(offlineOwnerId) : null;
+  const cachedInventory = offlineOwnerId ? getOfflineInventory<{ items?: unknown }>(offlineOwnerId) : null;
+  const cashSource = online ? displayData?.cash : cachedCash ?? displayData?.cash;
+  const inventoryItems = extractArray(online ? displayData?.inventory?.items : cachedInventory?.items ?? displayData?.inventory?.items);
   const counts = {
     today: displayData?.todayVisits.length ?? 0,
     upcoming: displayData?.upcomingVisits.length ?? 0,
     due: displayData?.dueReminders.length ?? 0,
-    inventory: displayData?.inventory.totalItems ?? 0,
-    cash: Math.round(displayData?.cash?.balance ?? 0),
+    inventory: inventoryItems.length,
+    cash: Math.round(Number(cashSource?.balance ?? 0) || 0),
   };
   const nextVisit = displayData?.upcomingVisits[0];
   const nextDueReminder = displayData?.dueReminders[0];

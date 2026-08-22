@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   cashSummary: vi.fn(),
   backupStatus: vi.fn(),
   backupCreateNow: vi.fn(),
+  dashboardInvalidate: vi.fn(),
   setLocation: vi.fn(),
   toastWarning: vi.fn(),
 }));
@@ -22,7 +23,7 @@ vi.mock("@/lib/trpc", () => ({
         createNow: { useMutation: mocks.backupCreateNow },
       },
     },
-    useUtils: () => ({ filters: { backup: { status: { invalidate: vi.fn() } } } }),
+    useUtils: () => ({ filters: { dashboard: { invalidate: mocks.dashboardInvalidate }, backup: { status: { invalidate: vi.fn() } } } }),
   },
 }));
 
@@ -41,6 +42,7 @@ vi.mock("wouter", () => ({
 describe("بطاقة رصيد الخزينة في لوحة التحكم", () => {
   beforeEach(() => {
     mocks.setLocation.mockReset();
+    mocks.dashboardInvalidate.mockReset();
     mocks.toastWarning.mockReset();
     localStorage.removeItem("purepoint-low-stock-alert");
     mocks.dashboard.mockReturnValue({
@@ -103,6 +105,26 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     expect(completedButton.textContent).toContain("٢");
     fireEvent.click(screen.getByRole("button", { name: "فتح أوامر الفنيين" }));
     expect(mocks.setLocation).toHaveBeenCalledWith("/work-orders");
+  });
+
+  it("تشتق عداد المخزن من الأصناف الفعلية حتى عند اختلاف totalItems", () => {
+    mocks.dashboard.mockReturnValue({
+      isLoading: false,
+      data: {
+        todayVisits: [], upcomingVisits: [], upcomingFollowUps: [], dueReminders: [],
+        cash: { incomeTotal: 0, expenseTotal: 0, balance: 0, summaries: [] },
+        inventory: { totalItems: 99, lowStockCount: 0, lowStock: [], items: [{ id: 1, name: "شمعة", currentBalance: 4, reorderLevel: 2 }, { id: 2, name: "ممبرين", currentBalance: 3, reorderLevel: 2 }] },
+      },
+    });
+    render(<Home />);
+    const inventoryCard = screen.getByRole("button", { name: "فتح تفاصيل أصناف بالمخزن" });
+    expect(inventoryCard.textContent).toContain("2");
+  });
+
+  it("تعيد إبطال dashboard عند تغير التخزين المحلي", () => {
+    render(<Home />);
+    window.dispatchEvent(new Event("purepoint-offline-queue-changed"));
+    expect(mocks.dashboardInvalidate).toHaveBeenCalled();
   });
 
   it("تعرض بطاقتي التسجيل وتوجههما للمسارات الصحيحة عند النقر", () => {
