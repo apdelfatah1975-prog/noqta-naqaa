@@ -1,58 +1,57 @@
-import { cn } from "@/lib/utils";
 import { AlertTriangle, RotateCcw } from "lucide-react";
-import { Component, ReactNode } from "react";
+import React, { Component, ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
+  pageName?: string;
 }
 
 interface State {
   hasError: boolean;
-  error: Error | null;
 }
 
 class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false, error: null };
+  state: State = { hasError: false };
+
+  static getDerivedStateFromError(): State {
+    return { hasError: true };
   }
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+  componentDidCatch(error: Error) {
+    console.error("[PurePoint] page render error", error);
   }
+
+  componentDidUpdate(previousProps: Props) {
+    if (previousProps.children !== this.props.children && this.state.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  private retry = () => {
+    this.setState({ hasError: false });
+    window.setTimeout(() => window.location.reload(), 0);
+  };
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex items-center justify-center min-h-screen p-8 bg-background">
-          <div className="flex flex-col items-center w-full max-w-2xl p-8">
-            <AlertTriangle
-              size={48}
-              className="text-destructive mb-6 flex-shrink-0"
-            />
-
-            <h2 className="text-xl mb-4 font-bold" dir="rtl">حدث خطأ مؤقت في عرض هذه الصفحة</h2>
-            <p className="mb-4 text-center text-muted-foreground" dir="rtl">لم تُفقد البيانات. أعد تحميل بيانات الصفحة للمحاولة مرة أخرى.</p>
-
-            <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
-              <pre className="text-sm text-muted-foreground whitespace-break-spaces">
-                {this.state.error?.stack}
-              </pre>
-            </div>
-
+        <section className="flex min-h-[50vh] items-center justify-center bg-background px-5 py-12" dir="rtl" role="alert">
+          <div className="w-full max-w-lg rounded-3xl border border-amber-200 bg-amber-50 p-8 text-center shadow-sm">
+            <AlertTriangle size={44} className="mx-auto mb-5 text-amber-600" aria-hidden="true" />
+            <h2 className="text-xl font-black text-amber-950">تعذر فتح هذه الصفحة</h2>
+            <p className="mt-3 text-sm font-semibold leading-7 text-amber-900/80">
+              حدث خطأ مؤقت أثناء تحميل البيانات. لم تُحذف أي بيانات، ويمكنك إعادة المحاولة الآن.
+            </p>
             <button
-              onClick={() => window.location.reload()}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg",
-                "bg-primary text-primary-foreground",
-                "hover:opacity-90 cursor-pointer"
-              )}
+              type="button"
+              onClick={this.retry}
+              className="mx-auto mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-amber-700 px-5 font-bold text-white transition hover:bg-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
             >
-              <RotateCcw size={16} />
-              إعادة تحميل البيانات
+              <RotateCcw size={17} aria-hidden="true" />
+              إعادة فتح الصفحة
             </button>
           </div>
-        </div>
+        </section>
       );
     }
 
@@ -61,3 +60,4 @@ class ErrorBoundary extends Component<Props, State> {
 }
 
 export default ErrorBoundary;
+

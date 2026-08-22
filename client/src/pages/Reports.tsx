@@ -127,6 +127,10 @@ export default function Reports() {
   const expenseByCategory = Array.isArray(data.expenseByCategory) ? data.expenseByCategory : [];
   const treasuryTransactions = Array.isArray(treasury.transactions) ? treasury.transactions : [];
   const inventoryItems = Array.isArray(data.inventory?.items) ? data.inventory.items : [];
+  const safeVisitsByType = Array.isArray(data.visitsByType) ? data.visitsByType : [];
+  const safeVisitsByTechnician = Array.isArray(data.visitsByTechnician) ? data.visitsByTechnician : [];
+  const safeRecentVisits = Array.isArray(data.recentVisits) ? data.recentVisits : [];
+  const safeTechnicianPayments = Array.isArray(financial.technicianPaymentsByName) ? financial.technicianPaymentsByName : [];
   useEffect(() => {
     if (query.data && user)
       cacheOfflineReport(user.id, dateFrom, dateTo, query.data);
@@ -225,7 +229,7 @@ export default function Reports() {
     XLSX.utils.book_append_sheet(
       workbook,
       XLSX.utils.json_to_sheet(
-        financial.technicianPaymentsByName.map(row => ({
+        safeTechnicianPayments.map(row => ({
           الفني: row.technician,
           الحالة: row.status === "paid" ? "مدفوع" : "متبقي",
           "إجمالي المستحق": row.requiredAmount,
@@ -239,7 +243,7 @@ export default function Reports() {
     XLSX.utils.book_append_sheet(
       workbook,
       XLSX.utils.json_to_sheet(
-        data.expenseByCategory.map(row => ({
+        expenseByCategory.map(row => ({
           البند: row.label,
           الإجمالي: row.total,
         }))
@@ -249,7 +253,7 @@ export default function Reports() {
     XLSX.utils.book_append_sheet(
       workbook,
       XLSX.utils.json_to_sheet(
-        data.visitsByType.map(row => ({
+        safeVisitsByType.map(row => ({
           النوع: labelVisitType(row.label),
           العدد: row.total,
         }))
@@ -259,7 +263,7 @@ export default function Reports() {
     XLSX.utils.book_append_sheet(
       workbook,
       XLSX.utils.json_to_sheet(
-        data.visitsByTechnician.map(row => ({
+        safeVisitsByTechnician.map(row => ({
           الفني: row.label,
           "عدد الزيارات": row.total,
         }))
@@ -269,7 +273,7 @@ export default function Reports() {
     XLSX.utils.book_append_sheet(
       workbook,
       XLSX.utils.json_to_sheet(
-        data.recentVisits.map(row => ({
+        safeRecentVisits.map(row => ({
           التاريخ: dateLabel(row.date),
           العميل: row.customer,
           النوع: labelVisitType(row.type),
@@ -365,7 +369,7 @@ export default function Reports() {
         البيان: "صافي إيراد الشركة بعد المصروفات",
         القيمة: money(financial.companyNet),
       },
-      ...financial.technicianPaymentsByName.map(row => ({
+      ...safeTechnicianPayments.map(row => ({
         البيان: `الفني: ${row.technician}`,
         القيمة: `${row.status === "paid" ? "مدفوع" : "متبقي"} — المستحق ${money(row.requiredAmount)} — المدفوع ${money(row.totalPaid)} — المتبقي ${money(row.remainingAmount)}`,
       })),
@@ -1259,8 +1263,8 @@ export default function Reports() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {financial.technicianPaymentsByName.length ? (
-                        financial.technicianPaymentsByName.map(row => (
+                      {safeTechnicianPayments.length ? (
+                        safeTechnicianPayments.map(row => (
                           <tr key={row.technician}>
                             <td className="px-3 py-3 font-bold">
                               {row.technician}
@@ -1326,7 +1330,7 @@ export default function Reports() {
                 />
                 <ReportList
                   title="الزيارات حسب النوع"
-                  rows={data.visitsByType.map(row => ({
+                  rows={safeVisitsByType.map(row => ({
                     ...row,
                     label: labelVisitType(row.label),
                   }))}
@@ -1349,8 +1353,8 @@ export default function Reports() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {data.recentVisits.length ? (
-                        data.recentVisits.map((visit, index) => (
+                      {safeRecentVisits.length ? (
+                        safeRecentVisits.map((visit, index) => (
                           <tr key={`${visit.customer}-${index}`}>
                             <td className="px-3 py-3">
                               {dateLabel(visit.date)}
