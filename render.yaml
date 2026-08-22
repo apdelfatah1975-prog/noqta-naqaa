@@ -8,8 +8,10 @@ services:
     
     plan: free
     
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm run build
+    buildCommand: >-
     
+      tar -xzf PurePoint-source.tar.gz && pnpm install --frozen-lockfile && pnpm run build
+      
     startCommand: pnpm run db:migrate && pnpm start
     
     healthCheckPath: /
@@ -28,6 +30,7 @@ services:
       
         generateValue: true
         
+
 
 
 
