@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCustomerClipboard } from "./excelExport";
+import { cleanExcelCell, localizeExcelRows, parseCustomerClipboard } from "./excelExport";
 
 describe("parseCustomerClipboard", () => {
   it("reads pasted Arabic Excel rows and calculates follow-up dates", () => {
@@ -23,5 +23,15 @@ describe("parseCustomerClipboard", () => {
     const result = parseCustomerClipboard("العنوان\tالملاحظات\nالرياض\tبدون بيانات أساسية");
     expect(result.rows).toHaveLength(0);
     expect(result.issues[0].reason).toContain("اسم العميل والهاتف");
+  });
+});
+
+describe("تنظيف Excel", () => {
+  it("يحوّل null-like إلى خلايا فارغة ويحافظ على الصفر", () => {
+    expect(cleanExcelCell(null)).toBe("");
+    expect(cleanExcelCell(" undefined ")).toBe("");
+    expect(cleanExcelCell("N/A")).toBe("");
+    expect(cleanExcelCell(0)).toBe(0);
+    expect(localizeExcelRows([{ notes: null, tdsIn: undefined, amount: 0 }])).toEqual([{ notes: "", tdsIn: "", amount: 0 }]);
   });
 });

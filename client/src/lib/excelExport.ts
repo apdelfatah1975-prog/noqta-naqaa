@@ -71,6 +71,21 @@ function textCell(value: unknown) {
   return value === undefined || value === null ? "" : String(value).trim();
 }
 
+const emptyExcelTokens = new Set(["null", "undefined", "n/a", "na", "none", "غير محدد", "غير مسجل"]);
+
+export function cleanExcelCell(value: unknown): unknown {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") {
+    const cleaned = value.replace(/[\u200B\uFEFF]/g, "").trim();
+    return emptyExcelTokens.has(cleaned.toLocaleLowerCase("ar-EG")) ? "" : cleaned;
+  }
+  return value;
+}
+
+function cleanExcelRow(row: Record<string, unknown>) {
+  return Object.fromEntries(Object.entries(row).map(([key, value]) => [key, cleanExcelCell(value)]));
+}
+
 const excelValueLabels: Record<string, string> = {
   installation: "تركيب فلتر",
   install: "تركيب فلتر",
@@ -117,9 +132,9 @@ function localizeExcelValue(key: string, value: unknown) {
 }
 
 export function localizeExcelRows(rows: Array<Record<string, unknown>>) {
-  return rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => {
+  return rows.map(row => Object.fromEntries(Object.entries(cleanExcelRow(row)).map(([key, value]) => {
     const arabicKey = excelKeyLabels[key] ?? key;
-    return [arabicKey, localizeExcelValue(arabicKey, value)];
+    return [arabicKey, cleanExcelCell(localizeExcelValue(arabicKey, value))];
   })));
 }
 
@@ -277,7 +292,7 @@ export type CustomerExportRow = {
   followUpDays: string;
   lastServiceType: string;
   latestTechnicianName: string;
-  totalCollectedAmount: number;
+  totalCollectedAmount: number | "";
 };
 
 export type VisitExportRow = {
@@ -288,7 +303,7 @@ export type VisitExportRow = {
   visitType: string;
   visitDate: string;
   technicianName: string;
-  collectedAmount: number;
+  collectedAmount: number | "";
   visitResult: string;
 };
 
@@ -299,7 +314,7 @@ export type ReminderExportRow = {
   reminderDate: string;
   lastServiceType: string;
   lastServiceDate: string;
-  daysOverdue: number;
+  daysOverdue: number | "";
   status: string;
 };
 
@@ -310,10 +325,10 @@ export function customerRowsForExcel(customers: Array<any>): CustomerExportRow[]
     phone: customer.phone || "",
     address: customer.address || "",
     followUpDate: customer.followUp?.nextVisitDate ? new Date(customer.followUp.nextVisitDate).toLocaleDateString("ar-EG") : "",
-    followUpDays: customer.followUp ? (customer.followUp.daysRemaining < 0 ? `متأخر ${Math.abs(customer.followUp.daysRemaining)} يوم` : customer.followUp.daysRemaining === 0 ? "اليوم" : `${customer.followUp.daysRemaining} يوم`) : "لا يوجد موعد",
-    lastServiceType: labelVisitType(customer.followUp?.lastServiceVisitType),
+    followUpDays: customer.followUp ? (customer.followUp.daysRemaining < 0 ? `متأخر ${Math.abs(customer.followUp.daysRemaining)} يوم` : customer.followUp.daysRemaining === 0 ? "اليوم" : `${customer.followUp.daysRemaining} يوم`) : "",
+    lastServiceType: customer.followUp?.lastServiceVisitType ? labelVisitType(customer.followUp.lastServiceVisitType) : "",
     latestTechnicianName: customer.latestTechnicianName || "",
-    totalCollectedAmount: Number(customer.totalCollectedAmount || 0),
+    totalCollectedAmount: customer.totalCollectedAmount == null ? "" : Number(customer.totalCollectedAmount),
   }));
 }
 
@@ -323,10 +338,10 @@ export function visitRowsForExcel(visits: Array<any>): VisitExportRow[] {
     customerName: visit.customer?.name || "",
     phone: visit.customer?.phone || "",
     address: visit.customer?.address || "",
-    visitType: labelVisitType(visit.visitType),
+    visitType: visit.visitType ? labelVisitType(visit.visitType) : "",
     visitDate: visit.visitDate ? new Date(visit.visitDate).toLocaleString("ar-EG") : "",
     technicianName: visit.technicianName || "",
-    collectedAmount: Number(visit.collectedAmount || 0),
+    collectedAmount: visit.collectedAmount == null ? "" : Number(visit.collectedAmount),
     visitResult: visit.visitResult || visit.visitOutcome || visit.result || visit.notes || "",
   }));
 }
@@ -336,10 +351,10 @@ export function reminderRowsForExcel(reminders: Array<any>): ReminderExportRow[]
     customerCode: reminder.customer?.customerCode || "",
     customerName: reminder.customer?.name || "",
     phone: reminder.customer?.phone || "",
-    reminderDate: new Date(reminder.reminderDate).toLocaleDateString("ar-EG"),
-    lastServiceType: labelVisitType(reminder.lastServiceVisitType),
+    reminderDate: reminder.reminderDate ? new Date(reminder.reminderDate).toLocaleDateString("ar-EG") : "",
+    lastServiceType: reminder.lastServiceVisitType ? labelVisitType(reminder.lastServiceVisitType) : "",
     lastServiceDate: reminder.lastServiceVisitDate ? new Date(reminder.lastServiceVisitDate).toLocaleDateString("ar-EG") : "",
-    daysOverdue: reminder.daysOverdue || 0,
+    daysOverdue: reminder.daysOverdue == null ? "" : reminder.daysOverdue,
     status: reminder.status === "pending" ? "معلق" : reminder.status || "",
   }));
 }

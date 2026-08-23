@@ -6,8 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { UsedItemsSection, addOrIncrementVisitItem, buildPartsConfirmation, type CatalogItem, type UsedVisitItem } from "@/pages/Customers";
 import { trpc } from "@/lib/trpc";
 import { formatDateTime, reminderStatusLabels, toDateTimeLocal, visitTypeLabels } from "@/lib/filterUi";
-import { printVisitReport } from "@/lib/pdfExport";
-import { ArrowRight, BellRing, CalendarClock, CalendarPlus, Edit3, FileText, Loader2 } from "lucide-react";
+import { printCustomerProfile, printVisitReport } from "@/lib/pdfExport";
+import { ArrowRight, BellRing, CalendarClock, CalendarPlus, Edit3, FileText, Loader2, Printer } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useRoute } from "wouter";
@@ -88,6 +88,7 @@ export default function CustomerProfile() {
   const { customer } = resolvedData;
   const customerCode = customer.customerCode ?? customer.id;
   const followUp = customer.followUp;
+  const installationVisit = resolvedData.visits.filter(visit => visit.visitType === "installation").sort((a, b) => new Date(a.visitDate).getTime() - new Date(b.visitDate).getTime())[0];
 
   function submitVisit(event: FormEvent) {
     event.preventDefault();
@@ -107,7 +108,7 @@ export default function CustomerProfile() {
             <div className="mt-1 flex flex-wrap items-center gap-2"><h1 className="text-2xl font-extrabold">{customer.name}</h1><span className="text-lg font-extrabold text-white" dir="ltr">{customerCode}</span></div>
             <p className="mt-2 text-sm text-teal-50/80" dir="ltr">{customer.phone}</p>
           </div>
-          <Button onClick={() => {       setVisitType("maintenance"); setVisitDate(toDateTimeLocal()); setNotes(""); setVisitResult(""); setVisitTechnicianName(""); setVisitTechnicianId(""); setVisitCollectedAmount(""); setVisitTdsIn(""); setVisitTdsOut(""); setVisitNextDate(""); setVisitItems([]); setManualItemName(""); setManualItemQuantity("1"); setDialogOpen(true); }} className="mt-5 rounded-xl bg-white text-teal-800 hover:bg-teal-50 sm:mt-0"><CalendarPlus className="ml-2 h-4 w-4" />تسجيل زيارة</Button>
+          <div className="mt-5 flex flex-wrap justify-end gap-2 sm:mt-0"><Button type="button" variant="outline" onClick={() => { const opened = printCustomerProfile({ customerName: customer.name, customerCode, phone: customer.phone, address: customer.address, location: customer.latitude && customer.longitude ? `${customer.latitude}, ${customer.longitude}` : null, filterType: null, installationDate: installationVisit?.visitDate, notes: customer.notes, nextFollowUpDate: followUp?.nextVisitDate, visits: resolvedData.visits.map(visit => ({ visitType: visitTypeLabels[visit.visitType], visitDate: visit.visitDate, technicianName: visit.technicianName, tdsIn: visit.tdsIn, tdsOut: visit.tdsOut, collectedAmount: (visit as { collectedAmount?: number | null }).collectedAmount, notes: visit.visitResult || visit.notes })) }); if (opened) toast.success("تم تجهيز ملف العميل للطباعة أو الحفظ PDF"); else toast.error("تعذر فتح التقرير؛ اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى"); }} className="rounded-xl border-white/70 bg-white/10 text-white hover:bg-white/20"><Printer className="ml-2 h-4 w-4" />طباعة ملف العميل / PDF</Button><Button onClick={() => { setVisitType("maintenance"); setVisitDate(toDateTimeLocal()); setNotes(""); setVisitResult(""); setVisitTechnicianName(""); setVisitTechnicianId(""); setVisitCollectedAmount(""); setVisitTdsIn(""); setVisitTdsOut(""); setVisitNextDate(""); setVisitItems([]); setManualItemName(""); setManualItemQuantity("1"); setDialogOpen(true); }} className="rounded-xl bg-white text-teal-800 hover:bg-teal-50"><CalendarPlus className="ml-2 h-4 w-4" />تسجيل زيارة</Button></div>
         </div>
         <div className="grid gap-4 p-6 sm:grid-cols-3">
           <div><p className="text-xs font-bold text-muted-foreground">العنوان</p><p className="mt-2 text-sm leading-6">{customer.address || "غير مسجل"}</p></div>
