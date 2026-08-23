@@ -83,6 +83,8 @@ const customerCreateInput = customerInput.extend({
   firstTechnicianId: z.number().int().positive().optional().nullable(),
   firstSalesAgentName: z.string().trim().max(160).optional().nullable(),
   firstFilterCount: z.number().int().positive().max(1000).optional().default(1),
+  firstTdsIn: z.number().int().nonnegative().max(100000).optional().nullable(),
+  firstTdsOut: z.number().int().nonnegative().max(100000).optional().nullable(),
   firstVisitNotes: z.string().trim().max(2000).optional().nullable(),
   firstVisitResult: z.string().trim().max(2000).optional().nullable(),
   firstCollectedAmount: z.number().int().nonnegative().optional().default(0),
@@ -861,7 +863,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         )).limit(1);
         if (existing[0]) return { id: existing[0].id, alreadySynced: true };
       }
-      const { clientOperationId, firstVisitType, firstVisitDate, firstTechnicianName, firstTechnicianId, firstSalesAgentName, firstFilterCount, firstVisitResult, firstVisitNotes, firstCollectedAmount, firstCollectedCurrency, items, ...data } = input;
+      const { clientOperationId, firstVisitType, firstVisitDate, firstTechnicianName, firstTechnicianId, firstSalesAgentName, firstFilterCount, firstTdsIn, firstTdsOut, firstVisitResult, firstVisitNotes, firstCollectedAmount, firstCollectedCurrency, items, ...data } = input;
       const assignedTechnician = await resolveAssignedTechnician(ownerId, ctx.user.role === "user" ? ctx.user.id : null, firstTechnicianId, firstTechnicianName);
       const storedTechnicianName = assignedTechnician?.name ?? firstTechnicianName ?? null;
       const existingNames = await db.select({ id: customers.id, name: customers.name }).from(customers).where(eq(customers.ownerId, ownerId)).limit(100000);
@@ -879,7 +881,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         return { id: customerId, alreadySynced: false, firstVisitCreated: false };
       }
       const visitDate = firstVisitDate ?? new Date();
-      const visitResult = await db.insert(visits).values({ customerId, ownerId, visitType: firstVisitType, visitDate, technicianName: storedTechnicianName, assignedTechnicianId: assignedTechnician?.id ?? null, salesAgentName: firstSalesAgentName ?? null, filterCount: firstFilterCount, visitResult: firstVisitResult ?? null, notes: firstVisitNotes ?? null });
+      const visitResult = await db.insert(visits).values({ customerId, ownerId, visitType: firstVisitType, visitDate, technicianName: storedTechnicianName, assignedTechnicianId: assignedTechnician?.id ?? null, salesAgentName: firstSalesAgentName ?? null, filterCount: firstFilterCount, tdsIn: firstTdsIn ?? null, tdsOut: firstTdsOut ?? null, visitResult: firstVisitResult ?? null, notes: firstVisitNotes ?? null });
       const visitId = Number(visitResult[0].insertId);
       const inventoryRows = items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ownerId), inArray(inventoryItems.id, items.map(item => item.inventoryItemId)))) : [];
       const inventoryById = new Map(inventoryRows.map(item => [item.id, item]));

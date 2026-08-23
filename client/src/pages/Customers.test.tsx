@@ -133,6 +133,19 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(screen.getByRole("button", { name: "إضافة صنف" })).toBeTruthy();
   });
 
+  it("يظهر قياسي TDS ويحفظهما مع العميل الجديد والزيارة الأولى", () => {
+    const mutate = vi.fn();
+    mocks.createUseMutation.mockReturnValue({ mutate, isPending: false });
+    render(<Customers />);
+    fireEvent.click(screen.getByRole("button", { name: "إضافة عميل" }));
+    fireEvent.change(screen.getByLabelText("اسم العميل"), { target: { value: "عميل TDS" } });
+    fireEvent.change(screen.getByLabelText("رقم الهاتف"), { target: { value: "0500000000" } });
+    fireEvent.change(screen.getAllByLabelText("قياس المياه قبل الفلتر للعميل الجديد")[0], { target: { value: "420" } });
+    fireEvent.change(screen.getAllByLabelText("قياس المياه بعد الفلتر للعميل الجديد")[0], { target: { value: "38" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "حفظ البيانات" })[0]);
+    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ firstTdsIn: 420, firstTdsOut: 38 }));
+  });
+
   it("يجمع عدة أصناف مختلفة داخل زيارة واحدة دون استبدال الصنف السابق", () => {
     const catalog = [
       { id: 1, name: "فلتر جامبو" },
