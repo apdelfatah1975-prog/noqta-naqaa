@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import { parse as parseCookie } from "cookie";
 import { and, asc, desc, eq, gte, inArray, isNotNull, like, lte, ne, or } from "drizzle-orm";
 import { z } from "zod";
+import { normalizeEvidenceDataUrl, isSupportedEvidenceMime } from "../../shared/evidence";
 import {
   cashTransactions,
   customers,
@@ -115,7 +116,7 @@ const workOrderProofInput = z.object({
   visitId: z.number().int().positive(),
   kind: z.enum(["photo", "signature", "audio"]),
   photoSlot: z.enum(["before", "after", "general"]).optional(),
-  dataUrl: z.string().regex(/^data:(?:image\/(?:jpeg|png|webp)|audio\/(?:webm|mp4|mpeg|ogg));base64,[A-Za-z0-9+/=]+$/, "صيغة الدليل غير صالحة").max(12_000_000),
+  dataUrl: z.string().max(12_000_000).transform(value => normalizeEvidenceDataUrl(value)).refine(value => value !== null, "صيغة الدليل غير صالحة").transform(value => value as string),
 });
 
 const visitItemInput = z.object({
@@ -1693,8 +1694,8 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         : and(eq(visits.id, input.visitId), eq(visits.assignedTechnicianId, ctx.user.id));
       const visit = (await db.select({ id: visits.id, ownerId: visits.ownerId }).from(visits).where(condition).limit(1))[0];
       if (!visit) throw new TRPCError({ code: "NOT_FOUND", message: "أمر العمل غير موجود أو غير مسند إليك." });
-      const match = input.dataUrl.match(/^data:((?:image\/(?:jpeg|png|webp)|audio\/(?:webm|mp4|mpeg|ogg)));base64,(.+)$/);
-      if (!match) throw new TRPCError({ code: "BAD_REQUEST", message: "صيغة الدليل غير صالحة." });
+      const match = input.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match || !isSupportedEvidenceMime(match[1], input.kind)) throw new TRPCError({ code: "BAD_REQUEST", message: "صيغة الدليل غير صالحة. اختر صورة أو تسجيلًا مدعومًا." });
       const mimeType = match[1];
       const buffer = Buffer.from(match[2], "base64");
       const maxBytes = input.kind === "audio" ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
