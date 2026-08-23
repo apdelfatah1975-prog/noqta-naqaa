@@ -41,4 +41,11 @@ describe("field improvements contracts", () => {
     expect(workOrders).toContain("صورة قبل الصيانة");
     expect(workOrders).toContain("صورة بعد الصيانة");
   });
+
+  it("keeps large customer imports central and technician-assigned", () => {
+    expect(router).toContain("rows: z.array(customerImportRowInput).min(1).max(1000)");
+    expect(router).toContain("const ownerId = await getCompanyOwnerId(ctx.user.id, ctx.user.role);");
+    expect(router).toContain("assignedTechnicianId: assignedTechnician?.id ?? null");
+    expect(router).toContain("clientOperationId: operationId");
+  });
 });
