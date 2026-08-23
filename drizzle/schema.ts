@@ -116,6 +116,8 @@ export const visits = mysqlTable(
     filterCount: int("filterCount").default(1).notNull(),
     tdsIn: int("tdsIn"),
     tdsOut: int("tdsOut"),
+    photoBeforeKey: varchar("photoBeforeKey", { length: 512 }),
+    photoAfterKey: varchar("photoAfterKey", { length: 512 }),
     status: mysqlEnum("status", ["assigned", "en_route", "arrived", "in_progress", "completed", "postponed", "cancelled"]).default("assigned").notNull(),
     assignedTechnicianId: int("assignedTechnicianId").references(() => users.id, { onDelete: "set null" }),
     arrivedAt: timestamp("arrivedAt"),
@@ -312,6 +314,7 @@ export const visitItems = mysqlTable(
 
 
 export const workOrderProofKindValues = ["photo", "signature", "audio"] as const;
+export const workOrderPhotoSlotValues = ["before", "after", "general"] as const;
 
 export const workOrderProofs = mysqlTable(
   "workOrderProofs",
@@ -321,6 +324,7 @@ export const workOrderProofs = mysqlTable(
     visitId: int("visitId").notNull().references(() => visits.id, { onDelete: "cascade" }),
     uploadedBy: int("uploadedBy").notNull().references(() => users.id, { onDelete: "restrict" }),
     kind: mysqlEnum("kind", workOrderProofKindValues).notNull(),
+    photoSlot: mysqlEnum("photoSlot", workOrderPhotoSlotValues),
     storageKey: varchar("storageKey", { length: 512 }).notNull(),
     url: varchar("url", { length: 1024 }).notNull(),
     mimeType: varchar("mimeType", { length: 120 }).notNull(),

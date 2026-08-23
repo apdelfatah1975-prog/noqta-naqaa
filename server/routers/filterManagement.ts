@@ -113,6 +113,7 @@ const customerImportRowInput = z.object({
 const workOrderProofInput = z.object({
   visitId: z.number().int().positive(),
   kind: z.enum(["photo", "signature", "audio"]),
+  photoSlot: z.enum(["before", "after", "general"]).optional(),
   dataUrl: z.string().regex(/^data:(?:image\/(?:jpeg|png|webp)|audio\/(?:webm|mp4|mpeg|ogg));base64,[A-Za-z0-9+/=]+$/, "صيغة الدليل غير صالحة").max(12_000_000),
 });
 
@@ -159,6 +160,8 @@ const workOrderUpdateInput = z.object({
   executionOutcome: z.enum(executionOutcomeValues).optional().nullable(),
   notCompletedReason: z.string().trim().max(1000).optional().nullable(),
   collectedAmount: z.number().int().nonnegative().max(100000, "مبلغ التحصيل يجب ألا يتجاوز 100,000 ريال.").optional().default(0),
+  tdsIn: z.number().int().nonnegative().max(100000).optional().nullable(),
+  tdsOut: z.number().int().nonnegative().max(100000).optional().nullable(),
   collectedCurrency: z.enum(cashCurrencies).optional().default("SAR"),
   items: z.array(visitItemInput).max(50).optional().default([]),
 }).superRefine((input, ctx) => {
@@ -1577,7 +1580,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       const [customerRows, incomeRows, proofRows] = await Promise.all([
         db.select().from(customers).where(inArray(customers.ownerId, ownerIds)),
         db.select().from(cashTransactions).where(and(inArray(cashTransactions.ownerId, ownerIds), eq(cashTransactions.transactionType, "income"))),
-        db.select({ id: workOrderProofs.id, visitId: workOrderProofs.visitId, kind: workOrderProofs.kind, url: workOrderProofs.url, mimeType: workOrderProofs.mimeType, createdAt: workOrderProofs.createdAt }).from(workOrderProofs).where(and(inArray(workOrderProofs.visitId, rows.map(row => row.id)), inArray(workOrderProofs.ownerId, ownerIds))).orderBy(desc(workOrderProofs.createdAt)),
+        db.select({ id: workOrderProofs.id, visitId: workOrderProofs.visitId, kind: workOrderProofs.kind, photoSlot: workOrderProofs.photoSlot, url: workOrderProofs.url, mimeType: workOrderProofs.mimeType, createdAt: workOrderProofs.createdAt }).from(workOrderProofs).where(and(inArray(workOrderProofs.visitId, rows.map(row => row.id)), inArray(workOrderProofs.ownerId, ownerIds))).orderBy(desc(workOrderProofs.createdAt)),
       ]);
       const customerById = new Map(customerRows.map(customer => [customer.id, customer]));
       const incomeByVisit = new Map(incomeRows.filter(row => row.sourceVisitId).map(row => [row.sourceVisitId!, row]));
@@ -1631,7 +1634,10 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       const extension = mimeType.split("/")[1];
       const key = `water-filter-proofs/${visit.ownerId}/${visit.id}/${Date.now()}-${randomBytes(6).toString("hex")}.${extension}`;
       const uploaded = await storagePut(key, buffer, mimeType);
-      const inserted = await db.insert(workOrderProofs).values({ ownerId: visit.ownerId, visitId: visit.id, uploadedBy: ctx.user.id, kind: input.kind, storageKey: uploaded.key, url: uploaded.url, mimeType });
+      const inserted = await db.insert(workOrderProofs).values({ ownerId: visit.ownerId, visitId: visit.id, uploadedBy: ctx.user.id, kind: input.kind, photoSlot: input.kind === "photo" ? (input.photoSlot ?? "general") : null, storageKey: uploaded.key, url: uploaded.url, mimeType });
+      if (input.kind === "photo" && input.photoSlot && input.photoSlot !== "general") {
+        await db.update(visits).set(input.photoSlot === "before" ? { photoBeforeKey: uploaded.key } : { photoAfterKey: uploaded.key }).where(eq(visits.id, visit.id));
+      }
       return { id: Number(inserted[0].insertId), url: uploaded.url, kind: input.kind };
     }),
     listProofs: protectedProcedure.input(z.object({ visitId: z.number().int().positive() })).query(async ({ ctx, input }) => {
@@ -1641,7 +1647,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         : and(eq(visits.id, input.visitId), eq(visits.assignedTechnicianId, ctx.user.id));
       const visit = (await db.select({ id: visits.id, ownerId: visits.ownerId }).from(visits).where(condition).limit(1))[0];
       if (!visit) throw new TRPCError({ code: "NOT_FOUND", message: "أمر العمل غير موجود." });
-      return db.select({ id: workOrderProofs.id, kind: workOrderProofs.kind, url: workOrderProofs.url, mimeType: workOrderProofs.mimeType, createdAt: workOrderProofs.createdAt }).from(workOrderProofs).where(and(eq(workOrderProofs.visitId, visit.id), eq(workOrderProofs.ownerId, visit.ownerId))).orderBy(desc(workOrderProofs.createdAt));
+      return db.select({ id: workOrderProofs.id, kind: workOrderProofs.kind, photoSlot: workOrderProofs.photoSlot, url: workOrderProofs.url, mimeType: workOrderProofs.mimeType, createdAt: workOrderProofs.createdAt }).from(workOrderProofs).where(and(eq(workOrderProofs.visitId, visit.id), eq(workOrderProofs.ownerId, visit.ownerId))).orderBy(desc(workOrderProofs.createdAt));
     }),
     updateStatus: protectedProcedure.input(workOrderUpdateInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
@@ -1659,7 +1665,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       if (outcome === "not_completed" && !input.notCompletedReason?.trim() && !visit.notCompletedReason?.trim()) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "اكتب سبب عدم تنفيذ الزيارة قبل الحفظ." });
       }
-      await db.update(visits).set({ status: input.status, visitResult: input.visitResult ?? visit.visitResult, notes: input.notes ?? visit.notes, executionOutcome: outcome, notCompletedReason: outcome === "not_completed" ? input.notCompletedReason?.trim() ?? visit.notCompletedReason : null, arrivedAt: input.status === "arrived" ? now : visit.arrivedAt, completedAt: input.status === "completed" ? now : visit.completedAt }).where(and(eq(visits.id, input.id), eq(visits.ownerId, ownerId)));
+      await db.update(visits).set({ status: input.status, visitResult: input.visitResult ?? visit.visitResult, notes: input.notes ?? visit.notes, executionOutcome: outcome, notCompletedReason: outcome === "not_completed" ? input.notCompletedReason?.trim() ?? visit.notCompletedReason : null, arrivedAt: input.status === "arrived" ? now : visit.arrivedAt, completedAt: input.status === "completed" ? now : visit.completedAt, tdsIn: input.tdsIn ?? visit.tdsIn, tdsOut: input.tdsOut ?? visit.tdsOut }).where(and(eq(visits.id, input.id), eq(visits.ownerId, ownerId)));
       if (input.status === "completed" && visit.status !== "completed") {
         const inventoryRows = input.items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ownerId), inArray(inventoryItems.id, input.items.map(item => item.inventoryItemId)))) : [];
         const inventoryById = new Map(inventoryRows.map(item => [item.id, item]));
@@ -1692,6 +1698,33 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       if (!backup) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر إنشاء النسخة الاحتياطية الآن." });
       return { generatedAt: backup.generatedAt, downloadUrl: backup.url, counts: backup.counts, tables: backup.tables };
     }),
+  }),
+
+  dailyCashClosing: adminProcedure.input(z.object({ date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional() }).optional()).query(async ({ ctx, input }) => {
+    const db = await databaseOrThrow();
+    const date = input?.date ?? new Date().toISOString().slice(0, 10);
+    const from = new Date(`${date}T00:00:00.000`);
+    const to = new Date(`${date}T23:59:59.999`);
+    const [rows, income] = await Promise.all([
+      db.select({ technicianName: visits.technicianName, status: visits.status, executionOutcome: visits.executionOutcome }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), gte(visits.visitDate, from), lte(visits.visitDate, to))),
+      db.select({ technicianName: cashTransactions.recipientName, amount: cashTransactions.amount }).from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.transactionType, "income"), gte(cashTransactions.transactionDate, from), lte(cashTransactions.transactionDate, to))),
+    ]);
+    const byName = new Map<string, { technicianName: string; visitsCompleted: number; collectedAmount: number }>();
+    for (const row of rows) {
+      if (row.status !== "completed" || row.executionOutcome === "not_completed") continue;
+      const technicianName = row.technicianName?.trim() || "غير محدد";
+      const current = byName.get(technicianName) ?? { technicianName, visitsCompleted: 0, collectedAmount: 0 };
+      current.visitsCompleted += 1;
+      byName.set(technicianName, current);
+    }
+    for (const row of income) {
+      const technicianName = row.technicianName?.trim() || "غير محدد";
+      const current = byName.get(technicianName) ?? { technicianName, visitsCompleted: 0, collectedAmount: 0 };
+      current.collectedAmount += Number(row.amount || 0);
+      byName.set(technicianName, current);
+    }
+    const technicians = Array.from(byName.values()).sort((a, b) => b.collectedAmount - a.collectedAmount || a.technicianName.localeCompare(b.technicianName, "ar-EG"));
+    return { date, technicians, totalVisits: technicians.reduce((sum, row) => sum + row.visitsCompleted, 0), totalCollected: technicians.reduce((sum, row) => sum + row.collectedAmount, 0) };
   }),
 
   cash: router({

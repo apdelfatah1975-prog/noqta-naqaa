@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { queueOfflineWorkOrderProof, queueOfflineWorkOrderUpdate } from "@/lib/offlineSync";
 import { CustomerContactActions } from "@/components/CustomerContactActions";
 
 const statusLabels: Record<string, string> = {
@@ -32,6 +31,30 @@ const resultQuickChoices = ["تم التركيب بنجاح", "تمت الصيا
 const notCompletedQuickChoices = ["العميل غير موجود", "العميل طلب التأجيل", "تعذر الوصول للموقع", "الموقع مغلق", "تحتاج الزيارة موافقة الإدارة", "سبب آخر"];
 const collectionQuickChoices = ["0", "50", "100", "250", "500", "1000"];
 
+async function compressFieldPhoto(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  let quality = 0.78;
+  let blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/webp", quality));
+  if (!blob) throw new Error("تعذر تجهيز الصورة");
+  while (blob.size >= 200 * 1024 && quality > 0.45) {
+    quality -= 0.06;
+    blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/webp", quality));
+    if (!blob) throw new Error("تعذر ضغط الصورة");
+  }
+  if (blob.size >= 200 * 1024) throw new Error("تعذر ضغط الصورة إلى أقل من 200 كيلوبايت");
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("تعذر قراءة الصورة"));
+    reader.onerror = () => reject(new Error("تعذر قراءة الصورة"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 export default function TechnicianPreview() {
   const [, setLocation] = useLocation();
   const { user, logout } = useAuth();
@@ -40,8 +63,12 @@ export default function TechnicianPreview() {
   const [result, setResult] = useState("");
   const [outcome, setOutcome] = useState<"completed" | "not_completed">("completed");
   const [notCompletedReason, setNotCompletedReason] = useState("");
-  const [proofDataUrl, setProofDataUrl] = useState<string | null>(null);
-  const [proofName, setProofName] = useState("");
+  const [photoBeforeDataUrl, setPhotoBeforeDataUrl] = useState<string | null>(null);
+  const [photoAfterDataUrl, setPhotoAfterDataUrl] = useState<string | null>(null);
+  const [photoBeforeName, setPhotoBeforeName] = useState("");
+  const [photoAfterName, setPhotoAfterName] = useState("");
+  const [tdsIn, setTdsIn] = useState("");
+  const [tdsOut, setTdsOut] = useState("");
   const [audioDataUrl, setAudioDataUrl] = useState<string | null>(null);
   const [audioName, setAudioName] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -79,8 +106,12 @@ export default function TechnicianPreview() {
       setResult("");
       setOutcome("completed");
       setNotCompletedReason("");
-      setProofDataUrl(null);
-      setProofName("");
+      setPhotoBeforeDataUrl(null);
+      setPhotoAfterDataUrl(null);
+      setPhotoBeforeName("");
+      setPhotoAfterName("");
+      setTdsIn("");
+      setTdsOut("");
       setAudioDataUrl(null);
       setAudioName("");
       setIsRecording(false);
@@ -135,30 +166,14 @@ export default function TechnicianPreview() {
     setResult(current => current.trim() ? `${current.trim()} — ${choice}` : choice);
   };
 
-  const saveUpdate = (input: { id: number; status: "en_route" | "arrived" | "in_progress" | "completed" | "postponed"; visitResult: string | null; notes: string | null; executionOutcome?: "completed" | "not_completed" | null; notCompletedReason?: string | null; collectedAmount: number; items: SelectedItem[] }) => {
-    if (!online && user) {
-      if (input.executionOutcome === "not_completed" && proofDataUrl) {
-        queueOfflineWorkOrderProof(user.id, { visitId: input.id, kind: "photo", dataUrl: proofDataUrl });
-      }
-      if (audioDataUrl) queueOfflineWorkOrderProof(user.id, { visitId: input.id, kind: "audio", dataUrl: audioDataUrl });
-      queueOfflineWorkOrderUpdate(user.id, input);
-      setLocalUpdates(current => ({ ...current, [input.id]: { status: input.status, visitResult: input.visitResult, collectedAmount: input.collectedAmount } }));
-      toast.success("تم الحفظ على الهاتف، وستتم المزامنة عند عودة الإنترنت");
-      setSelectedId(null);
-      setResult("");
-      setOutcome("completed");
-      setNotCompletedReason("");
-      setAudioDataUrl(null);
-      setAudioName("");
-      setIsRecording(false);
-      setAmount("");
-      setCollectionState("paid");
+  const saveUpdate = (input: { id: number; status: "en_route" | "arrived" | "in_progress" | "completed" | "postponed"; visitResult: string | null; notes: string | null; executionOutcome?: "completed" | "not_completed" | null; notCompletedReason?: string | null; collectedAmount: number; tdsIn?: number | null; tdsOut?: number | null; items: SelectedItem[] }) => {
+    if (!online) {
+      toast.error("لا يوجد اتصال بالسيرفر؛ أعد المحاولة بعد عودة الإنترنت.");
       return;
     }
     update.mutate(input);
-    if (input.executionOutcome === "not_completed" && proofDataUrl) {
-      addProof.mutate({ visitId: input.id, kind: "photo", dataUrl: proofDataUrl });
-    }
+    if (photoBeforeDataUrl) addProof.mutate({ visitId: input.id, kind: "photo", photoSlot: "before", dataUrl: photoBeforeDataUrl });
+    if (photoAfterDataUrl) addProof.mutate({ visitId: input.id, kind: "photo", photoSlot: "after", dataUrl: photoAfterDataUrl });
     if (audioDataUrl) addProof.mutate({ visitId: input.id, kind: "audio", dataUrl: audioDataUrl });
   };
   const updateOrder = (id: number, status: "en_route" | "arrived" | "in_progress") => {
@@ -212,7 +227,7 @@ export default function TechnicianPreview() {
       <section className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3.5"><div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white"><ShieldCheck className="h-5 w-5" /></div><div><h2 className="font-black text-emerald-950">أوامرك المسندة فقط</h2><p className="mt-1 text-xs font-semibold leading-6 text-emerald-800">تظهر هنا أوامر العمل الخاصة بك فقط، دون الخزينة أو التقارير أو بيانات باقي الفنيين.</p></div></div></section>
 
       <section className="space-y-2.5"><div className="flex items-center justify-between"><div><h2 className="text-lg font-black text-slate-900">أوامر الشغل</h2><p className="mt-1 text-xs font-bold text-slate-500">حدّث الحالة بعد كل خطوة</p></div><span className="rounded-full bg-teal-100 px-3 py-1 text-xs font-black text-teal-800">{visible.length} أوامر</span></div>
-        {visible.length ? visible.map(order => <article key={order.id} className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm"><div className="flex items-start gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-teal-50 text-teal-700"><UserRound className="h-6 w-6" /></div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><h3 className="truncate text-base font-black text-slate-900">{order.customer?.name || "عميل"}</h3><p className="mt-1 text-xs font-bold text-slate-500">{serviceLabels[order.visitType] || order.visitType}</p></div><span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-700">{statusLabels[order.status] || order.status}</span></div><div className="mt-3 space-y-2 text-xs font-bold text-slate-500"><span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4 text-teal-600" />{new Date(order.visitDate).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" })}</span><span className="flex items-start gap-1.5"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" />{order.customer?.address || "العنوان غير مسجل"}</span></div></div></div><div className="mt-4 flex flex-wrap items-center gap-2"><CustomerContactActions customer={order.customer ?? {}} serviceType={order.visitType} companyWhatsAppPhone={notificationSettingsQuery.data?.companyWhatsAppPhone} compact labels showLocationPlaceholder className="shrink-0" />{order.status === "assigned" ? <Button type="button" onClick={() => updateOrder(order.id, "en_route")} className="h-10 rounded-xl bg-teal-700 text-xs font-black">في الطريق</Button> : order.status !== "completed" && order.status !== "cancelled" ? <Button type="button" onClick={() => { setSelectedId(order.id); setResult(order.visitResult || ""); setOutcome(order.executionOutcome === "not_completed" ? "not_completed" : "completed"); setNotCompletedReason(order.notCompletedReason || ""); setProofDataUrl(null); setProofName("");       setAudioDataUrl(null); setAudioName(""); setIsRecording(false); setCollectionState("paid"); }} aria-label="تحديث" className="h-10 rounded-xl bg-teal-700 text-xs font-black">تحديث / تسجيل التنفيذ</Button> : <span className="flex h-10 items-center justify-center rounded-xl bg-emerald-50 text-xs font-black text-emerald-800">تم الحفظ</span>}</div>{order.status === "en_route" ? <Button type="button" onClick={() => updateOrder(order.id, "arrived")} className="mt-2 h-10 w-full rounded-xl bg-sky-700 text-xs font-black">وصلت إلى العميل</Button> : null}{order.status === "arrived" ? <Button type="button" onClick={() => updateOrder(order.id, "in_progress")} className="mt-2 h-10 w-full rounded-xl bg-indigo-700 text-xs font-black">بدء التنفيذ</Button> : null}</article>) : <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm font-bold text-slate-500">لا توجد أوامر مسندة حاليًا.</div>}
+        {visible.length ? visible.map(order => <article key={order.id} className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm"><div className="flex items-start gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-teal-50 text-teal-700"><UserRound className="h-6 w-6" /></div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><h3 className="truncate text-base font-black text-slate-900">{order.customer?.name || "عميل"}</h3><p className="mt-1 text-xs font-bold text-slate-500">{serviceLabels[order.visitType] || order.visitType}</p></div><span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-700">{statusLabels[order.status] || order.status}</span></div><div className="mt-3 space-y-2 text-xs font-bold text-slate-500"><span className="flex items-center gap-1.5"><Clock3 className="h-4 w-4 text-teal-600" />{new Date(order.visitDate).toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" })}</span><span className="flex items-start gap-1.5"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" />{order.customer?.address || "العنوان غير مسجل"}</span></div></div></div><div className="mt-4 flex flex-wrap items-center gap-2"><CustomerContactActions customer={order.customer ?? {}} serviceType={order.visitType} companyWhatsAppPhone={notificationSettingsQuery.data?.companyWhatsAppPhone} compact labels showLocationPlaceholder className="shrink-0" />{order.status === "assigned" ? <Button type="button" onClick={() => updateOrder(order.id, "en_route")} className="h-10 rounded-xl bg-teal-700 text-xs font-black">في الطريق</Button> : order.status !== "completed" && order.status !== "cancelled" ? <Button type="button" onClick={() => { setSelectedId(order.id); setResult(order.visitResult || ""); setOutcome(order.executionOutcome === "not_completed" ? "not_completed" : "completed"); setNotCompletedReason(order.notCompletedReason || ""); setPhotoBeforeDataUrl(null); setPhotoAfterDataUrl(null); setPhotoBeforeName(""); setPhotoAfterName(""); setTdsIn(""); setTdsOut(""); setAudioDataUrl(null); setAudioName(""); setIsRecording(false); setCollectionState("paid"); }} aria-label="تحديث" className="h-10 rounded-xl bg-teal-700 text-xs font-black">تحديث / تسجيل التنفيذ</Button> : <span className="flex h-10 items-center justify-center rounded-xl bg-emerald-50 text-xs font-black text-emerald-800">تم الحفظ</span>}</div>{order.status === "en_route" ? <Button type="button" onClick={() => updateOrder(order.id, "arrived")} className="mt-2 h-10 w-full rounded-xl bg-sky-700 text-xs font-black">وصلت إلى العميل</Button> : null}{order.status === "arrived" ? <Button type="button" onClick={() => updateOrder(order.id, "in_progress")} className="mt-2 h-10 w-full rounded-xl bg-indigo-700 text-xs font-black">بدء التنفيذ</Button> : null}</article>) : <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm font-bold text-slate-500">لا توجد أوامر مسندة حاليًا.</div>}
       </section>
 
       {selected ? (
@@ -230,7 +245,7 @@ export default function TechnicianPreview() {
               <button type="button" onClick={() => setOutcome("completed")} className={`rounded-xl border p-3 text-sm font-black ${outcome === "completed" ? "border-emerald-500 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-100" : "border-slate-200 bg-white text-slate-600"}`}>تم التنفيذ</button>
               <button type="button" onClick={() => setOutcome("not_completed")} className={`rounded-xl border p-3 text-sm font-black ${outcome === "not_completed" ? "border-amber-500 bg-amber-50 text-amber-800 ring-2 ring-amber-100" : "border-slate-200 bg-white text-slate-600"}`}>لم يتم التنفيذ</button>
             </div>
-            {outcome === "not_completed" ? <><div className="mt-3"><p className="text-sm font-black text-amber-900">اختر سبب عدم التنفيذ</p><div className="mt-2 flex flex-wrap gap-2">{notCompletedQuickChoices.map(choice => <button key={choice} type="button" onClick={() => setNotCompletedReason(choice)} className={`rounded-full border px-3 py-2 text-xs font-black ${notCompletedReason === choice ? "border-amber-500 bg-amber-100 text-amber-900" : "border-amber-200 bg-white text-amber-800"}`}>{choice}</button>)}</div></div><label className="mt-3 block text-sm font-black text-amber-900">تفاصيل إضافية<textarea aria-label="سبب عدم التنفيذ" value={notCompletedReason} onChange={event => setNotCompletedReason(event.target.value)} className="mt-2 min-h-20 w-full rounded-xl border border-amber-200 bg-amber-50/40 p-3 font-bold" placeholder="اختر سببًا أو اكتب تفاصيل إضافية" /></label><label className="mt-3 block text-sm font-black text-amber-900"><span className="flex items-center gap-2"><Camera className="h-4 w-4" />صورة الحالة للمتابع (اختياري)</span><input aria-label="صورة الزيارة" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 5 * 1024 * 1024) { toast.error("حجم الصورة يجب ألا يتجاوز 5 ميجابايت."); return; } const reader = new FileReader(); reader.onload = () => { if (typeof reader.result === "string") { setProofDataUrl(reader.result); setProofName(file.name); } }; reader.readAsDataURL(file); }} className="mt-2 block w-full rounded-xl border border-amber-200 bg-amber-50/40 p-3 text-sm font-bold" /><span className="mt-1 block text-[11px] font-bold text-slate-500">{proofName ? `تم اختيار: ${proofName}` : "صوّر الحالة من الهاتف ليشاهدها المتابع"}</span>{proofDataUrl ? <img src={proofDataUrl} alt="معاينة صورة الزيارة" className="mt-2 h-32 w-full rounded-xl object-cover" /> : null}</label></> : null}
+            {outcome === "not_completed" ? <><div className="mt-3"><p className="text-sm font-black text-amber-900">اختر سبب عدم التنفيذ</p><div className="mt-2 flex flex-wrap gap-2">{notCompletedQuickChoices.map(choice => <button key={choice} type="button" onClick={() => setNotCompletedReason(choice)} className={`rounded-full border px-3 py-2 text-xs font-black ${notCompletedReason === choice ? "border-amber-500 bg-amber-100 text-amber-900" : "border-amber-200 bg-white text-amber-800"}`}>{choice}</button>)}</div></div><label className="mt-3 block text-sm font-black text-amber-900">تفاصيل إضافية<textarea aria-label="سبب عدم التنفيذ" value={notCompletedReason} onChange={event => setNotCompletedReason(event.target.value)} className="mt-2 min-h-20 w-full rounded-xl border border-amber-200 bg-amber-50/40 p-3 font-bold" placeholder="اختر سببًا أو اكتب تفاصيل إضافية" /></label><div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="block text-sm font-black text-slate-700">صورة قبل الصيانة<input aria-label="صورة قبل الصيانة" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={async event => { const file = event.target.files?.[0]; if (!file) return; try { setPhotoBeforeDataUrl(await compressFieldPhoto(file)); setPhotoBeforeName(file.name); toast.success("تم ضغط صورة قبل الصيانة وتجهيزها"); } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر ضغط الصورة"); } }} className="mt-2 block w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-bold" /><span className="mt-1 block text-[11px] font-bold text-slate-500">{photoBeforeName || "أقل من 200KB تلقائيًا"}</span>{photoBeforeDataUrl ? <img src={photoBeforeDataUrl} alt="معاينة قبل الصيانة" className="mt-2 h-28 w-full rounded-xl object-cover" /> : null}</label><label className="block text-sm font-black text-slate-700">صورة بعد الصيانة<input aria-label="صورة بعد الصيانة" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={async event => { const file = event.target.files?.[0]; if (!file) return; try { setPhotoAfterDataUrl(await compressFieldPhoto(file)); setPhotoAfterName(file.name); toast.success("تم ضغط صورة بعد الصيانة وتجهيزها"); } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر ضغط الصورة"); } }} className="mt-2 block w-full rounded-xl border border-slate-200 bg-white p-2 text-xs font-bold" /><span className="mt-1 block text-[11px] font-bold text-slate-500">{photoAfterName || "أقل من 200KB تلقائيًا"}</span>{photoAfterDataUrl ? <img src={photoAfterDataUrl} alt="معاينة بعد الصيانة" className="mt-2 h-28 w-full rounded-xl object-cover" /> : null}</label></div></> : null}
           </div>
           <div className="mt-4"><p className="text-sm font-black text-slate-700">اختر ما تم تنفيذه</p><div className="mt-2 flex flex-wrap gap-2">{resultQuickChoices.map(choice => <button key={choice} type="button" onClick={() => addQuickResult(choice)} className="rounded-full border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-black text-teal-800">{choice}</button>)}</div></div>
           <label className="mt-3 block text-sm font-black text-slate-700">ملاحظات إضافية<textarea aria-label="ما تم تنفيذه" value={result} onChange={event => setResult(event.target.value)} className="mt-2 min-h-20 w-full rounded-xl border border-slate-200 p-3 font-bold" placeholder="اكتب تفاصيل إضافية أو استخدم التسجيل الصوتي" /></label>
@@ -241,6 +256,7 @@ export default function TechnicianPreview() {
           </div>
           <div className="mt-3"><p className="text-sm font-black text-slate-700">حالة التحصيل</p><div className="mt-2 grid grid-cols-3 gap-2"><button type="button" onClick={() => setCollectionState("paid")} className={`rounded-xl border p-2 text-xs font-black ${collectionState === "paid" ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-600"}`}>تم التحصيل</button><button type="button" onClick={() => setCollectionState("partial")} className={`rounded-xl border p-2 text-xs font-black ${collectionState === "partial" ? "border-amber-500 bg-amber-50 text-amber-800" : "border-slate-200 bg-white text-slate-600"}`}>جزء من المبلغ</button><button type="button" onClick={() => { setCollectionState("unpaid"); setAmount("0"); }} className={`rounded-xl border p-2 text-xs font-black ${collectionState === "unpaid" ? "border-rose-500 bg-rose-50 text-rose-800" : "border-slate-200 bg-white text-slate-600"}`}>لم يتم التحصيل</button></div></div>
           <label className="mt-3 block text-sm font-black text-slate-700">المبلغ المحصل<input aria-label="المبلغ المحصل" inputMode="numeric" min="0" max={MAX_COLLECTION_AMOUNT} value={amount} onChange={event => { setCollectionState("partial"); setAmount(event.target.value.replace(/[^0-9-]/g, "")); }} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 text-lg font-black" placeholder="0" /><div className="mt-2 flex flex-wrap gap-2">{collectionQuickChoices.map(choice => <button key={choice} type="button" onClick={() => { setCollectionState(choice === "0" ? "unpaid" : "partial"); setAmount(choice); }} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-700">{choice}</button>)}</div><span className="mt-1 block text-[11px] font-bold text-slate-500">اختر مبلغًا سريعًا أو اكتب الرقم كما هو</span></label>
+          <div className="mt-3 grid grid-cols-2 gap-2"><label className="text-sm font-black text-slate-700">TDS قبل الصيانة<input aria-label="TDS قبل الصيانة" inputMode="numeric" value={tdsIn} onChange={event => setTdsIn(event.target.value.replace(/[^0-9]/g, ""))} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 text-lg font-black" placeholder="اختياري" /></label><label className="text-sm font-black text-slate-700">TDS بعد الصيانة<input aria-label="TDS بعد الصيانة" inputMode="numeric" value={tdsOut} onChange={event => setTdsOut(event.target.value.replace(/[^0-9]/g, ""))} className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-3 text-lg font-black" placeholder="اختياري" /></label></div>
           <Button type="button" onClick={completeOrder} disabled={update.isPending} className="mt-4 h-12 w-full rounded-xl bg-teal-700 font-black hover:bg-teal-800">{update.isPending ? "جاري الحفظ..." : <><CheckCircle2 className="ml-2 h-5 w-5" /> حفظ وإغلاق أمر العمل</>}</Button>
         </section>
       ) : null}
