@@ -46,8 +46,6 @@ describe("عامل خدمة التطبيق القابل للتثبيت", () => {
     expect(technicianManifest).toContain('"display": "standalone"');
     expect(indexHtml).toContain("window.location.pathname.startsWith('/technician-')");
     expect(indexHtml).toContain("/technician-manifest.webmanifest");
-    expect(mainSource).toContain('const technicianStandalone = window.location.pathname.startsWith("/technician-app")');
-    expect(mainSource).toContain("version=19-technician-isolated");
   });
 
   it("يستقبل مشاركة موقع واتساب داخل صفحة العملاء", () => {
@@ -58,7 +56,8 @@ describe("عامل خدمة التطبيق القابل للتثبيت", () => {
     expect(manifest).toContain('"action": "/customers"');
     expect(manifest).toContain('"url": "url"');
     expect(indexHtml).toContain('/manifest.webmanifest?v=share-target-2');
-    expect(mainSource).toContain('/sw.js?version=19-shell-refresh');
+    expect(mainSource).toContain('navigator.serviceWorker.getRegistrations()');
+    expect(mainSource).not.toContain('register(serviceWorkerUrl');
     expect(customersSource).toContain('params.get("url") || params.get("text")');
     expect(customersSource).toContain("اختيار العميل للموقع المشارك");
   });

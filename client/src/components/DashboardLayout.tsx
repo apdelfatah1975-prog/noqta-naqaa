@@ -49,6 +49,7 @@ import {
   MapPinned,
   UserRoundPlus,
   RefreshCw,
+  FileDown,
   Timer,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -56,8 +57,6 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { AutomaticReminderNotifications } from "./AutomaticReminderNotifications";
 import { InstallAppButton } from "./InstallAppButton";
-import { OfflineSyncManager } from "./OfflineSyncManager";
-import { OfflineStatusIndicator } from "./OfflineStatusIndicator";
 import { countPendingReminders, countPendingWorkOrders } from "@/lib/notificationBadges";
 import { formatLastRefreshTime, getAutoRefreshSettings, isEditingFormElement, setAutoRefreshSettings, type AutoRefreshIntervalMinutes } from "@/lib/autoRefresh";
 
@@ -190,6 +189,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
   const dueReminders = trpc.filters.reminders.due.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000, refetchIntervalInBackground: true });
   const workOrders = trpc.filters.workOrders.list.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000, refetchIntervalInBackground: true });
+  const createBackup = trpc.filters.backup.createNow.useMutation({
+    onSuccess: data => {
+      toast.success(`تم إنشاء النسخة الاحتياطية (${data.counts.customers} عميل، ${data.counts.visits} زيارة)`);
+      if (data.downloadUrl) window.open(data.downloadUrl, "_blank", "noopener,noreferrer");
+    },
+    onError: error => toast.error(error.message || "تعذر إنشاء النسخة الاحتياطية"),
+  });
   const notificationCountFor = (path: string) => {
     if (path === "/reminders") return countPendingReminders(dueReminders.data);
     if (path === "/work-orders") return countPendingWorkOrders(workOrders.data);
@@ -273,7 +279,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <>
       <AutomaticReminderNotifications />
-      <OfflineSyncManager />
       <Sidebar side="right" collapsible="icon" className="border-l border-teal-950/8 bg-[#063c3a] text-white">
         <SidebarHeader className="h-24 border-b border-white/10 px-3 py-4">
           <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
@@ -346,7 +351,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-1.5">
-            <OfflineStatusIndicator />
             <button
               type="button"
               onClick={() => void refreshData()}
@@ -356,6 +360,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               className="grid h-9 w-9 place-items-center rounded-xl border border-teal-950/8 bg-white text-teal-800 transition hover:bg-teal-50 disabled:cursor-wait disabled:opacity-60 sm:h-11 sm:w-11"
             >
               <RefreshCw className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`} />
+            </button>
+            <button
+              type="button"
+              onClick={() => createBackup.mutate()}
+              disabled={createBackup.isPending}
+              aria-label="تنزيل نسخة احتياطية"
+              title="تنزيل نسخة احتياطية Excel"
+              className="grid h-9 w-9 place-items-center rounded-xl border border-teal-950/8 bg-white text-teal-800 transition hover:bg-teal-50 disabled:cursor-wait disabled:opacity-60 sm:h-11 sm:w-11"
+            >
+              <FileDown className={`h-5 w-5 ${createBackup.isPending ? "animate-pulse" : ""}`} />
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
