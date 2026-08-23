@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TechnicianPreview from "./TechnicianPreview";
 
@@ -75,6 +75,40 @@ describe("واجهة الفني وأوامر العمل", () => {
     fireEvent.click(screen.getByRole("button", { name: "تحديث" }));
     expect(screen.getByLabelText("صورة قبل الصيانة")).toBeTruthy();
     expect(screen.getByLabelText("صورة بعد الصيانة")).toBeTruthy();
+  });
+
+  it("تفتح صورة قبل الصيانة في Lightbox وتغلقها بزر الإغلاق", async () => {
+    orders[0].status = "in_progress";
+    vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 1600, height: 900 }));
+    vi.stubGlobal("FileReader", class MockFileReader {
+      result: string | null = null;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      readAsDataURL() {
+        this.result = "data:image/webp;base64,cGhvdG8=";
+        this.onload?.();
+      }
+    });
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D);
+    const toBlob = vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(callback => callback(new Blob(["photo"], { type: "image/webp" })));
+
+    render(<TechnicianPreview />);
+    fireEvent.click(screen.getByRole("button", { name: "تحديث" }));
+    fireEvent.change(screen.getByLabelText("صورة قبل الصيانة"), {
+      target: { files: [new File(["raw"], "before.jpg", { type: "image/jpeg" })] },
+    });
+
+    const preview = await screen.findByAltText("معاينة قبل الصيانة - اضغط للتكبير");
+    fireEvent.click(preview);
+    expect(screen.getByRole("dialog", { name: "صورة قبل الصيانة" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "إغلاق الصورة المكبرة" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "إغلاق الصورة المكبرة" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "صورة قبل الصيانة" })).toBeNull());
+
+    getContext.mockRestore();
+    toBlob.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it("ترسل نتيجة العمل والمبلغ عند إغلاق الأمر", () => {
