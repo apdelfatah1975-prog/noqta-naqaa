@@ -164,6 +164,7 @@ export const notificationSettings = mysqlTable(
     alertHour: int("alertHour").default(9).notNull(),
     alertMinute: int("alertMinute").default(0).notNull(),
     timezoneOffsetMinutes: int("timezoneOffsetMinutes").default(180).notNull(),
+    companyName: varchar("companyName", { length: 160 }),
     companyWhatsAppPhone: varchar("companyWhatsAppPhone", { length: 32 }),
     pinHash: varchar("pinHash", { length: 255 }),
     scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }),

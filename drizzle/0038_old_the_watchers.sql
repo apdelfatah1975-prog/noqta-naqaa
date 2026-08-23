@@ -1,0 +1,1 @@
+ALTER TABLE `notificationSettings` ADD `companyName` varchar(160);

@@ -222,6 +222,7 @@ const notificationSettingsInput = z.object({
   alertHour: z.number().int().min(0).max(23).default(DEFAULT_ALERT_HOUR),
   alertMinute: z.number().int().min(0).max(59).default(DEFAULT_ALERT_MINUTE),
   timezoneOffsetMinutes: z.number().int().min(-720).max(840).default(DEFAULT_TIMEZONE_OFFSET_MINUTES),
+  companyName: z.string().trim().max(160).optional().nullable(),
   companyWhatsAppPhone: z.string().trim().max(32).optional().nullable(),
 });
 const pinValue = z.string().trim().min(4, "الرقم السري يجب أن يتكون من 4 أحرف أو أرقام على الأقل.").max(64);
@@ -233,6 +234,7 @@ const defaultNotificationSettings = {
   alertHour: DEFAULT_ALERT_HOUR,
   alertMinute: DEFAULT_ALERT_MINUTE,
   timezoneOffsetMinutes: DEFAULT_TIMEZONE_OFFSET_MINUTES,
+  companyName: null,
   companyWhatsAppPhone: null,
   pinHash: null,
 };

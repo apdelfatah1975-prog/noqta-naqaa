@@ -23,6 +23,16 @@ describe("CustomerContactActions", () => {
     expect(locationRequestLink.textContent).toContain("طلب الموقع");
   });
 
+  it("يشارك موقع العميل عبر واتساب مع اسم العميل والرابط المسجل", () => {
+    render(<CustomerContactActions customer={{ name: "أحمد محمد", phone: "01008797774", address: null, location: "https://maps.google.com/?q=30.0444,31.2357", latitude: null, longitude: null }} labels />);
+
+    const shareLink = screen.getByRole("link", { name: "مشاركة موقع أحمد محمد عبر واتساب" });
+    const href = shareLink.getAttribute("href") ?? "";
+    expect(href).toContain("https://wa.me/201008797774?text=");
+    expect(decodeURIComponent(href)).toContain("أحمد محمد");
+    expect(decodeURIComponent(decodeURIComponent(href))).toContain("30.0444,31.2357");
+  });
+
   it("يعرض الموقع عند وجود رابط محفوظ في حقل location", () => {
     render(<CustomerContactActions customer={{ phone: "01008797774", address: null, location: "https://maps.google.com/?q=30.0444,31.2357", latitude: null, longitude: null }} labels />);
 
