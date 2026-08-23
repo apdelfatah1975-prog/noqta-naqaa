@@ -227,6 +227,8 @@ export default function TechnicianPreview() {
       notes: null,
       // المبلغ موحّد كوحدة نقدية كاملة في الواجهة والخادم والخزينة.
       collectedAmount: outcome === "completed" ? normalizedAmount : 0,
+      tdsIn: outcome === "completed" && tdsIn.trim() ? Number(tdsIn) : null,
+      tdsOut: outcome === "completed" && tdsOut.trim() ? Number(tdsOut) : null,
       items: outcome === "completed" ? items : [],
     });
   };

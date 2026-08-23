@@ -87,6 +87,16 @@ describe("واجهة الفني وأوامر العمل", () => {
     expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ id: 7, status: "completed", visitResult: "تم تغيير الشمعات", collectedAmount: 250, items: [] }));
   });
 
+  it("ترسل قياسات TDS قبل وبعد كأرقام عند إغلاق الأمر", () => {
+    orders[0].status = "in_progress";
+    render(<TechnicianPreview />);
+    fireEvent.click(screen.getByRole("button", { name: "تحديث" }));
+    fireEvent.change(screen.getByLabelText("TDS قبل الصيانة"), { target: { value: "420" } });
+    fireEvent.change(screen.getByLabelText("TDS بعد الصيانة"), { target: { value: "38" } });
+    fireEvent.click(screen.getByRole("button", { name: /حفظ وإغلاق أمر العمل/ }));
+    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ id: 7, tdsIn: 420, tdsOut: 38 }));
+  });
+
   it("تسمح بالاختيارات السريعة للنتيجة والتحصيل", () => {
     orders[0].status = "in_progress";
     render(<TechnicianPreview />);
