@@ -2442,8 +2442,8 @@
 
 ## رفع Keep-Alive Workflow إلى GitHub
 - [x] التحقق من صحة ملف keep-render-awake.yml ورابط RENDER_URL والفرع الافتراضي؛ الفرع main ورابط Render يعيدان /api/ping بحالة 200.
-- [ ] تنفيذ git add وcommit وpush للـ Workflow إلى GitHub؛ تعذر الدفع بسبب رفض GitHub بصلاحية 403 رغم أن الملف موجود في سجل الفرع المحلي.
-- [ ] التحقق من ظهور GitHub Actions وتشغيل Workflow وفحص استجابة Render؛ Render سليم، لكن Actions غير ظاهر على المستودع قبل نجاح الدفع.
+- [x] تنفيذ git add وcommit وpush للـ Workflow إلى GitHub؛ أكد المستخدم أن Workflow أصبح مرفوعًا ويعمل على GitHub Actions.
+- [x] التحقق من ظهور GitHub Actions وتشغيل Workflow وفحص استجابة Render؛ أكد المستخدم ظهور علامة الصح الخضراء ونجاح التشغيل المجدول.
 
 ## أزرار التواصل في أوامر الشغل ورقم واتساب الشركة
 - [x] إضافة رقم واتساب الشركة إلى إعدادات النظام مع حفظ مركزي عبر السيرفر.
