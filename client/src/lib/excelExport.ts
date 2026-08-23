@@ -71,6 +71,58 @@ function textCell(value: unknown) {
   return value === undefined || value === null ? "" : String(value).trim();
 }
 
+const excelValueLabels: Record<string, string> = {
+  installation: "تركيب فلتر",
+  install: "تركيب فلتر",
+  maintenance: "صيانة",
+  maintain: "صيانة",
+  cartridge_change: "تغيير شمعات",
+  "cartridge change": "تغيير شمعات",
+  follow_up: "متابعة",
+  "follow up": "متابعة",
+  other: "أخرى",
+  income: "إيراد",
+  expense: "مصروف",
+  pending: "معلق",
+  completed: "مكتمل",
+  dismissed: "تم التجاوز",
+  paid: "مدفوع",
+  remaining: "متبقي",
+  all: "الكل",
+};
+
+const excelKeyLabels: Record<string, string> = {
+  customerCode: "كود العميل",
+  customerName: "اسم العميل",
+  phone: "الهاتف",
+  address: "العنوان",
+  location: "الموقع",
+  notes: "ملاحظات",
+  technicianName: "اسم الفني",
+  visitType: "نوع الزيارة",
+  visitDate: "تاريخ الزيارة",
+  collectedAmount: "المبلغ المحصل",
+  status: "الحالة",
+  transactionType: "نوع الحركة",
+  category: "التصنيف",
+  recipientName: "الفني أو المستلم",
+};
+
+function localizeExcelValue(key: string, value: unknown) {
+  if (typeof value !== "string") return value;
+  const normalizedKey = key.trim().toLocaleLowerCase("ar-EG");
+  const normalizedValue = value.trim().toLocaleLowerCase("ar-EG");
+  const shouldTranslate = ["النوع", "نوع الزيارة", "نوع آخر خدمة", "الحالة", "نوع الحركة", "التصنيف", "البند", "category", "status", "transactiontype", "visittype"].some(token => normalizedKey === token || normalizedKey.includes(token));
+  return shouldTranslate ? excelValueLabels[normalizedValue] ?? value : value;
+}
+
+export function localizeExcelRows(rows: Array<Record<string, unknown>>) {
+  return rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => {
+    const arabicKey = excelKeyLabels[key] ?? key;
+    return [arabicKey, localizeExcelValue(arabicKey, value)];
+  })));
+}
+
 export async function parseCustomerPdf(file: File): Promise<{ rows: CustomerImportRow[]; issues: CustomerImportIssue[] }> {
   const pdf = await getDocument({ data: await file.arrayBuffer(), useWorkerFetch: false, isEvalSupported: false }).promise;
   const lines: Array<{ y: number; cells: Array<{ x: number; text: string }> }> = [];
@@ -293,7 +345,7 @@ export function reminderRowsForExcel(reminders: Array<any>): ReminderExportRow[]
 }
 
 export function customerImportIssuesForExcel(issues: CustomerImportIssue[]): Array<Record<string, unknown>> {
-  return issues.map(issue => ({ "رقم الصف": issue.rowNumber, "سبب الرفض": issue.reason, ...(issue.data ?? {}) }));
+  return localizeExcelRows(issues.map(issue => ({ "رقم الصف": issue.rowNumber, "سبب الرفض": issue.reason, ...(issue.data ?? {}) })));
 }
 
 export function downloadCustomerImportIssues(issues: CustomerImportIssue[]) {
@@ -304,7 +356,7 @@ export function downloadCustomerImportIssues(issues: CustomerImportIssue[]) {
 
 export function downloadRowsAsExcel(filename: string, sheetName: string, rows: Array<Record<string, unknown>>) {
   if (typeof document === "undefined" || typeof URL === "undefined") return false;
-  const worksheet = XLSX.utils.json_to_sheet(rows.length ? rows : [{ "لا توجد بيانات": "" }]);
+  const worksheet = XLSX.utils.json_to_sheet(rows.length ? localizeExcelRows(rows) : [{ "لا توجد بيانات": "" }]);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName.slice(0, 31) || "البيانات");
   const bytes = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
@@ -360,7 +412,7 @@ export const reminderExcelHeaders: Record<keyof ReminderExportRow, string> = {
 };
 
 export function withArabicHeaders<T extends Record<string, unknown>>(rows: T[], headers: Record<keyof T, string>): Array<Record<string, unknown>> {
-  return rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [headers[key as keyof T], value])));
+  return localizeExcelRows(rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [headers[key as keyof T], value]))));
 }
 
 

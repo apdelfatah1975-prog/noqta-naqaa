@@ -10,6 +10,7 @@ import {
   parseCustomerExcel,
   parseCustomerPdf,
   customerImportIssuesForExcel,
+  localizeExcelRows,
 } from "./excelExport";
 
 describe("Excel export rows", () => {
@@ -164,6 +165,13 @@ describe("Excel export rows", () => {
   it("يبني تقرير أخطاء عربيًا مع رقم الصف والسبب والبيانات الأصلية", () => {
     const rows = customerImportIssuesForExcel([{ rowNumber: 7, reason: "رقم الهاتف ناقص", data: { "اسم العميل": "عميل ناقص", "الهاتف": "" } }]);
     expect(rows).toEqual([{ "رقم الصف": 7, "سبب الرفض": "رقم الهاتف ناقص", "اسم العميل": "عميل ناقص", "الهاتف": "" }]);
+  });
+
+  it("يعرب عناوين Excel والقيم الداخلية مع الحفاظ على النصوص الحرة", () => {
+    const rows = localizeExcelRows([
+      { customerName: "عميل إنجليزي الاسم", visitType: "maintenance", status: "pending", transactionType: "income", notes: "ملاحظة خاصة" },
+    ]);
+    expect(rows[0]).toEqual({ "اسم العميل": "عميل إنجليزي الاسم", "نوع الزيارة": "صيانة", الحالة: "معلق", "نوع الحركة": "إيراد", ملاحظات: "ملاحظة خاصة" });
   });
 
   it("يبني صفوف التذكيرات باسم العميل وأيام التأخر", () => {

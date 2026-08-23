@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { formatAppMoney, getAppSettings, saveAppSettings, type AppSettings, type SalesAgentCommissionMode, type SalesAgentProfile } from "@/lib/appSettings";
 import { printArabicPdf } from "@/lib/pdfExport";
+import { localizeExcelRows } from "@/lib/excelExport";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
@@ -198,9 +199,9 @@ export default function TechnicianPayroll() {
   const technicians = rows.map(row => row.technician).sort((a, b) => a.localeCompare(b, "ar"));
   const exportExcel = () => {
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ البيان: "الشهر", القيمة: month }, { البيان: "الفني", القيمة: technician === "all" ? "كل الفنيين" : technician }, { البيان: "إجمالي المستحق", القيمة: Math.round(totals.required) }, { البيان: "إجمالي المدفوع", القيمة: Math.round(totals.paid) }, { البيان: "إجمالي المتبقي", القيمة: Math.round(totals.remaining) }]), "ملخص الكشف");
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(selected.map(row => ({ الفني: row.technician, الحالة: row.status === "paid" ? "مدفوع" : "متبقي", "المستحق": Math.round(row.required), "المدفوع": Math.round(row.paid), "المتبقي": Math.round(row.remaining), "عدد العمليات": row.transactions.length }))), "الفنيون");
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(selected.flatMap(row => row.transactions.map(item => ({ الفني: row.technician, التاريخ: dateLabel(item.transactionDate), التصنيف: item.category, "المبلغ": Math.round(item.amount), الملاحظات: item.notes || "" })))), "تفاصيل العمليات");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(localizeExcelRows([{ البيان: "الشهر", القيمة: month }, { البيان: "الفني", القيمة: technician === "all" ? "كل الفنيين" : technician }, { البيان: "إجمالي المستحق", القيمة: Math.round(totals.required) }, { البيان: "إجمالي المدفوع", القيمة: Math.round(totals.paid) }, { البيان: "إجمالي المتبقي", القيمة: Math.round(totals.remaining) }])), "ملخص الكشف");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(localizeExcelRows(selected.map(row => ({ الفني: row.technician, الحالة: row.status === "paid" ? "مدفوع" : "متبقي", "المستحق": Math.round(row.required), "المدفوع": Math.round(row.paid), "المتبقي": Math.round(row.remaining), "عدد العمليات": row.transactions.length })))), "الفنيون");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(localizeExcelRows(selected.flatMap(row => row.transactions.map(item => ({ الفني: row.technician, التاريخ: dateLabel(item.transactionDate), التصنيف: item.category, "المبلغ": Math.round(item.amount), الملاحظات: item.notes || "" }))))), "تفاصيل العمليات");
     XLSX.writeFile(workbook, `كشف-رواتب-الفنيين-${month}.xlsx`);
   };
   const exportPdf = () => {

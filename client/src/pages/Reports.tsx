@@ -14,6 +14,7 @@ import {
 import { labelVisitType } from "@/lib/filterUi";
 import { formatAppMoney } from "@/lib/appSettings";
 import { printArabicPdf } from "@/lib/pdfExport";
+import { localizeExcelRows } from "@/lib/excelExport";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
@@ -125,7 +126,7 @@ export default function Reports() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(
       workbook,
-      XLSX.utils.json_to_sheet([
+      XLSX.utils.json_to_sheet(localizeExcelRows([
         { البيان: "الفترة من", القيمة: data.period.dateFrom },
         { البيان: "الفترة إلى", القيمة: data.period.dateTo },
         { البيان: "عدد الزيارات", القيمة: data.summary.visits },
@@ -138,22 +139,22 @@ export default function Reports() {
         { البيان: "صافي الحركة", القيمة: data.summary.balance },
         { البيان: "المتابعات المعلقة", القيمة: data.summary.pendingReminders },
         { البيان: "الأصناف منخفضة الرصيد", القيمة: data.summary.lowStock },
-      ]),
+      ])),
       "الملخص"
     );
     XLSX.utils.book_append_sheet(
       workbook,
-      XLSX.utils.json_to_sheet(
+      XLSX.utils.json_to_sheet(localizeExcelRows(
         incomeByCategory.map(row => ({
           البند: row.label,
           الإجمالي: row.total,
         }))
-      ),
+      )),
       "الإيرادات"
     );
     XLSX.utils.book_append_sheet(
       workbook,
-      XLSX.utils.json_to_sheet(
+      XLSX.utils.json_to_sheet(localizeExcelRows(
         treasuryTransactions.map((row: any) => ({
           التاريخ: dateLabel(row.transactionDate),
           النوع: row.transactionType === "income" ? "إيراد" : "مصروف",
@@ -162,12 +163,12 @@ export default function Reports() {
           المبلغ: row.amount,
           الملاحظات: row.notes || "",
         }))
-      ),
+      )),
       "حركات الخزينة"
     );
     XLSX.utils.book_append_sheet(
       workbook,
-      XLSX.utils.json_to_sheet([
+      XLSX.utils.json_to_sheet(localizeExcelRows([
         { البيان: "إيرادات الخدمات", الإجمالي: financial.serviceIncome },
         {
           البيان: "نقدية خارج إيرادات العمل",
@@ -207,12 +208,12 @@ export default function Reports() {
           البيان: "صافي إيراد الشركة بعد المصروفات",
           الإجمالي: financial.companyNet,
         },
-      ]),
+      ])),
       "مالية الشركة"
     );
     XLSX.utils.book_append_sheet(
       workbook,
-      XLSX.utils.json_to_sheet(
+      XLSX.utils.json_to_sheet(localizeExcelRows(
         safeTechnicianPayments.map(row => ({
           الفني: row.technician,
           الحالة: row.status === "paid" ? "مدفوع" : "متبقي",
@@ -221,49 +222,49 @@ export default function Reports() {
           المتبقي: row.remainingAmount,
           "عدد العمليات": row.transactionCount,
         }))
-      ),
+      )),
       "مستحقات الفنيين"
     );
     XLSX.utils.book_append_sheet(
       workbook,
-      XLSX.utils.json_to_sheet(
+      XLSX.utils.json_to_sheet(localizeExcelRows(
         expenseByCategory.map(row => ({
           البند: row.label,
           الإجمالي: row.total,
         }))
-      ),
+      )),
       "المصروفات"
     );
     XLSX.utils.book_append_sheet(
       workbook,
-      XLSX.utils.json_to_sheet(
+      XLSX.utils.json_to_sheet(localizeExcelRows(
         safeVisitsByType.map(row => ({
           النوع: labelVisitType(row.label),
           العدد: row.total,
         }))
-      ),
+      )),
       "أنواع الزيارات"
     );
     XLSX.utils.book_append_sheet(
       workbook,
-      XLSX.utils.json_to_sheet(
+      XLSX.utils.json_to_sheet(localizeExcelRows(
         safeVisitsByTechnician.map(row => ({
           الفني: row.label,
           "عدد الزيارات": row.total,
         }))
-      ),
+      )),
       "الفنيون"
     );
     XLSX.utils.book_append_sheet(
       workbook,
-      XLSX.utils.json_to_sheet(
+      XLSX.utils.json_to_sheet(localizeExcelRows(
         safeRecentVisits.map(row => ({
           التاريخ: dateLabel(row.date),
           العميل: row.customer,
           النوع: labelVisitType(row.type),
           الفني: row.technician,
         }))
-      ),
+      )),
       "آخر الزيارات"
     );
     XLSX.writeFile(workbook, `تقرير-نقطة-نقاء-${dateFrom}-${dateTo}.xlsx`);
@@ -443,12 +444,12 @@ export default function Reports() {
     ];
     XLSX.utils.book_append_sheet(
       workbook,
-      XLSX.utils.json_to_sheet(filterRows),
+      XLSX.utils.json_to_sheet(localizeExcelRows(filterRows)),
       "ملخص الخزينة"
     );
     XLSX.utils.book_append_sheet(
       workbook,
-      XLSX.utils.json_to_sheet(
+      XLSX.utils.json_to_sheet(localizeExcelRows(
         treasuryTransactions.map((row: any) => ({
           التاريخ: dateLabel(row.transactionDate),
           النوع: row.transactionType === "income" ? "إيراد" : "مصروف",
@@ -457,7 +458,7 @@ export default function Reports() {
           المبلغ: Number(row.amount || 0),
           الملاحظات: row.notes || "",
         }))
-      ),
+      )),
       "المعاملات المالية"
     );
     XLSX.writeFile(workbook, `حركات-الخزينة-${dateFrom}-${dateTo}.xlsx`);
