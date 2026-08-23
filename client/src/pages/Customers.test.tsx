@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import Customers, { addOrIncrementVisitItem, buildPartsConfirmation } from "./Customers";
+import Customers, { addOrIncrementVisitItem, buildPartsConfirmation, getCustomerCardStatus } from "./Customers";
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -56,6 +56,13 @@ vi.mock("@/lib/trpc", () => ({
 vi.mock("wouter", () => ({ useLocation: () => ["/customers", mocks.location] }));
 
 describe("ترابط تعديل بيانات العميل", () => {
+  it("يصنف ألوان بطاقة العميل حسب حالة موعد الصيانة", () => {
+    expect(getCustomerCardStatus(-1)).toBe("overdue");
+    expect(getCustomerCardStatus(0)).toBe("due_soon");
+    expect(getCustomerCardStatus(7)).toBe("due_soon");
+    expect(getCustomerCardStatus(8)).toBe("regular");
+    expect(getCustomerCardStatus(null)).toBe("regular");
+  });
   beforeEach(() => {
     mocks.list.mockReturnValue({
       data: [{ id: 12, name: "عميل قديم", phone: "01000000000", address: "العنوان", latitude: null, longitude: null, notes: null, customerCode: "C-000012", followUp: { nextVisitDate: new Date("2026-12-01T09:00:00Z"), lastServiceVisitDate: new Date("2026-08-01T09:00:00Z"), lastServiceVisitType: "maintenance", daysRemaining: 108 } }],
