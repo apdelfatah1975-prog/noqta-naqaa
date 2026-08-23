@@ -59,6 +59,7 @@ import { AutomaticReminderNotifications } from "./AutomaticReminderNotifications
 import { InstallAppButton } from "./InstallAppButton";
 import { countPendingReminders, countPendingWorkOrders } from "@/lib/notificationBadges";
 import { formatLastRefreshTime, getAutoRefreshSettings, isEditingFormElement, setAutoRefreshSettings, type AutoRefreshIntervalMinutes } from "@/lib/autoRefresh";
+import { getBackupSuccessCopy } from "@/lib/backupFeedback";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "الرئيسية", path: "/" },
@@ -191,8 +192,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const workOrders = trpc.filters.workOrders.list.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000, refetchIntervalInBackground: true });
   const createBackup = trpc.filters.backup.createNow.useMutation({
     onSuccess: data => {
-      toast.success(`تم إنشاء النسخة الاحتياطية (${data.counts.customers} عميل، ${data.counts.visits} زيارة)`);
       if (data.downloadUrl) window.open(data.downloadUrl, "_blank", "noopener,noreferrer");
+      const feedback = getBackupSuccessCopy({
+        downloaded: Boolean(data.downloadUrl),
+        customers: data.counts.customers,
+        visits: data.counts.visits,
+      });
+      toast.success(feedback.title, { description: feedback.description });
     },
     onError: error => toast.error(error.message || "تعذر إنشاء النسخة الاحتياطية"),
   });
@@ -365,11 +371,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               type="button"
               onClick={() => createBackup.mutate()}
               disabled={createBackup.isPending}
-              aria-label="تنزيل نسخة احتياطية"
+              aria-label="تنزيل نسخة احتياطية بصيغة Excel"
               title="تنزيل نسخة احتياطية Excel"
-              className="grid h-9 w-9 place-items-center rounded-xl border border-teal-950/8 bg-white text-teal-800 transition hover:bg-teal-50 disabled:cursor-wait disabled:opacity-60 sm:h-11 sm:w-11"
+              className="flex h-10 min-w-10 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-2.5 text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md active:scale-[.98] disabled:cursor-wait disabled:opacity-60 sm:h-11 sm:min-w-11 sm:px-3"
             >
-              <FileDown className={`h-5 w-5 ${createBackup.isPending ? "animate-pulse" : ""}`} />
+              <FileDown className={`h-5 w-5 shrink-0 ${createBackup.isPending ? "animate-pulse" : ""}`} />
+              <span className="hidden whitespace-nowrap text-xs font-extrabold sm:inline">{createBackup.isPending ? "جارٍ التجهيز…" : "نسخة Excel"}</span>
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
