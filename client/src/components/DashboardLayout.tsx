@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import React from "react";
+import { useIsFetching } from "@tanstack/react-query";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { trpc } from "@/lib/trpc";
+import { BackupDialog } from "@/components/BackupDialog";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   BellRing,
@@ -51,6 +53,7 @@ import {
   RefreshCw,
   FileDown,
   Timer,
+  LoaderCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -168,6 +171,7 @@ function LocalLoginScreen() {
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const technicianPermissions = trpc.filters.allowedTechnicians.myPermissions.useQuery(undefined, { enabled: Boolean(user && user.role !== "admin"), retry: false, staleTime: 60_000 });
+  const fetchingCount = useIsFetching();
   const utils = trpc.useUtils();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [autoRefreshSettings, setAutoRefreshSettingsState] = React.useState(getAutoRefreshSettings);
@@ -186,6 +190,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       return false;
     });
   const [location, setLocation] = useLocation();
+  const [isBackupOpen, setIsBackupOpen] = React.useState(false);
   const { state, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
   const dueReminders = trpc.filters.reminders.due.useQuery(undefined, { enabled: Boolean(user), refetchInterval: 60_000, refetchIntervalInBackground: true });
@@ -285,6 +290,17 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <>
       <AutomaticReminderNotifications />
+      {fetchingCount > 0 ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed left-1/2 top-3 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full border border-teal-200 bg-white/95 px-4 py-2 text-xs font-extrabold text-teal-800 shadow-lg shadow-teal-900/10 backdrop-blur"
+          dir="rtl"
+        >
+          <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+          <span>جارٍ تحميل البيانات…</span>
+        </div>
+      ) : null}
       <Sidebar side="right" collapsible="icon" className="border-l border-teal-950/8 bg-[#063c3a] text-white">
         <SidebarHeader className="h-24 border-b border-white/10 px-3 py-4">
           <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
@@ -369,7 +385,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </button>
             <button
               type="button"
-              onClick={() => createBackup.mutate()}
+              onClick={() => setIsBackupOpen(true)}
               disabled={createBackup.isPending}
               aria-label="تنزيل نسخة احتياطية بصيغة Excel"
               title="تنزيل نسخة احتياطية Excel"
@@ -414,6 +430,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           {mobileNavItems.map(item => { const active = activeMenuItem.path === item.path; const notificationCount = notificationCountFor(item.path); return <button key={item.path} type="button" onClick={() => setLocation(item.path)} className={`relative flex min-h-[4.5rem] min-w-[78px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-bold leading-4 transition active:scale-95 ${active ? "bg-teal-700 text-white shadow-md ring-2 ring-teal-200/80" : "text-slate-500 hover:bg-slate-50 hover:text-teal-700"}`} aria-current={active ? "page" : undefined}><span className="relative"><item.icon className="h-5 w-5" />{notificationCount > 0 ? <span className={`absolute -right-3 -top-3 grid min-h-5 min-w-5 place-items-center rounded-full border-2 border-white px-1 text-[10px] font-black leading-none shadow-sm ${active ? "bg-rose-500 text-white" : "bg-rose-600 text-white"}`} aria-label={`${notificationCount} عناصر معلقة`} title={`${notificationCount} عناصر معلقة`}>{notificationCount > 99 ? "99+" : notificationCount}</span> : null}</span><span className="max-w-[76px] text-center">{item.label}</span></button>; })}
         </div>
       </nav> : null}
+      <BackupDialog open={isBackupOpen} onOpenChange={setIsBackupOpen} />
     </>
 
   );

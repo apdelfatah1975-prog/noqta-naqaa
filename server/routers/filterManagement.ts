@@ -43,7 +43,7 @@ import { COOKIE_NAME } from "../../shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { createLocalSessionToken } from "../_core/localAuth";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "../_core/trpc";
-import { createOwnerBackup, refreshOwnerBackup } from "../backup";
+import { BACKUP_TABLES, createOwnerBackup, getOwnerBackupStatus, refreshOwnerBackup } from "../backup";
 import { storageGet, storagePut } from "../storage";
 
 type TechnicianMenuPermission = "workOrders" | "pendingOperations" | "customers" | "visits";
@@ -127,6 +127,7 @@ const visitInput = z.object({
   phone: z.string().trim().max(32).optional().nullable(),
   visitType: z.enum(visitTypes),
   visitDate: z.date(),
+  nextVisitDate: z.date().optional().nullable(),
   technicianName: z.string().trim().max(160).optional().nullable(),
   salesAgentName: z.string().trim().max(160).optional().nullable(),
   filterCount: z.number().int().positive().max(1000).optional().default(1),
@@ -1145,7 +1146,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
           customerId: input.customerId,
           visitId,
           ownerId: ctx.user.id,
-          reminderDate: followUpDate(input.visitDate),
+          reminderDate: input.nextVisitDate ?? followUpDate(input.visitDate),
         });
       }
       if (collectedAmount && collectedAmount > 0) {
@@ -1162,6 +1163,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       id: z.number().int().positive(),
       visitType: z.enum(visitTypes),
       visitDate: z.date(),
+      nextVisitDate: z.date().optional().nullable(),
       technicianName: z.string().trim().max(160).optional().nullable(),
       salesAgentName: z.string().trim().max(160).optional().nullable(),
       filterCount: z.number().int().positive().max(1000).optional().default(1),
@@ -1182,6 +1184,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       await db.update(visits).set({
         visitType: input.visitType,
         visitDate: input.visitDate,
+        nextVisitDate: input.nextVisitDate ?? null,
         technicianName: input.technicianName ?? null,
         salesAgentName: input.salesAgentName ?? null,
         filterCount: input.filterCount,
@@ -1196,8 +1199,8 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       await db.update(reminders).set({ status: "completed" }).where(and(eq(reminders.ownerId, ctx.user.id), eq(reminders.customerId, existing[0].customerId), eq(reminders.status, "pending")));
       if (needsAutomaticReminder(input.visitType)) {
         const pending = await db.select().from(reminders).where(and(eq(reminders.visitId, input.id), eq(reminders.ownerId, ctx.user.id), eq(reminders.status, "pending"))).limit(1);
-        if (pending[0]) await db.update(reminders).set({ reminderDate: followUpDate(input.visitDate) }).where(eq(reminders.id, pending[0].id));
-        else await db.insert(reminders).values({ customerId: existing[0].customerId, visitId: input.id, ownerId: ctx.user.id, reminderDate: followUpDate(input.visitDate) });
+        if (pending[0]) await db.update(reminders).set({ reminderDate: input.nextVisitDate ?? followUpDate(input.visitDate) }).where(eq(reminders.id, pending[0].id));
+        else await db.insert(reminders).values({ customerId: existing[0].customerId, visitId: input.id, ownerId: ctx.user.id, reminderDate: input.nextVisitDate ?? followUpDate(input.visitDate) });
       }
 
       const income = await db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.sourceVisitId, input.id))).limit(1);
@@ -1220,7 +1223,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       if (needsAutomaticReminder(existing[0].visitType)) {
         const pending = await db.select().from(reminders).where(and(eq(reminders.visitId, input.visitId), eq(reminders.ownerId, ctx.user.id), eq(reminders.status, "pending"))).limit(1);
         if (pending[0]) {
-          await db.update(reminders).set({ reminderDate: followUpDate(input.visitDate) }).where(eq(reminders.id, pending[0].id));
+          await db.update(reminders).set({ reminderDate: existing[0].nextVisitDate ?? followUpDate(input.visitDate) }).where(eq(reminders.id, pending[0].id));
         }
       }
       await db.update(cashTransactions).set({ transactionDate: input.visitDate }).where(and(eq(cashTransactions.sourceVisitId, input.visitId), eq(cashTransactions.ownerId, ctx.user.id)));
@@ -1678,15 +1681,14 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
   }),
 
   backup: router({
-    status: protectedProcedure.query(async ({ ctx }) => {
-      const settings = await getNotificationSettings(ctx.user.id);
-      const stored = settings.backupFileKey ? await storageGet(settings.backupFileKey) : null;
-      return { generatedAt: settings.backupGeneratedAt ?? null, downloadUrl: stored?.url ?? null };
-    }),
-    createNow: protectedProcedure.mutation(async ({ ctx }) => {
-      const backup = await createOwnerBackup(ctx.user.id);
+    options: protectedProcedure.query(() => ({ tables: BACKUP_TABLES })),
+    status: protectedProcedure.query(async ({ ctx }) => getOwnerBackupStatus(ctx.user.id)),
+    createNow: protectedProcedure.input(z.object({ tables: z.array(z.string()).optional() }).optional()).mutation(async ({ ctx, input }) => {
+      const allowed = new Set(BACKUP_TABLES.map(table => table.key));
+      const selected = (input?.tables ?? []).filter((table): table is typeof BACKUP_TABLES[number]["key"] => allowed.has(table as typeof BACKUP_TABLES[number]["key"]));
+      const backup = await createOwnerBackup(ctx.user.id, { tables: selected.length ? selected : undefined, exportedBy: ctx.user.id });
       if (!backup) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر إنشاء النسخة الاحتياطية الآن." });
-      return { generatedAt: backup.generatedAt, downloadUrl: backup.url, counts: backup.counts };
+      return { generatedAt: backup.generatedAt, downloadUrl: backup.url, counts: backup.counts, tables: backup.tables };
     }),
   }),
 

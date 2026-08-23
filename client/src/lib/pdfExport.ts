@@ -81,3 +81,41 @@ export function printArabicPdf(title: string, rows: Array<Record<string, unknown
   const opened = openArabicPdfPrintWindow(buildArabicPdfDocument(title, rows, columns));
   return opened;
 }
+
+export type VisitReportInput = {
+  customerName: string;
+  customerPhone?: string | null;
+  customerAddress?: string | null;
+  visitType: string;
+  visitDate: Date | string;
+  technicianName?: string | null;
+  tdsIn?: number | null;
+  tdsOut?: number | null;
+  collectedAmount?: number | null;
+  currency?: string | null;
+  visitResult?: string | null;
+  notes?: string | null;
+  items?: Array<{ name: string; quantity: number; unit?: string | null }>;
+};
+
+export function buildVisitReportDocument(visit: VisitReportInput) {
+  const text = (value: unknown) => escapeHtml(value ?? "غير مسجل");
+  const date = new Date(visit.visitDate);
+  const items = visit.items ?? [];
+  const itemRows = items.length
+    ? items.map(item => `<tr><td>${text(item.name)}</td><td>${text(item.quantity)}</td><td>${text(item.unit || "قطعة")}</td></tr>`).join("")
+    : `<tr><td colspan="3">لم تُسجل أصناف مستبدلة</td></tr>`;
+  return `<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8" /><title>تقرير زيارة - ${text(visit.customerName)}</title>
+<style>
+@page{size:A4;margin:15mm}*{box-sizing:border-box}body{margin:0;color:#173f3b;font-family:Tahoma,Arial,sans-serif;background:#fff}.sheet{border:1px solid #c9dfdc;padding:24px}.top{display:flex;justify-content:space-between;gap:20px;border-bottom:4px solid #0f766e;padding-bottom:16px}.brand h1{margin:0;color:#064e4a;font-size:24px}.brand p{margin:5px 0 0;color:#5b7773;font-size:12px}.badge{background:#e6f5f2;color:#064e4a;padding:9px 13px;border-radius:9px;font-size:12px;font-weight:bold}.section{margin-top:20px}.section h2{margin:0 0 10px;color:#0f766e;font-size:15px;border-bottom:1px solid #c9dfdc;padding-bottom:7px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field{background:#f7fbfa;padding:10px;border-right:3px solid #8bcfc5}.field span{display:block;color:#6b8581;font-size:10px;margin-bottom:4px}.field strong{font-size:13px}.result{white-space:pre-wrap;line-height:1.9;background:#f7fbfa;padding:12px;min-height:45px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #c9dfdc;padding:8px;text-align:right}th{background:#e6f5f2;color:#064e4a}.total{margin-top:14px;text-align:left;font-size:18px;font-weight:bold;color:#0f766e}.footer{margin-top:24px;padding-top:10px;border-top:1px solid #c9dfdc;color:#6b8581;font-size:10px}@media print{.no-print{display:none}}
+</style></head><body><main class="sheet"><header class="top"><div class="brand"><h1>نقطة نقاء</h1><p>إدارة فلاتر مياه الشرب</p></div><div class="badge">تقرير زيارة / فاتورة خدمة<br>${text(formatDate(date))}</div></header>
+<section class="section"><h2>بيانات العميل</h2><div class="grid"><div class="field"><span>اسم العميل</span><strong>${text(visit.customerName)}</strong></div><div class="field"><span>الهاتف</span><strong dir="ltr">${text(visit.customerPhone)}</strong></div><div class="field"><span>العنوان</span><strong>${text(visit.customerAddress)}</strong></div><div class="field"><span>نوع الزيارة والفني</span><strong>${text(visit.visitType)} — ${text(visit.technicianName)}</strong></div></div></section>
+<section class="section"><h2>تفاصيل القياس والتحصيل</h2><div class="grid"><div class="field"><span>TDS In — قبل الفلتر</span><strong>${text(visit.tdsIn == null ? "غير مسجل" : `${visit.tdsIn} ppm`)}</strong></div><div class="field"><span>TDS Out — بعد الفلتر</span><strong>${text(visit.tdsOut == null ? "غير مسجل" : `${visit.tdsOut} ppm`)}</strong></div></div><p class="total">المبلغ المحصل: ${text(Number(visit.collectedAmount || 0).toLocaleString("ar-SA"))} ${text(visit.currency || "SAR")}</p></section>
+<section class="section"><h2>الأصناف المستبدلة</h2><table><thead><tr><th>الصنف</th><th>الكمية</th><th>الوحدة</th></tr></thead><tbody>${itemRows}</tbody></table></section>
+<section class="section"><h2>نتيجة الزيارة والملاحظات</h2><div class="result">${text(visit.visitResult || visit.notes || "لا توجد ملاحظات إضافية")}</div></section><footer class="footer">تم إنشاء هذا التقرير من نظام نقطة نقاء. يمكن طباعته أو حفظه بصيغة PDF من نافذة الطباعة.</footer></main></body></html>`;
+}
+
+export function printVisitReport(visit: VisitReportInput) {
+  return openArabicPdfPrintWindow(buildVisitReportDocument(visit));
+}

@@ -110,6 +110,7 @@ export const visits = mysqlTable(
     ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
     visitType: mysqlEnum("visitType", visitTypeValues).notNull(),
     visitDate: timestamp("visitDate").notNull(),
+    nextVisitDate: timestamp("nextVisitDate"),
     technicianName: varchar("technicianName", { length: 160 }),
     salesAgentName: varchar("salesAgentName", { length: 160 }),
     filterCount: int("filterCount").default(1).notNull(),
@@ -173,6 +174,24 @@ export const notificationSettings = mysqlTable(
     index("notification_settings_schedule_idx").on(table.scheduleCronTaskUid),
   ],
 );
+
+export const exportHistory = mysqlTable(
+  "exportHistory",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ownerId: int("ownerId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    exportedBy: int("exportedBy").notNull().references(() => users.id, { onDelete: "restrict" }),
+    selectedTables: text("selectedTables").notNull(),
+    counts: text("counts").notNull(),
+    fileKey: varchar("fileKey", { length: 512 }).notNull(),
+    generatedAt: timestamp("generatedAt").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => [index("export_history_owner_created_idx").on(table.ownerId, table.createdAt)],
+);
+
+export type ExportHistory = typeof exportHistory.$inferSelect;
+export type InsertExportHistory = typeof exportHistory.$inferInsert;
 
 export const inventoryItems = mysqlTable(
   "inventoryItems",
