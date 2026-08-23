@@ -31,6 +31,7 @@ vi.mock("@/lib/trpc", () => ({
         addProof: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       },
       inventory: { technicianSummary: { useQuery: () => ({ data: { items: [] } }) } },
+      notifications: { settings: { useQuery: () => ({ data: { companyWhatsAppPhone: "0500000000" } }) } },
     },
   },
 }));

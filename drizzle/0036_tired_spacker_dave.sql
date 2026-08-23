@@ -1,0 +1,1 @@
+ALTER TABLE `notificationSettings` ADD `companyWhatsAppPhone` varchar(32);

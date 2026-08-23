@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 afterEach(cleanup);
@@ -10,7 +10,11 @@ describe("CustomerContactActions", () => {
     render(<CustomerContactActions customer={{ phone: "01008797774", address: "القاهرة", latitude: null, longitude: null }} labels />);
 
     expect(screen.getByRole("link", { name: "اتصال بالعميل" }).getAttribute("href")).toBe("tel:01008797774");
-    expect(screen.getByRole("link", { name: "فتح واتساب مع العميل" }).getAttribute("href")).toContain("https://wa.me/201008797774?text=");
+    const whatsappButton = screen.getByRole("button", { name: "إرسال رسالة واتساب للعميل" });
+    expect(whatsappButton).toBeTruthy();
+    fireEvent.click(whatsappButton);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "في الطريق إليك" })).toBeTruthy();
     const mapLink = screen.getByRole("link", { name: "فتح موقع العميل على خرائط Google" });
     expect(mapLink.getAttribute("href")).toContain("google.com/maps");
     expect(mapLink.textContent).toContain("الموقع");
