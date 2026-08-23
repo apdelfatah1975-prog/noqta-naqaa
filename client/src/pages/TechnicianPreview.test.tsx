@@ -69,6 +69,14 @@ describe("واجهة الفني وأوامر العمل", () => {
     expect(screen.getByLabelText("المبلغ المحصل")).toBeTruthy();
   });
 
+  it("تعرض حقلي صورة قبل وبعد الصيانة عند تسجيل التنفيذ المكتمل", () => {
+    orders[0].status = "in_progress";
+    render(<TechnicianPreview />);
+    fireEvent.click(screen.getByRole("button", { name: "تحديث" }));
+    expect(screen.getByLabelText("صورة قبل الصيانة")).toBeTruthy();
+    expect(screen.getByLabelText("صورة بعد الصيانة")).toBeTruthy();
+  });
+
   it("ترسل نتيجة العمل والمبلغ عند إغلاق الأمر", () => {
     orders[0].status = "in_progress";
     render(<TechnicianPreview />);
