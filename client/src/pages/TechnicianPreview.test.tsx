@@ -77,7 +77,7 @@ describe("واجهة الفني وأوامر العمل", () => {
     expect(screen.getByLabelText("صورة بعد الصيانة")).toBeTruthy();
   });
 
-  it("تفتح صورة قبل الصيانة في Lightbox وتغلقها بزر الإغلاق", async () => {
+  it("تفتح صورة قبل الصيانة في Lightbox وتغلقها بالزر والنقر خارجها ولوحة المفاتيح", async () => {
     orders[0].status = "in_progress";
     vi.stubGlobal("createImageBitmap", vi.fn().mockResolvedValue({ width: 1600, height: 900 }));
     vi.stubGlobal("FileReader", class MockFileReader {
@@ -104,6 +104,11 @@ describe("واجهة الفني وأوامر العمل", () => {
     expect(screen.getByRole("button", { name: "إغلاق الصورة المكبرة" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "إغلاق الصورة المكبرة" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "صورة قبل الصيانة" })).toBeNull());
+
+    fireEvent.keyDown(preview, { key: "Enter" });
+    expect(screen.getByRole("dialog", { name: "صورة قبل الصيانة" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("dialog", { name: "صورة قبل الصيانة" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "صورة قبل الصيانة" })).toBeNull());
 
     getContext.mockRestore();
