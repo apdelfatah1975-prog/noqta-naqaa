@@ -52,10 +52,12 @@ import {
   UserRoundPlus,
   RefreshCw,
   FileDown,
+  Printer,
   Timer,
   LoaderCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { printCurrentPage } from "@/lib/print";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { AutomaticReminderNotifications } from "./AutomaticReminderNotifications";
@@ -363,7 +365,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       </Sidebar>
 
       <SidebarInset className="min-w-0 max-w-full bg-[#f6fbfa]">
-        <header className={`relative sticky top-0 z-20 flex min-h-14 items-center justify-between gap-1.5 border-b border-teal-950/5 px-2 py-2 backdrop-blur-lg sm:h-16 sm:gap-2 sm:px-4 sm:py-0 lg:px-8 ${pageAccent.surface} ${pageAccent.glow}`}>
+        <div className="no-print" aria-live="polite" />
+        <header className={`no-print relative sticky top-0 z-20 flex min-h-14 items-center justify-between gap-1.5 border-b border-teal-950/5 px-2 py-2 backdrop-blur-lg sm:h-16 sm:gap-2 sm:px-4 sm:py-0 lg:px-8 ${pageAccent.surface} ${pageAccent.glow}`}>
           <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-l ${pageAccent.bar}`} aria-hidden="true" />
           <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2.5">
             {isMobile ? <SidebarTrigger className="h-9 w-9 shrink-0 rounded-xl border border-teal-950/10 bg-white text-teal-800 sm:h-10 sm:w-10"><Menu className="h-5 w-5" /></SidebarTrigger> : null}
@@ -373,6 +376,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-1.5">
+            <button
+              type="button"
+              onClick={printCurrentPage}
+              aria-label="طباعة الصفحة أو حفظها PDF"
+              title="طباعة الصفحة أو حفظها بصيغة PDF"
+              className="flex h-10 min-w-10 items-center justify-center gap-2 rounded-xl border border-violet-200 bg-white px-2.5 text-violet-800 shadow-sm transition hover:border-violet-300 hover:bg-violet-50 hover:shadow-md active:scale-[.98] sm:h-11 sm:min-w-11 sm:px-3"
+            >
+              <Printer className="h-5 w-5 shrink-0" />
+              <span className="hidden whitespace-nowrap text-xs font-extrabold sm:inline">طباعة / PDF</span>
+            </button>
             <button
               type="button"
               onClick={() => void refreshData()}
@@ -425,7 +438,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </header>
         <main className="min-h-[calc(100dvh-3.5rem)] min-w-0 overflow-x-hidden px-2.5 pb-28 pt-3 sm:min-h-[calc(100vh-4rem)] sm:px-6 sm:pb-28 sm:pt-6 lg:px-8 lg:pb-8 lg:pt-8">{children}</main>
       </SidebarInset>
-      {isMobile ? <nav aria-label="التنقل السريع" className="fixed inset-x-0 bottom-0 z-40 min-h-[5.75rem] border-t border-teal-950/10 bg-white/95 px-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(13,82,76,.10)] backdrop-blur-lg">
+      {isMobile ? <nav data-print-hide="true" aria-label="التنقل السريع" className="fixed inset-x-0 bottom-0 z-40 min-h-[5.75rem] border-t border-teal-950/10 bg-white/95 px-1 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(13,82,76,.10)] backdrop-blur-lg">
         <div className="mx-auto flex h-full max-w-full gap-1 overflow-x-auto overscroll-x-contain px-1 [scrollbar-width:thin]">
           {mobileNavItems.map(item => { const active = activeMenuItem.path === item.path; const notificationCount = notificationCountFor(item.path); return <button key={item.path} type="button" onClick={() => setLocation(item.path)} className={`relative flex min-h-[4.5rem] min-w-[78px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-bold leading-4 transition active:scale-95 ${active ? "bg-teal-700 text-white shadow-md ring-2 ring-teal-200/80" : "text-slate-500 hover:bg-slate-50 hover:text-teal-700"}`} aria-current={active ? "page" : undefined}><span className="relative"><item.icon className="h-5 w-5" />{notificationCount > 0 ? <span className={`absolute -right-3 -top-3 grid min-h-5 min-w-5 place-items-center rounded-full border-2 border-white px-1 text-[10px] font-black leading-none shadow-sm ${active ? "bg-rose-500 text-white" : "bg-rose-600 text-white"}`} aria-label={`${notificationCount} عناصر معلقة`} title={`${notificationCount} عناصر معلقة`}>{notificationCount > 99 ? "99+" : notificationCount}</span> : null}</span><span className="max-w-[76px] text-center">{item.label}</span></button>; })}
         </div>
