@@ -22,12 +22,21 @@ import { CloudOff, CloudUpload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+export function formatSyncError(error: unknown) {
+  const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  if (/network|fetch|timeout|offline|failed to fetch/i.test(raw)) return "تعذر الاتصال بالخادم. تحقق من الإنترنت ثم أعد المحاولة.";
+  if (/unauthorized|forbidden|401|403/i.test(raw)) return "انتهت صلاحية الجلسة أو لا تملك صلاحية المزامنة. سجّل الدخول مجددًا.";
+  if (/duplicate|already exists|conflict/i.test(raw)) return "تعذر حفظ إحدى العمليات لأنها موجودة مسبقًا. راجع السجل قبل إعادة المحاولة.";
+  return "تعذر مزامنة البيانات بسبب خطأ غير متوقع. أعد المحاولة، وإذا استمر الخطأ تواصل مع الدعم.";
+}
+
 export function OfflineSyncManager() {
   const { user } = useAuth();
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [syncFailed, setSyncFailed] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const syncingRef = useRef(false);
   const utils = trpc.useUtils();
   const { mutateAsync: syncCustomer } = trpc.filters.customers.create.useMutation();
@@ -52,6 +61,7 @@ export function OfflineSyncManager() {
     setSyncing(true);
     window.dispatchEvent(new CustomEvent("purepoint-offline-sync-start"));
     setSyncFailed(false);
+    setSyncError(null);
     let syncedCount = 0;
     let batchFailed = false;
     const customerIdMap = new Map<number, number>();
@@ -79,9 +89,10 @@ export function OfflineSyncManager() {
         replaceOfflineCustomerId(customer.localId, result.id);
         removePendingCustomer(user.id, customer.clientOperationId);
         syncedCount += 1;
-      } catch {
+      } catch (error) {
         batchFailed = true;
         setSyncFailed(true);
+        setSyncError(formatSyncError(error));
         break;
       }
     }
@@ -105,9 +116,10 @@ export function OfflineSyncManager() {
         });
         removePendingVisit(user.id, visit.clientOperationId);
         syncedCount += 1;
-      } catch {
+      } catch (error) {
         batchFailed = true;
         setSyncFailed(true);
+        setSyncError(formatSyncError(error));
         break;
       }
     }
@@ -116,9 +128,10 @@ export function OfflineSyncManager() {
         await deleteVisit({ id: operation.id, pin: operation.pin });
         removePendingVisitDelete(user.id, operation.clientOperationId);
         syncedCount += 1;
-      } catch {
+      } catch (error) {
         batchFailed = true;
         setSyncFailed(true);
+        setSyncError(formatSyncError(error));
         break;
       }
     }
@@ -137,9 +150,10 @@ export function OfflineSyncManager() {
         });
         removePendingWorkOrderUpdate(user.id, operation.clientOperationId);
         syncedCount += 1;
-      } catch {
+      } catch (error) {
         batchFailed = true;
         setSyncFailed(true);
+        setSyncError(formatSyncError(error));
         break;
       }
     }
@@ -148,9 +162,10 @@ export function OfflineSyncManager() {
         await syncWorkOrderProof({ visitId: operation.visitId, kind: operation.kind, dataUrl: operation.dataUrl });
         removePendingWorkOrderProof(user.id, operation.clientOperationId);
         syncedCount += 1;
-      } catch {
+      } catch (error) {
         batchFailed = true;
         setSyncFailed(true);
+        setSyncError(formatSyncError(error));
         break;
       }
     }
@@ -174,9 +189,10 @@ export function OfflineSyncManager() {
         }
         removePendingInventory(user.id, operation.clientOperationId);
         syncedCount += 1;
-      } catch {
+      } catch (error) {
         batchFailed = true;
         setSyncFailed(true);
+        setSyncError(formatSyncError(error));
         break;
       }
     }
@@ -186,9 +202,10 @@ export function OfflineSyncManager() {
         else await deleteCash({ id: operation.id, pin: operation.pin });
         removePendingCash(user.id, operation.clientOperationId);
         syncedCount += 1;
-      } catch {
+      } catch (error) {
         batchFailed = true;
         setSyncFailed(true);
+        setSyncError(formatSyncError(error));
         break;
       }
     }
@@ -198,6 +215,8 @@ export function OfflineSyncManager() {
     refreshCount();
     if (syncedCount > 0 && !batchFailed) {
       toast.success(`تمت مزامنة ${syncedCount} ${syncedCount === 1 ? "عملية" : "عمليات"} بنجاح بعد عودة الإنترنت.`);
+    } else if (batchFailed) {
+      toast.error("فشلت مزامنة بعض البيانات. راجع الرسالة الظاهرة وأعد المحاولة.");
     }
     await Promise.all([
       utils.filters.dashboard.invalidate(),
@@ -247,12 +266,17 @@ export function OfflineSyncManager() {
     : syncing
       ? `جارٍ مزامنة ${pendingCount} عملية محفوظة…`
       : syncFailed
-        ? `تعذر مزامنة ${pendingCount} عملية. ستتم المحاولة لاحقًا.`
+        ? syncError ?? `تعذر مزامنة ${pendingCount} عملية. أعد المحاولة.`
         : `${pendingCount} عملية بانتظار المزامنة`;
   return (
     <div className={`fixed bottom-4 left-4 z-50 flex max-w-[calc(100vw-2rem)] flex-wrap items-center gap-2 rounded-xl px-4 py-3 text-xs font-bold shadow-lg ${!online ? "bg-amber-500 text-amber-950" : syncFailed ? "bg-red-600 text-white" : "bg-teal-700 text-white"}`} role="status" aria-live="polite" aria-busy={syncing} title="حالة المزامنة">
       {online ? <CloudUpload className={`h-4 w-4 shrink-0 ${syncing ? "motion-safe:animate-spin motion-reduce:animate-none" : ""}`} /> : <CloudOff className="h-4 w-4 shrink-0" />}
       <span className="min-w-0 flex-1">{message}</span>
+      {syncFailed && !syncing && (
+        <button type="button" onClick={() => window.dispatchEvent(new Event("purepoint-offline-sync-request"))} className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg bg-white/15 px-2 text-[11px] font-black hover:bg-white/25 focus:outline-none focus:ring-2 focus:ring-white" aria-label="إعادة محاولة مزامنة البيانات">
+          <CloudUpload className="h-3.5 w-3.5" />إعادة المحاولة
+        </button>
+      )}
       {syncing && (
         <span className="basis-full space-y-1" aria-label="تقدم المزامنة">
           <span className="block h-1.5 w-full overflow-hidden rounded-full bg-white/25">

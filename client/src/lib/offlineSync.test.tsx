@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { formatSyncError } from "../components/OfflineSyncManager";
 import {
   cacheOfflineCustomers,
   cacheOfflineReminders,
@@ -32,6 +33,20 @@ import {
   queueOfflineWorkOrderUpdate,
   queueOfflineWorkOrderProof,
 } from "./offlineSync";
+
+describe("معالجة أخطاء مزامنة البيانات", () => {
+  it("يعرض رسالة واضحة لأخطاء الاتصال", () => {
+    expect(formatSyncError(new Error("Failed to fetch"))).toContain("تعذر الاتصال بالخادم");
+  });
+
+  it("يعرض رسالة صلاحيات قابلة للفهم", () => {
+    expect(formatSyncError(new Error("401 Unauthorized"))).toContain("انتهت صلاحية الجلسة");
+  });
+
+  it("يستخدم رسالة عامة آمنة للأخطاء غير المعروفة", () => {
+    expect(formatSyncError({ unexpected: true })).toContain("خطأ غير متوقع");
+  });
+});
 
 describe("التخزين المحلي للمزامنة", () => {
   beforeEach(() => {
