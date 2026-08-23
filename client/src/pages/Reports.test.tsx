@@ -129,7 +129,7 @@ describe("تقارير نقطة نقاء", () => {
 });
 
 
-it("تعرض تقريرًا محليًا فارغًا عند فشل الشبكة دون شاشة تعذر", () => {
+it("تعرض تقريرًا هيكليًا فارغًا من المصدر المركزي عند فشل الشبكة دون شاشة تعذر", () => {
   mocks.monthly.mockReturnValue({ isLoading: false, isError: true, refetch: mocks.refetch, data: undefined });
   render(<Reports />);
   expect(screen.getAllByText("التقارير").length).toBeGreaterThan(0);

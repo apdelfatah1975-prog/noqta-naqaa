@@ -34,11 +34,18 @@ export default function WorkOrders() {
   const [notes, setNotes] = useState("");
   const [reportFrom, setReportFrom] = useState(today);
   const [reportTo, setReportTo] = useState(today);
-  const customersQuery = trpc.filters.customers.list.useQuery({ followUpStatus: "all", sortBy: "created_desc" });
-  const techniciansQuery = trpc.filters.technicians.list.useQuery();
-  const ordersQuery = trpc.filters.workOrders.list.useQuery(undefined, { retry: false });
-  const notificationSettingsQuery = trpc.filters.notifications.settings.useQuery(undefined, { retry: false, staleTime: 60_000 });
-  const dailyClosingQuery = trpc.filters.dailyCashClosing.useQuery({ date: today }, { retry: false, staleTime: 30_000 });
+  const centralQueryOptions = {
+    staleTime: 5_000,
+    refetchInterval: 8_000,
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: false,
+    networkMode: "online" as const,
+  };
+  const customersQuery = trpc.filters.customers.list.useQuery({ followUpStatus: "all", sortBy: "created_desc" }, centralQueryOptions);
+  const techniciansQuery = trpc.filters.technicians.list.useQuery(undefined, { ...centralQueryOptions, staleTime: 30_000 });
+  const ordersQuery = trpc.filters.workOrders.list.useQuery(undefined, { ...centralQueryOptions, retry: false });
+  const notificationSettingsQuery = trpc.filters.notifications.settings.useQuery(undefined, { ...centralQueryOptions, staleTime: 60_000 });
+  const dailyClosingQuery = trpc.filters.dailyCashClosing.useQuery({ date: today }, { ...centralQueryOptions, staleTime: 30_000, retry: false });
   const visibleCustomers = extractArray<NonNullable<typeof customersQuery.data>[number]>(customersQuery.data);
   const visibleTechnicians = extractArray<NonNullable<typeof techniciansQuery.data>[number]>(techniciansQuery.data);
   const visibleOrders = extractArray<NonNullable<typeof ordersQuery.data>[number]>(ordersQuery.data);

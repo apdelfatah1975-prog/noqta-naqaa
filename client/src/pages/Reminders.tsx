@@ -2,7 +2,6 @@ import { NotificationSettingsCard } from "@/components/NotificationSettingsCard"
 import { PinVerificationDialog } from "@/components/PinVerificationDialog";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { cacheOfflineReminders, getOfflineReminders } from "@/lib/offlineSync";
 import { reminderExcelHeaders, reminderRowsForExcel, downloadRowsAsExcel, withArabicHeaders } from "@/lib/excelExport";
 import { printArabicPdf } from "@/lib/pdfExport";
 import {
@@ -35,26 +34,11 @@ function readWhatsAppState(): WhatsAppState {
 }
 
 export default function Reminders() {
-  const { data: dueReminders, isLoading: dueLoading, isError: dueError } = trpc.filters.reminders.due.useQuery();
-  const { data: alertReminders, isLoading: alertsLoading, isError: alertsError } = trpc.filters.reminders.alerts.useQuery();
-  type OfflineReminderCache = { due: NonNullable<typeof dueReminders> | null; alerts: NonNullable<typeof alertReminders> | null };
-  const [offlineReminders, setOfflineReminders] = useState<OfflineReminderCache>(() => getOfflineReminders<OfflineReminderCache>() ?? { due: null, alerts: null });
-  useEffect(() => {
-    if (!dueReminders && !alertReminders) return;
-    const next = { due: dueReminders ?? offlineReminders.due, alerts: alertReminders ?? offlineReminders.alerts };
-    setOfflineReminders(next);
-    cacheOfflineReminders(next);
-  }, [dueReminders, alertReminders]);
-  const visibleDueReminders = Array.isArray(dueReminders)
-    ? dueReminders
-    : Array.isArray(offlineReminders.due)
-      ? offlineReminders.due
-      : [];
-  const visibleAlertReminders = Array.isArray(alertReminders)
-    ? alertReminders
-    : Array.isArray(offlineReminders.alerts)
-      ? offlineReminders.alerts
-      : [];
+  const queryOptions = { retry: false, staleTime: 5_000, refetchInterval: 8_000, refetchOnReconnect: true, refetchOnWindowFocus: false, networkMode: "online" as const };
+  const { data: dueReminders, isLoading: dueLoading, isError: dueError } = trpc.filters.reminders.due.useQuery(undefined, queryOptions);
+  const { data: alertReminders, isLoading: alertsLoading, isError: alertsError } = trpc.filters.reminders.alerts.useQuery(undefined, queryOptions);
+  const visibleDueReminders = Array.isArray(dueReminders) ? dueReminders : [];
+  const visibleAlertReminders = Array.isArray(alertReminders) ? alertReminders : [];
   const utils = trpc.useUtils();
   const [, setLocation] = useLocation();
   const [whatsappState, setWhatsAppState] = useState<WhatsAppState>(readWhatsAppState);

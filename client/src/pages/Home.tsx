@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { cacheOfflineCash, cacheOfflineDashboard, downloadOfflineBackup, getOfflineBackupKeyCount, getOfflineCash, getOfflineDashboard, getOfflineInventory, getOfflineSession, getPendingOperationCount, restoreOfflineBackupFromExcel } from "@/lib/offlineSync";
+import { cacheOfflineDashboard, downloadOfflineBackup, getOfflineBackupKeyCount, restoreOfflineBackupFromExcel } from "@/lib/offlineSync";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { printArabicPdf } from "@/lib/pdfExport";
 import { AppSettings, getAppSettings } from "@/lib/appSettings";
@@ -37,15 +37,15 @@ const statStyles = [
 export default function Home() {
   const { data, isLoading: dashboardLoading } = trpc.filters.dashboard.useQuery(undefined, {
     retry: false,
+    staleTime: 5_000,
+    refetchInterval: 8_000,
+    refetchOnReconnect: true,
     refetchOnWindowFocus: false,
-    networkMode: "offlineFirst",
+    networkMode: "online",
   });
   type DashboardData = NonNullable<typeof data>;
-  const offlineSession = getOfflineSession();
-  const offlineOwnerId = offlineSession?.id;
   const [appSettings, setAppSettings] = React.useState<AppSettings>(() => getAppSettings());
   const [online, setOnline] = React.useState(() => typeof navigator === "undefined" || navigator.onLine);
-  const [pendingCount, setPendingCount] = React.useState(() => offlineOwnerId ? getPendingOperationCount(offlineOwnerId) : 0);
   const [trashCount, setTrashCount] = React.useState(() => getTrashItems().length);
   const restoreInputRef = React.useRef<HTMLInputElement>(null);
   React.useEffect(() => {
@@ -65,7 +65,6 @@ export default function Home() {
   }, []);
   React.useEffect(() => {
     const refreshStatus = () => {
-      setPendingCount(offlineOwnerId ? getPendingOperationCount(offlineOwnerId) : 0);
       setTrashCount(getTrashItems().length);
     };
     const goOnline = () => setOnline(true);
@@ -81,25 +80,12 @@ export default function Home() {
       window.removeEventListener("purepoint-trash-bin-changed", refreshStatus);
       window.clearInterval(interval);
     };
-  }, [offlineOwnerId]);
-  const [offlineDashboard, setOfflineDashboard] = React.useState<DashboardData | null>(() => getOfflineDashboard<DashboardData>());
-  const [localCacheVersion, setLocalCacheVersion] = React.useState(0);
-  const utils = trpc.useUtils();
+  }, []);
   React.useEffect(() => {
     if (!data) return;
     cacheOfflineDashboard(data);
-    setOfflineDashboard(data);
   }, [data]);
-  React.useEffect(() => {
-    const refreshFromLocalCache = () => {
-      setOfflineDashboard(getOfflineDashboard<DashboardData>());
-      setLocalCacheVersion(version => version + 1);
-      void utils.filters.dashboard.invalidate();
-    };
-    window.addEventListener("purepoint-offline-queue-changed", refreshFromLocalCache);
-    return () => window.removeEventListener("purepoint-offline-queue-changed", refreshFromLocalCache);
-  }, [utils]);
-  const sourceData = data ?? offlineDashboard;
+  const sourceData = data;
   const displayData = React.useMemo<DashboardData | null>(() => sourceData ? {
     ...sourceData,
     todayVisits: extractArray<DashboardData["todayVisits"][number]>(sourceData.todayVisits),
@@ -112,20 +98,21 @@ export default function Home() {
       lowStock: extractArray<DashboardData["inventory"]["lowStock"][number]>(sourceData.inventory?.lowStock),
       items: extractArray<DashboardData["inventory"]["items"][number]>(sourceData.inventory?.items),
     },
-  } : null, [sourceData, localCacheVersion]);
+  } : null, [sourceData]);
   const isLoading = !displayData && dashboardLoading;
   const { data: backupStatus, isLoading: backupLoading } = trpc.filters.backup.status.useQuery(undefined, {
     retry: false,
+    staleTime: 5_000,
+    refetchInterval: 8_000,
+    refetchOnReconnect: true,
     refetchOnWindowFocus: false,
-    networkMode: "offlineFirst",
+    networkMode: "online",
   });
   const backupMutation = trpc.filters.backup.createNow.useMutation();
   const backupUtils = trpc.useUtils();
   const [, setLocation] = useLocation();
-  const cachedCash = offlineOwnerId ? getOfflineCash<DashboardData["cash"]>(offlineOwnerId) : null;
-  const cachedInventory = offlineOwnerId ? getOfflineInventory<{ items?: unknown }>(offlineOwnerId) : null;
-  const cashSource = online ? displayData?.cash : cachedCash ?? displayData?.cash;
-  const inventoryItems = extractArray(online ? displayData?.inventory?.items : cachedInventory?.items ?? displayData?.inventory?.items);
+  const cashSource = displayData?.cash;
+  const inventoryItems = extractArray(displayData?.inventory?.items);
   const counts = {
     today: displayData?.todayVisits.length ?? 0,
     upcoming: displayData?.upcomingVisits.length ?? 0,
@@ -142,8 +129,6 @@ export default function Home() {
       return;
     }
     if (displayData) cacheOfflineDashboard(displayData);
-    if (displayData?.cash && offlineOwnerId) cacheOfflineCash(offlineOwnerId, displayData.cash);
-    setOfflineDashboard(displayData ?? null);
     toast.success("تم حفظ البيانات الحالية على الجهاز بنجاح");
   }
   function downloadDashboardPdf() {
@@ -184,11 +169,11 @@ export default function Home() {
         <div className="flex items-start gap-3">
           <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white ${online ? "bg-emerald-600" : "bg-amber-500"}`}>{online ? <CloudUpload className="h-5 w-5" /> : <CloudOff className="h-5 w-5" />}</div>
           <div>
-            <p className={`font-extrabold ${online ? "text-emerald-900" : "text-amber-900"}`}>{online ? "متصل — التطبيق جاهز للعمل دون إنترنت" : "وضع دون إنترنت — يمكنك التسجيل بأمان"}</p>
-            <p className={`mt-1 text-xs font-semibold ${online ? "text-emerald-700" : "text-amber-800"}`}>{pendingCount > 0 ? `${pendingCount} عملية محفوظة محليًا ${online ? "وتنتظر المزامنة" : "وستتزامن عند عودة الاتصال"}` : online ? "البيانات متزامنة ولا توجد عمليات معلقة" : "ستُحفظ البيانات محليًا وتتم مزامنتها عند عودة الاتصال"}</p>
+            <p className={`font-extrabold ${online ? "text-emerald-900" : "text-amber-900"}`}>{online ? "متصل — البيانات تُحفظ في السيرفر المركزي" : "لا يوجد اتصال بالسيرفر المركزي"}</p>
+            <p className={`mt-1 text-xs font-semibold ${online ? "text-emerald-700" : "text-amber-800"}`}>{online ? "المعلومات المشتركة تُحدّث تلقائياً كل ٨ ثوانٍ" : "لا يمكن إنشاء أو تعديل البيانات حتى يعود الاتصال"}</p>
           </div>
         </div>
-        <button type="button" onClick={saveLocalSnapshot} className={`rounded-full px-3 py-1.5 text-xs font-extrabold transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${pendingCount > 0 ? "bg-sky-100 text-sky-800 hover:bg-sky-200" : online ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" : "bg-amber-100 text-amber-800 hover:bg-amber-200"}`} aria-label="حفظ البيانات الحالية محليًا">{pendingCount > 0 ? "حفظ محلي الآن" : online ? "حفظ محلي" : "حفظ محلي الآن"}</button>
+        <button type="button" onClick={saveLocalSnapshot} className={`rounded-full px-3 py-1.5 text-xs font-extrabold transition hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${online ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" : "bg-amber-100 text-amber-800 hover:bg-amber-200"}`} aria-label="تنزيل نسخة احتياطية محلية">تنزيل نسخة احتياطية</button>
       </section>
 
       <section aria-labelledby="quick-actions-title">

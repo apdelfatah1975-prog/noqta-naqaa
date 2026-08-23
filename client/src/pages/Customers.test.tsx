@@ -198,7 +198,7 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(mocks.list.mock.calls.at(-1)?.[0].sortBy).toBe("collected_desc");
   });
 
-  it("يعرض القائمة المحلية عند فشل الاتصال بالخادم", () => {
+  it("لا يعرض بيانات LocalStorage عند فشل API ويُظهر الحالة الفارغة المركزية", () => {
     localStorage.setItem("purepoint-offline-customers", JSON.stringify([
       { id: 44, manualCode: "٤٤", name: "عميل محفوظ محليًا", phone: "0500000000", address: "عنوان محلي", latitude: null, longitude: null, notes: null },
     ]));
@@ -206,8 +206,8 @@ describe("ترابط تعديل بيانات العميل", () => {
 
     render(<Customers />);
 
-    expect(screen.getAllByText("عميل محفوظ محليًا")[0]).toBeTruthy();
-    expect(screen.getByText(/تُعرض آخر قائمة عملاء محفوظة/)).toBeTruthy();
+    expect(screen.queryByText("عميل محفوظ محليًا")).toBeNull();
+    expect(screen.getByText("تعذر تحميل قائمة العملاء من الخادم المركزي.")).toBeTruthy();
     localStorage.removeItem("purepoint-offline-customers");
   });
 

@@ -1,12 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import {
-  cacheOfflineReport,
-  getLatestOfflineReport,
-  getOfflineReport,
-  getOfflineSession,
-} from "@/lib/offlineSync";
 import {
   CalendarDays,
   Download,
@@ -42,7 +36,6 @@ const firstOfMonth = () => {
 const today = () => isoDate(new Date());
 
 export default function Reports() {
-  const user = getOfflineSession();
   const [dateFrom, setDateFrom] = useState(firstOfMonth);
   const [dateTo, setDateTo] = useState(today);
   const [reportSection, setReportSection] = useState<
@@ -66,16 +59,12 @@ export default function Reports() {
   );
   const query = trpc.filters.reports.monthly.useQuery(reportInput, {
     retry: false,
-    staleTime: 60_000,
+    staleTime: 5_000,
+    refetchInterval: 8_000,
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: false,
+    networkMode: "online",
   });
-  const cachedReport = getOfflineReport<typeof query.data>(
-    user?.id ?? 0,
-    dateFrom,
-    dateTo
-  );
-  const latestCachedReport = getLatestOfflineReport<
-    NonNullable<typeof query.data>
-  >(user?.id ?? 0);
   const emptyReport = {
     period: { dateFrom, dateTo },
     summary: {
@@ -99,7 +88,7 @@ export default function Reports() {
     },
     recentVisits: [],
   } as unknown as NonNullable<typeof query.data>;
-  const data = query.data ?? cachedReport ?? latestCachedReport ?? emptyReport;
+  const data = query.data ?? emptyReport;
   const financial = data.financial ?? {
     serviceIncome: 0,
     externalIncome: 0,
@@ -131,11 +120,6 @@ export default function Reports() {
   const safeVisitsByTechnician = Array.isArray(data.visitsByTechnician) ? data.visitsByTechnician : [];
   const safeRecentVisits = Array.isArray(data.recentVisits) ? data.recentVisits : [];
   const safeTechnicianPayments = Array.isArray(financial.technicianPaymentsByName) ? financial.technicianPaymentsByName : [];
-  useEffect(() => {
-    if (query.data && user)
-      cacheOfflineReport(user.id, dateFrom, dateTo, query.data);
-  }, [dateFrom, dateTo, query.data, user]);
-
   const exportExcel = () => {
     if (!data) return;
     const workbook = XLSX.utils.book_new();
@@ -749,8 +733,7 @@ export default function Reports() {
         <>
           {!query.data ? (
             <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 print:hidden">
-              يُعرض التقرير من البيانات المحلية؛ يمكنك التصدير والطباعة دون
-              اتصال.
+              تعذر الاتصال بالخادم؛ يُعرض قالب التقرير فارغًا دون بيانات محلية. أعد المحاولة قبل التصدير أو الطباعة.
             </div>
           ) : null}
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

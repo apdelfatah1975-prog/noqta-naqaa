@@ -121,10 +121,13 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     expect(inventoryCard.textContent).toContain("2");
   });
 
-  it("تعيد إبطال dashboard عند تغير التخزين المحلي", () => {
+  it("تعتمد لوحة المتابعة على إعادة الجلب المركزي ولا تستجيب لطابور offline القديم", () => {
     render(<Home />);
+    const options = mocks.dashboard.mock.calls.at(-1)?.[1] as { refetchInterval?: number; networkMode?: string };
+    expect(options.refetchInterval).toBe(8_000);
+    expect(options.networkMode).toBe("online");
     window.dispatchEvent(new Event("purepoint-offline-queue-changed"));
-    expect(mocks.dashboardInvalidate).toHaveBeenCalled();
+    expect(mocks.dashboardInvalidate).not.toHaveBeenCalled();
   });
 
   it("تعرض بطاقتي التسجيل وتوجههما للمسارات الصحيحة عند النقر", () => {

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { CustomerContactActions } from "@/components/CustomerContactActions";
+import { extractArray } from "@/lib/dataNormalization";
 
 const statusLabels: Record<string, string> = {
   assigned: "مسند",
@@ -26,6 +27,7 @@ const serviceLabels: Record<string, string> = {
 };
 
 type SelectedItem = { inventoryItemId: number; quantity: number; source: "manual" };
+type WorkOrderRow = Record<string, any> & { id: number; status: string };
 const MAX_COLLECTION_AMOUNT = 100000;
 const resultQuickChoices = ["تم التركيب بنجاح", "تمت الصيانة", "تم تغيير الشمعات", "تم الفحص والمتابعة", "يحتاج قطعة غيار", "يحتاج زيارة متابعة"];
 const notCompletedQuickChoices = ["العميل غير موجود", "العميل طلب التأجيل", "تعذر الوصول للموقع", "الموقع مغلق", "تحتاج الزيارة موافقة الإدارة", "سبب آخر"];
@@ -77,7 +79,6 @@ export default function TechnicianPreview() {
   const [amount, setAmount] = useState("");
   const [collectionState, setCollectionState] = useState<"paid" | "partial" | "unpaid">("paid");
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
-  const [localUpdates, setLocalUpdates] = useState<Record<number, { status: string; visitResult?: string | null; collectedAmount?: number }>>({});
   useEffect(() => {
     const goOnline = () => setOnline(true);
     const goOffline = () => setOnline(false);
@@ -85,8 +86,22 @@ export default function TechnicianPreview() {
     window.addEventListener("offline", goOffline);
     return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
   }, []);
-  const query = trpc.filters.workOrders.list.useQuery(undefined, { retry: false, staleTime: 30_000 });
-  const notificationSettingsQuery = trpc.filters.notifications.settings.useQuery(undefined, { retry: false, staleTime: 60_000 });
+  const query = trpc.filters.workOrders.list.useQuery(undefined, {
+    retry: false,
+    staleTime: 5_000,
+    refetchInterval: 8_000,
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: false,
+    networkMode: "online",
+  });
+  const notificationSettingsQuery = trpc.filters.notifications.settings.useQuery(undefined, {
+    retry: false,
+    staleTime: 60_000,
+    refetchInterval: 30_000,
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: false,
+    networkMode: "online",
+  });
   const utils = trpc.useUtils();
   const addProof = trpc.filters.workOrders.addProof.useMutation({
     onSuccess: () => {
@@ -121,7 +136,7 @@ export default function TechnicianPreview() {
     onError: error => toast.error(error.message || "تعذر حفظ التحديث"),
   });
 
-  const orders = useMemo(() => (query.data ?? []).map(order => localUpdates[order.id] ? { ...order, ...localUpdates[order.id] } : order), [localUpdates, query.data]);
+  const orders = useMemo<WorkOrderRow[]>(() => extractArray<WorkOrderRow>(query.data), [query.data]);
   const visible = useMemo(() => filter === "all" ? orders : orders.filter(order => order.status === filter), [filter, orders]);
   const selected = orders.find(order => order.id === selectedId);
 
@@ -217,7 +232,7 @@ export default function TechnicianPreview() {
           <div className="text-left"><p className="text-xs font-bold text-teal-100">حساب الفني</p><h1 className="mt-1 text-2xl font-black">أوامري فقط</h1></div>
           <Wrench className="h-7 w-7 text-teal-100" />
         </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/10 px-3 py-2.5 text-sm"><span className="font-bold">الفني: {user?.name || "حساب الفني"}</span><div className="flex items-center gap-2"><span className="flex items-center gap-1.5 text-teal-50"><Wifi className="h-4 w-4" /> {online ? "متصل ومزامن" : "محفوظ على الهاتف"}</span><Button type="button" onClick={() => setLocation("/technician-pending-operations")} variant="secondary" size="sm" className="h-8 rounded-lg bg-white text-teal-800 hover:bg-teal-50">العمليات المعلقة</Button></div></div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/10 px-3 py-2.5 text-sm"><span className="font-bold">الفني: {user?.name || "حساب الفني"}</span><div className="flex items-center gap-2"><span className="flex items-center gap-1.5 text-teal-50"><Wifi className="h-4 w-4" /> {online ? "متصل ومزامن" : "لا يوجد اتصال بالخادم"}</span><Button type="button" onClick={() => setLocation("/technician-pending-operations")} variant="secondary" size="sm" className="h-8 rounded-lg bg-white text-teal-800 hover:bg-teal-50">العمليات المعلقة</Button></div></div>
       </section>
 
       <section className="grid grid-cols-3 gap-2">

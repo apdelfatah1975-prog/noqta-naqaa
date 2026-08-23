@@ -8,7 +8,6 @@ import { trpc } from "@/lib/trpc";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { customerExcelHeaders, customerRowsForExcel, downloadCustomerImportIssues, downloadCustomerImportTemplate, downloadRowsAsExcel, parseCustomerClipboard, parseCustomerExcel, parseCustomerPdf, withArabicHeaders, type CustomerImportIssue, type CustomerImportRow } from "@/lib/excelExport";
 import { printArabicPdf } from "@/lib/pdfExport";
-import { cacheOfflineCustomers, cacheOfflineInventory, cacheOfflineServiceCatalog, getOfflineCustomers, getOfflineInventory, getOfflineServiceCatalog, getOfflineSession, hasOfflineCustomerName, queueOfflineCustomer, queueOfflineVisit, type OfflineServiceCatalog } from "@/lib/offlineSync";
 import { moveToTrash } from "@/lib/trashBin";
 import { formatAppMoney, getAppSettings, saveAppSettings } from "@/lib/appSettings";
 import { parseWhatsAppLocationText } from "@/lib/locationParser";
@@ -19,7 +18,6 @@ import { toast } from "sonner";
 import { useLocation } from "wouter";
 
 type VisitType = "installation" | "maintenance" | "cartridge_change" | "follow_up" | "other";
-type OfflineInventorySnapshot = { items: Array<{ id: number; name: string; currentBalance: number }>; movements: Array<{ id: number; inventoryItemId: number; inventoryItemName: string; movementType: "incoming" | "outgoing"; quantity: number; movementDate: string; technicianName?: string | null; notes?: string | null }> };
 export type UsedVisitItem = { inventoryItemId: number; quantity: number; source: "default" | "manual" };
 export type CatalogItem = { id: number; name: string; unit?: string; currentBalance?: number };
 type CustomerForm = { id?: number; manualCode: string; name: string; phone: string; address: string; location: string; notes: string; firstVisitType: VisitType; firstVisitDate: string; firstTechnicianName: string; firstSalesAgentName: string; firstFilterCount: string; firstVisitResult: string; firstVisitNotes: string; firstCollectedAmount: string; firstVisitItems: UsedVisitItem[] };
@@ -43,11 +41,17 @@ function customerCardTone(status: CustomerCardStatus) {
 function followUpBadge(daysRemaining: number) { if (daysRemaining < 0) return { label: "متأخر", className: "border-rose-200 bg-rose-100 text-rose-800 hover:bg-rose-100", ariaLabel: "العميل متأخر عن موعد المتابعة" }; if (daysRemaining <= 5) return { label: daysRemaining === 0 ? "قريب · اليوم" : "قريب", className: "border-amber-200 bg-amber-100 text-amber-900 hover:bg-amber-100", ariaLabel: daysRemaining === 0 ? "موعد متابعة العميل قريب وهو اليوم" : "موعد متابعة العميل قريب" }; return { label: "أكثر من ٥ أيام", className: "border-emerald-200 bg-emerald-100 text-emerald-800 hover:bg-emerald-100", ariaLabel: "موعد متابعة العميل بعد أكثر من خمسة أيام" }; }
 const emptyCustomer: CustomerForm = { manualCode: "", name: "", phone: "", address: "", location: "", notes: "", firstVisitType: "installation", firstVisitDate: toDateTimeLocal(), firstTechnicianName: "", firstSalesAgentName: "", firstFilterCount: "1", firstVisitResult: "", firstVisitNotes: "", firstCollectedAmount: "", firstVisitItems: [] };
 
-function normalizeServiceCatalog(response: unknown): OfflineServiceCatalog | null {
+type ServiceCatalog = {
+  types: Array<{ id: number; code: string; name: string }>;
+  mappings: Array<{ serviceTypeId: number; inventoryItemId: number; defaultQuantity: number; isRequired: boolean; allowEditQuantity: boolean }>;
+  items: Array<CatalogItem & { unit: string; currentBalance: number }>;
+};
+
+function normalizeServiceCatalog(response: unknown): ServiceCatalog | null {
   const source = response && typeof response === "object" && !Array.isArray(response) ? response as Record<string, unknown> : null;
   const nested = source?.data && typeof source.data === "object" && !Array.isArray(source.data) ? source.data as Record<string, unknown> : source;
   if (!nested || !Array.isArray(nested.types) || !Array.isArray(nested.mappings) || !Array.isArray(nested.items)) return null;
-  return { types: nested.types as OfflineServiceCatalog["types"], mappings: nested.mappings as OfflineServiceCatalog["mappings"], items: nested.items as OfflineServiceCatalog["items"] };
+  return { types: nested.types as ServiceCatalog["types"], mappings: nested.mappings as ServiceCatalog["mappings"], items: nested.items as ServiceCatalog["items"] };
 }
 
 export function addOrIncrementVisitItem(items: UsedVisitItem[], item: CatalogItem, quantity = 1): UsedVisitItem[] {
@@ -98,27 +102,27 @@ export default function Customers() {
   const [firstManualItemQuantity, setFirstManualItemQuantity] = useState("1");
   const input = useMemo(() => ({ search: search || undefined, followUpStatus, sortBy }), [search, followUpStatus, sortBy]);
   const statusInput = useMemo(() => ({ search: search || undefined, followUpStatus: "all" as const, sortBy }), [search, sortBy]);
-  const { data: customers, isLoading, isError } = trpc.filters.customers.list.useQuery(input, {
-    staleTime: 30_000,
+  const { data: customers, isLoading, isError, refetch: refetchCustomers } = trpc.filters.customers.list.useQuery(input, {
+    staleTime: 5_000,
+    refetchInterval: 8_000,
+    refetchOnReconnect: true,
     refetchOnWindowFocus: false,
-    networkMode: "offlineFirst",
+    networkMode: "online",
   });
   const { data: statusCustomers } = trpc.filters.customers.list.useQuery(statusInput, {
     enabled: followUpStatus !== "all",
-    staleTime: 30_000,
+    staleTime: 5_000,
+    refetchInterval: 8_000,
+    refetchOnReconnect: true,
     refetchOnWindowFocus: false,
-    networkMode: "offlineFirst",
+    networkMode: "online",
   });
   const techniciansQuery = trpc.filters.technicians?.list?.useQuery?.(undefined, { retry: false, staleTime: 60_000 });
   const visibleTechnicians = extractArray<NonNullable<typeof techniciansQuery.data>[number]>(techniciansQuery?.data);
   const salesAgentNames = Object.keys(getAppSettings().salesAgents).sort((a, b) => a.localeCompare(b, "ar"));
   const serviceCatalogQuery = trpc.filters.serviceTypes?.list?.useQuery?.();
   const serviceCatalog = normalizeServiceCatalog(serviceCatalogQuery?.data);
-  const [offlineServiceCatalog, setOfflineServiceCatalog] = useState<OfflineServiceCatalog | null>(() => normalizeServiceCatalog(getOfflineServiceCatalog()));
-  const effectiveServiceCatalog = serviceCatalog ?? offlineServiceCatalog;
-  const [offlineCustomers, setOfflineCustomers] = useState(() => getOfflineCustomers());
-  const cachedCustomersSignature = useRef<string | null>(null);
-  const cachedCatalogSignature = useRef<string | null>(null);
+  const effectiveServiceCatalog = serviceCatalog;
   const handledRouteRequest = useRef<string | null>(null);
   const utils = trpc.useUtils();
   const [location, setLocation] = useLocation();
@@ -141,7 +145,18 @@ export default function Customers() {
 
   const updateCustomer = trpc.filters.customers.update.useMutation({ onSuccess: () => { utils.filters.customers.list.invalidate(); utils.filters.customers.get.invalidate(); utils.filters.dashboard.invalidate(); utils.filters.reminders.due.invalidate(); toast.success("تم تعديل بيانات العميل"); setDialogOpen(false); }, onError: error => toast.error(error.message || "تعذر تعديل بيانات العميل. يرجى المحاولة مرة أخرى.") });
   const saving = createCustomer.isPending || updateCustomer.isPending;
-  const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  const isOffline = !online;
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
   const locationPreview = useMemo(() => parseWhatsAppLocationText(form.location), [form.location]);
   const [compactMobile, setCompactMobile] = useState(() => getAppSettings().compactCustomersOnMobile);
   const [importOpen, setImportOpen] = useState(false);
@@ -163,32 +178,13 @@ export default function Customers() {
   }, []);
   const safeCustomers = useMemo(() => extractArray<NonNullable<typeof customers>[number]>(customers), [customers]);
   const safeStatusCustomers = useMemo(() => extractArray<NonNullable<typeof customers>[number]>(statusCustomers), [statusCustomers]);
-  const safeOfflineCustomers = Array.isArray(offlineCustomers) ? offlineCustomers : [];
-  const displayedCustomers = (Array.isArray(customers) || safeCustomers.length > 0) ? safeCustomers : safeOfflineCustomers.map(customer => ({
-    ...customer,
-    address: customer.address ?? null,
-    latitude: customer.latitude ?? null,
-    longitude: customer.longitude ?? null,
-    notes: customer.notes ?? null,
-    manualCode: customer.manualCode ?? null,
-    customerCode: customer.manualCode || "",
-    followUp: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ownerId: getOfflineSession()?.id ?? 0,
-    clientOperationId: null,
-    lastVisitDate: new Date(0),
-    latestTechnicianName: null,
-    collectedAmount: 0,
-    totalCollectedAmount: 0,
-    collectedCurrency: "SAR" as const,
-  }));
+  const displayedCustomers = safeCustomers;
   const renderedCustomers = useMemo(() => (Array.isArray(displayedCustomers) ? displayedCustomers.slice(0, visibleCount) : []), [displayedCustomers, visibleCount]);
   useEffect(() => { setVisibleCount(100); }, [search, followUpStatus, sortBy]);
   const activeFilterLabel = ({ all: "كل العملاء", overdue: "العملاء المتأخرون", today: "عملاء موعد اليوم", within_5_days: "المتابعة خلال ٥ أيام", more_than_5_days: "أكثر من ٥ أيام", upcoming: "المتابعة خلال ٥ أيام", regular: "أكثر من ٥ أيام" } as const)[followUpStatus];
   const statusCards = useMemo(() => {
-    const statusSource = Array.isArray(statusCustomers) || safeStatusCustomers.length > 0 ? safeStatusCustomers : null;
-    const source = statusSource ?? (followUpStatus === "all" ? (Array.isArray(displayedCustomers) ? displayedCustomers : []) : safeOfflineCustomers);
+    const statusSource = Array.isArray(statusCustomers) ? safeStatusCustomers : null;
+    const source = statusSource ?? displayedCustomers;
     const counts = { all: source.length, overdue: 0, today: 0, within_5_days: 0, more_than_5_days: 0 };
     source.forEach(customer => {
       const followUp = (customer as { followUp?: { daysRemaining: number } | null }).followUp;
@@ -200,23 +196,8 @@ export default function Customers() {
       else counts.more_than_5_days += 1;
     });
     return counts;
-  }, [statusCustomers, displayedCustomers, offlineCustomers, followUpStatus]);
+  }, [statusCustomers, displayedCustomers]);
 
-  useEffect(() => {
-    if (!Array.isArray(customers)) return;
-    const signature = JSON.stringify(customers.map(customer => ({ id: customer.id, updatedAt: customer.updatedAt, name: customer.name, phone: customer.phone, address: customer.address, latitude: customer.latitude, longitude: customer.longitude, notes: customer.notes })));
-    if (cachedCustomersSignature.current === signature) return;
-    cachedCustomersSignature.current = signature;
-    cacheOfflineCustomers(customers);
-  }, [customers]);
-  useEffect(() => {
-    if (!serviceCatalog) return;
-    const signature = JSON.stringify(serviceCatalog);
-    if (cachedCatalogSignature.current === signature) return;
-    cachedCatalogSignature.current = signature;
-    cacheOfflineServiceCatalog(serviceCatalog);
-    setOfflineServiceCatalog(serviceCatalog);
-  }, [serviceCatalog]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pathname = window.location.pathname.replace(/\/$/, "");
@@ -293,7 +274,7 @@ export default function Customers() {
     setSharedLocationOpen(false);
     setDialogOpen(true);
   }
-  if (isError && !displayedCustomers) return <div className="soft-card p-8 text-center"><p className="font-bold text-teal-950">تعذر تحميل قائمة العملاء من الخادم.</p><p className="mt-2 text-sm text-muted-foreground">لا توجد نسخة محلية محفوظة على هذا الجهاز بعد. افتح التطبيق مرة واحدة مع الإنترنت لمزامنة البيانات ثم يمكنك استخدامه دون اتصال.</p><Button onClick={() => window.location.reload()} variant="outline" className="mt-4 rounded-xl">إعادة المحاولة</Button></div>;
+  if (isError && !isLoading && safeCustomers.length === 0) return <div className="soft-card p-8 text-center"><p className="font-bold text-teal-950">تعذر تحميل قائمة العملاء من الخادم المركزي.</p><p className="mt-2 text-sm text-muted-foreground">تحقق من الاتصال ثم أعد المحاولة. لا يتم استخدام نسخة محلية كبديل للبيانات المشتركة.</p><Button onClick={() => void refetchCustomers()} variant="outline" className="mt-4 rounded-xl">إعادة المحاولة</Button></div>;
 
   function openNew() { setForm({ ...emptyCustomer, firstVisitItems: getDefaultVisitItems("installation") }); setDialogOpen(true); }
   function handleCustomerDialogOpenChange(nextOpen: boolean) {
@@ -369,21 +350,7 @@ export default function Customers() {
       if (!confirmed) return;
     }
     if (isOffline) {
-      const offlineUser = getOfflineSession();
-      if (!offlineUser) return toast.error("افتح التطبيق مرة واحدة مع الإنترنت أولًا لتفعيل العمل دون اتصال.");
-      const offlineInventory = getOfflineInventory<OfflineInventorySnapshot>(offlineUser.id);
-      if (offlineInventory) {
-        for (const usedItem of payload.items) {
-          const localItem = offlineInventory.items.find(item => item.id === usedItem.inventoryItemId);
-          if (!localItem) return toast.error("تعذر العثور على أحد الأصناف في المخزن المحلي.");
-          if (usedItem.quantity > localItem.currentBalance) return toast.error(`الرصيد غير كافٍ من صنف ${localItem.name}؛ المتاح ${localItem.currentBalance} والمطلوب ${usedItem.quantity}.`);
-        }
-        const movementDate = new Date(visitDate).toISOString();
-        cacheOfflineInventory(offlineUser.id, { ...offlineInventory, items: offlineInventory.items.map(item => { const used = payload.items.filter(entry => entry.inventoryItemId === item.id).reduce((sum, entry) => sum + entry.quantity, 0); return used ? { ...item, currentBalance: item.currentBalance - used } : item; }), movements: [...(offlineInventory.movements ?? []), ...payload.items.map((entry, index) => ({ id: -Date.now() - index, inventoryItemId: entry.inventoryItemId, inventoryItemName: offlineInventory.items.find(item => item.id === entry.inventoryItemId)?.name ?? "صنف", movementType: "outgoing" as const, quantity: entry.quantity, movementDate, technicianName: visitTechnicianName || null, notes: "منصرف تلقائي من زيارة محفوظة دون اتصال" }))] });
-      }
-      queueOfflineVisit(offlineUser.id, { ...payload, visitDate: new Date(visitDate).toISOString() });
-      toast.success("تم حفظ الزيارة وخصم الأصناف محليًا، وستتم المزامنة تلقائيًا عند عودة الإنترنت.");
-      setVisitCustomer(null);
+      toast.error("تسجيل الزيارة يحتاج اتصالًا مباشرًا بالسيرفر المركزي.");
       return;
     }
     createVisit.mutate(payload);
@@ -392,10 +359,6 @@ export default function Customers() {
   function submit(event: FormEvent) {
     event.preventDefault();
     const location = parseLocation(form.location);
-    if (!form.id && hasOfflineCustomerName(form.name)) {
-      toast.error("اسم العميل موجود بالفعل، استخدم اسمًا مختلفًا.");
-      return;
-    }
     const payload = { manualCode: form.manualCode.trim() || null, name: form.name, phone: form.phone, address: form.address || null, latitude: location.latitude, longitude: location.longitude, notes: form.notes || null, ...(form.id ? {} : { firstVisitType: form.firstVisitType, firstVisitDate: new Date(form.firstVisitDate), firstTechnicianName: form.firstTechnicianName || null, firstSalesAgentName: form.firstSalesAgentName || null, firstFilterCount: Math.max(1, Math.floor(Number(form.firstFilterCount) || 1)), firstVisitResult: form.firstVisitResult || null, firstVisitNotes: form.firstVisitNotes || null, firstCollectedAmount: Math.round(Number(form.firstCollectedAmount || 0)), firstCollectedCurrency: "SAR" as const, items: form.firstVisitItems.filter(item => item.quantity > 0) }) };
     if (form.id) {
       if (isOffline) return toast.error("تعديل البيانات يحتاج اتصالًا بالإنترنت حاليًا.");
@@ -404,18 +367,7 @@ export default function Customers() {
       return;
     }
     if (isOffline) {
-      const offlineUser = getOfflineSession();
-      if (!offlineUser) return toast.error("افتح التطبيق مرة واحدة مع الإنترنت أولًا لتفعيل العمل دون اتصال.");
-      try {
-        queueOfflineCustomer(offlineUser.id, { ...payload, firstVisitDate: new Date(form.firstVisitDate).toISOString() });
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "اسم العميل موجود بالفعل، استخدم اسمًا مختلفًا.");
-        return;
-      }
-      setOfflineCustomers(getOfflineCustomers());
-      toast.success("تم حفظ العميل على الجهاز وسيتزامن تلقائيًا عند عودة الإنترنت.");
-      setForm(emptyCustomer);
-      setDialogOpen(false);
+      toast.error("إضافة العميل تحتاج اتصالًا مباشرًا بالسيرفر المركزي.");
       return;
     }
     createCustomer.mutate(payload);

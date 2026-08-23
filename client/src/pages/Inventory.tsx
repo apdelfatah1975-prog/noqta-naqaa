@@ -9,31 +9,38 @@ import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Boxes, Droplets, Filter, Pa
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { cacheOfflineCash, cacheOfflineInventory, getOfflineCash, getOfflineInventory, getOfflineSession, queueOfflineDelete, queueOfflineInventoryItem, queueOfflineInventoryMovement } from "@/lib/offlineSync";
 import { moveToTrash } from "@/lib/trashBin";
 import { canRemoveInventoryCategory, getInventoryCategoryOptions, INVENTORY_CATEGORY_OPTIONS, INVENTORY_CATEGORY_STORAGE_KEY, readCustomInventoryCategories } from "@/lib/inventoryCategories";
 import { formatAppMoney } from "@/lib/appSettings";
 import { extractArray } from "@/lib/dataNormalization";
 
-function shouldCreateOfflinePurchase(quantity: number, unitCost: number) { return quantity > 0 && unitCost > 0; }
-
 export default function Inventory() {
   const [location, navigate] = useLocation();
   const [focusedItemId, setFocusedItemId] = useState(() => Number(new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("item") ?? 0));
   const selectedItemId = focusedItemId || Number(new URLSearchParams(location.includes("?") ? location.split("?")[1] : typeof window !== "undefined" ? window.location.search : "").get("item") ?? 0);
-  const owner = getOfflineSession();
-  const inventoryQuery = trpc.filters.inventory.summary.useQuery(undefined, { retry: false, staleTime: 60_000 });
-  const techniciansQuery = trpc.filters.technicians.list.useQuery(undefined, { retry: false, staleTime: 60_000 });
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+  const centralQueryOptions = { retry: false, staleTime: 5_000, refetchInterval: 8_000, refetchOnReconnect: true, refetchOnWindowFocus: false, networkMode: "online" as const };
+  const inventoryQuery = trpc.filters.inventory.summary.useQuery(undefined, centralQueryOptions);
+  const techniciansQuery = trpc.filters.technicians.list.useQuery(undefined, { ...centralQueryOptions, staleTime: 30_000 });
   const visibleTechnicians = Array.isArray(techniciansQuery.data) ? techniciansQuery.data : [];
-  const cachedInventory = getOfflineInventory<typeof inventoryQuery.data>(owner?.id ?? 0);
-  const rawInventory = inventoryQuery.data ?? cachedInventory;
+  const rawInventory = inventoryQuery.data;
   const data = {
     ...(rawInventory && typeof rawInventory === "object" ? rawInventory : {}),
     items: extractArray<any>((rawInventory as any)?.items),
     movements: extractArray<any>((rawInventory as any)?.movements),
   } as NonNullable<typeof inventoryQuery.data>;
-  const isLoading = inventoryQuery.isLoading && !inventoryQuery.data && !cachedInventory;
-  const isError = false;
+  const isLoading = inventoryQuery.isLoading && !inventoryQuery.data;
+  const isError = inventoryQuery.isError;
   const lowStockItems = useMemo(() => (Array.isArray(data.items) ? data.items : []).filter(item => item.currentBalance <= (item.reorderLevel ?? 2)).slice(0, 3), [data]);
   useEffect(() => {
     if (!lowStockItems.length || typeof window === "undefined") return;
@@ -44,9 +51,6 @@ export default function Inventory() {
     toast.warning(`تنبيه المخزن: ${names}`, { description: "وصل الرصيد إلى الحد الأدنى أو انخفض عنه. يُرجى مراجعة الكمية." });
     window.localStorage.setItem(storageKey, signature);
   }, [lowStockItems]);
-  useEffect(() => {
-    if (inventoryQuery.data && owner) cacheOfflineInventory(owner.id, inventoryQuery.data);
-  }, [inventoryQuery.data, owner]);
   useEffect(() => {
     if (!selectedItemId) return;
     const targets = Array.from(document.querySelectorAll<HTMLElement>(`[data-inventory-item-id="${selectedItemId}"]`));
@@ -151,39 +155,6 @@ export default function Inventory() {
     onError: error => toast.error(error.message || "تعذر تسجيل الحركة. يرجى المحاولة مرة أخرى."),
   });
 
-  function recordOfflineInventoryPurchase(amount: number, itemName: string, quantity: number, movementDate: Date, notes?: string | null) {
-    if (!owner || amount <= 0) return;
-    // لا نضيف العملية إلى طابور الخزنة هنا؛ مزامنة حركة الوارد على الخادم
-    // تنشئ مصروف الشراء المرتبط بها تلقائيًا. نحدّث النسخة المحلية للعرض الفوري فقط.
-    const current = getOfflineCash<any>(owner.id);
-    if (!current) return;
-    const localTransaction = {
-      id: -Date.now(),
-      transactionType: "expense",
-      currency: "SAR",
-      amount,
-      category: `شراء مخزون - ${itemName}`,
-      transactionDate: movementDate.toISOString(),
-      recipientName: "مشتريات",
-      notes: notes || `شراء ${quantity} من ${itemName}`,
-      sourceVisitId: null,
-      sourceInventoryMovementId: null,
-      createdAt: new Date().toISOString(),
-    };
-    const currentSummary = current.summaries?.SAR ?? { incomeTotal: 0, expenseTotal: 0, balance: 0 };
-    const nextSummary = {
-      ...currentSummary,
-      expenseTotal: currentSummary.expenseTotal + amount,
-      balance: currentSummary.balance - amount,
-    };
-    cacheOfflineCash(owner.id, {
-      ...current,
-      transactions: [localTransaction, ...extractArray<any>(current.transactions)],
-      expenseTotal: nextSummary.expenseTotal,
-      balance: nextSummary.balance,
-      summaries: { ...current.summaries, SAR: nextSummary },
-    });
-  }
 
   function submitItem(event: FormEvent) {
     event.preventDefault();
@@ -194,27 +165,8 @@ export default function Inventory() {
     setItemErrors(errors);
     if (Object.keys(errors).length) { firstInvalidField(event.currentTarget as HTMLFormElement); return; }
     const input = { name: itemName, category: itemCategory.trim() || "عام", unit: itemUnit.trim() || "قطعة", reorderLevel: Number(reorderLevel || 0), defaultUnitCost: Math.round(Number(defaultUnitCost || 0)), openingQuantity: Number(openingQuantity || 0), notes: itemNotes || null };
-    if (!navigator.onLine && owner) {
-      const existingItem = extractArray<any>(data.items).find(item => String(item.name).trim().toLocaleLowerCase() === item.name.trim().toLocaleLowerCase());
-      if (existingItem) {
-        if (input.openingQuantity <= 0) {
-          toast.info("الصنف موجود بالفعل؛ أدخل كمية أكبر من صفر لإضافة وارد.");
-          return;
-        }
-        const movementInput = { inventoryItemId: existingItem.id, movementType: "incoming" as const, quantity: input.openingQuantity, unitCost: input.defaultUnitCost, currency: "SAR" as const, movementDate: new Date(), technicianName: null, notes: input.notes || `إضافة وارد للصنف الموجود: ${input.name}` };
-        queueOfflineInventoryMovement(owner.id, { ...movementInput, movementDate: movementInput.movementDate.toISOString() });
-        if (shouldCreateOfflinePurchase(input.openingQuantity, input.defaultUnitCost)) recordOfflineInventoryPurchase(input.openingQuantity * input.defaultUnitCost, existingItem.name, input.openingQuantity, movementInput.movementDate, input.notes);
-        const current = data as any;
-        cacheOfflineInventory(owner.id, { ...current, items: current.items.map((item: any) => item.id === existingItem.id ? { ...item, currentBalance: item.currentBalance + input.openingQuantity } : item), movements: [{ ...movementInput, id: -Date.now(), movementDate: movementInput.movementDate.toISOString(), inventoryItemName: existingItem.name }, ...(current.movements ?? [])] });
-        toast.success("الصنف موجود؛ تم حفظ الوارد محليًا دون إنشاء بطاقة ثانية");
-      } else {
-        const pending = queueOfflineInventoryItem(owner.id, input);
-        if (shouldCreateOfflinePurchase(input.openingQuantity, input.defaultUnitCost)) recordOfflineInventoryPurchase(input.openingQuantity * input.defaultUnitCost, input.name, input.openingQuantity, new Date(), input.notes);
-        const current = data as any;
-        cacheOfflineInventory(owner.id, { ...current, items: [{ ...input, id: pending.localId, currentBalance: input.openingQuantity }, ...current.items], movements: current.movements ?? [] });
-        toast.success("تم حفظ الصنف محليًا وستتم مزامنته عند عودة الإنترنت");
-      }
-      setItemDialog(false); setItemName(""); setItemCategory("مستلزمات تركيب"); setItemUnit("قطعة"); setReorderLevel("2"); setDefaultUnitCost("0"); setOpeningQuantity("0"); setItemNotes("");
+    if (!online) {
+      toast.error("إضافة الصنف تحتاج اتصالًا مباشرًا بقاعدة البيانات المركزية.");
       return;
     }
     createItem.mutate(input);
@@ -229,14 +181,8 @@ export default function Inventory() {
     setMovementErrors(errors);
     if (Object.keys(errors).length) { firstInvalidField(event.currentTarget as HTMLFormElement); return; }
     const input = { inventoryItemId: movementItem.id, movementType, quantity: Number(quantity), unitCost: movementType === "incoming" ? Math.round(Number(unitCost || 0)) : 0, currency: movementCurrency, movementDate: new Date(movementDate), technicianName: technicianName || null, notes: movementNotes || null };
-    if (!navigator.onLine && owner) {
-      queueOfflineInventoryMovement(owner.id, { ...input, movementDate: input.movementDate.toISOString() });
-      if (movementType === "incoming" && shouldCreateOfflinePurchase(input.quantity, input.unitCost)) recordOfflineInventoryPurchase(input.quantity * input.unitCost, movementItem.name, input.quantity, input.movementDate, input.notes);
-      const current = data as any;
-      const delta = movementType === "incoming" ? input.quantity : -input.quantity;
-      cacheOfflineInventory(owner.id, { ...current, items: current.items.map((item: any) => item.id === movementItem.id ? { ...item, currentBalance: item.currentBalance + delta } : item), movements: [{ ...input, id: -Date.now(), movementDate: input.movementDate.toISOString(), inventoryItemName: movementItem.name }, ...(current.movements ?? [])] });
-      toast.success("تم حفظ حركة المخزن محليًا وستتم مزامنتها عند عودة الإنترنت");
-      setMovementItem(null); setQuantity(""); setUnitCost(""); setTechnicianName(""); setMovementNotes("");
+    if (!online) {
+      toast.error("تسجيل حركة المخزن يحتاج اتصالًا مباشرًا بقاعدة البيانات المركزية.");
       return;
     }
     createMovement.mutate(input);
@@ -321,7 +267,7 @@ export default function Inventory() {
         </div>
       </section>
 
-      <PinVerificationDialog open={pinAction !== null} onOpenChange={open => { if (!open) setPinAction(null); }} busy={deleteItem.isPending || deleteMovement.isPending} title={pinAction?.kind === "item" ? "تأكيد حذف الصنف" : "تأكيد حذف حركة المخزن"} description={pinAction?.kind === "item" ? "سيتم حذف الصنف وجميع حركاته المرتبطة نهائيًا." : "سيتم حذف الحركة وسجل الشراء المرتبط بها إن وجد."} onConfirm={pin => { if (!pinAction) return; const target = pinAction.kind === "item" ? data.items.find((item: any) => item.id === pinAction.id) : data.movements.find((movement: any) => movement.id === pinAction.id); if (target) { const relatedMovements = pinAction.kind === "item" ? (data.movements ?? []).filter((movement: any) => movement.inventoryItemId === pinAction.id) : []; moveToTrash({ entityType: "inventory", entityLabel: pinAction.kind === "item" ? `صنف من المخزن: ${(target as any).name ?? "غير مسمى"}` : `حركة من المخزن: ${(target as any).inventoryItemName ?? "غير مسمى"}`, payload: { kind: pinAction.kind, target, relatedMovements } }); } if (!navigator.onLine && owner) { queueOfflineDelete(owner.id, { entity: pinAction.kind === "item" ? "inventoryItem" : "inventoryMovement", id: pinAction.id, pin }); const current = data as any; cacheOfflineInventory(owner.id, pinAction.kind === "item" ? { ...current, items: current.items.filter((item: any) => item.id !== pinAction.id), movements: (current.movements ?? []).filter((movement: any) => movement.inventoryItemId !== pinAction.id) } : { ...current, movements: (current.movements ?? []).filter((movement: any) => movement.id !== pinAction.id), items: current.items.map((item: any) => item) }); setPinAction(null); toast.success("تم الحذف محليًا وستتم مزامنته عند عودة الإنترنت"); } else if (pinAction.kind === "item") deleteItem.mutate({ id: pinAction.id, pin }); else deleteMovement.mutate({ id: pinAction.id, pin }); }} />
+      <PinVerificationDialog open={pinAction !== null} onOpenChange={open => { if (!open) setPinAction(null); }} busy={deleteItem.isPending || deleteMovement.isPending} title={pinAction?.kind === "item" ? "تأكيد حذف الصنف" : "تأكيد حذف حركة المخزن"} description={pinAction?.kind === "item" ? "سيتم حذف الصنف وجميع حركاته المرتبطة نهائيًا." : "سيتم حذف الحركة وسجل الشراء المرتبط بها إن وجد."} onConfirm={pin => { if (!pinAction) return; const target = pinAction.kind === "item" ? data.items.find((item: any) => item.id === pinAction.id) : data.movements.find((movement: any) => movement.id === pinAction.id); if (target) { const relatedMovements = pinAction.kind === "item" ? (data.movements ?? []).filter((movement: any) => movement.inventoryItemId === pinAction.id) : []; moveToTrash({ entityType: "inventory", entityLabel: pinAction.kind === "item" ? `صنف من المخزن: ${(target as any).name ?? "غير مسمى"}` : `حركة من المخزن: ${(target as any).inventoryItemName ?? "غير مسمى"}`, payload: { kind: pinAction.kind, target, relatedMovements } }); } if (!online) { toast.error("حذف بيانات المخزن يحتاج اتصالًا مباشرًا بقاعدة البيانات المركزية."); return; } if (pinAction.kind === "item") deleteItem.mutate({ id: pinAction.id, pin }); else deleteMovement.mutate({ id: pinAction.id, pin }); }} />
       <Dialog open={Boolean(detailItem)} onOpenChange={open => !open && setDetailItemId(null)}><DialogContent dir="rtl" showCloseButton={false} onPointerDownOutside={() => setDetailItemId(null)} className="max-h-[calc(100vh-1rem)] overflow-hidden p-0 sm:max-w-2xl"><DialogClose aria-label="إغلاق تفاصيل الصنف" className="absolute left-3 top-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full border border-teal-950/10 bg-background text-xl font-bold text-teal-950 shadow-md transition-colors hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600">×<span className="sr-only">إغلاق تفاصيل الصنف</span></DialogClose><DialogHeader className="sticky top-0 z-10 border-b border-teal-950/10 bg-background px-6 pb-4 pt-6"><DialogTitle>تفاصيل الصنف: {detailItem?.name}</DialogTitle><DialogDescription>كل بيانات الصنف وسجل التوريد في مكان واحد.</DialogDescription></DialogHeader><div className="max-h-[calc(100vh-8rem)] overflow-y-auto px-6 pb-6 pt-4">{detailItem ? <div className="space-y-4"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-xl bg-teal-50 p-3"><p className="text-xs text-muted-foreground">النوع</p><p className="mt-1 font-black text-teal-950">{detailItem.category || "عام"}</p></div><div className="rounded-xl bg-cyan-50 p-3"><p className="text-xs text-muted-foreground">وحدة القياس</p><p className="mt-1 font-black text-cyan-800">{detailItem.unit || "قطعة"}</p></div><div className="rounded-xl bg-teal-50 p-3"><p className="text-xs text-muted-foreground">الرصيد الافتتاحي</p><p className="mt-1 font-black text-teal-950">{detailItem.openingQuantity ?? 0}</p></div><div className="rounded-xl bg-emerald-50 p-3"><p className="text-xs text-muted-foreground">الرصيد الحالي</p><p className="mt-1 font-black text-emerald-800">{detailItem.currentBalance}</p></div><div className="rounded-xl bg-violet-50 p-3"><p className="text-xs text-muted-foreground">سعر الوحدة</p><p className="mt-1 font-black text-violet-800">{formatMoney(detailItem.openingUnitCost ?? detailItem.defaultUnitCost ?? 0)}</p></div><div className="rounded-xl bg-sky-50 p-3"><p className="text-xs text-muted-foreground">تاريخ الإضافة</p><p className="mt-1 font-black text-sky-800">{formatDate(detailItem.openingAddedAt ?? detailItem.createdAt)}</p></div><div className="rounded-xl bg-amber-50 p-3"><p className="text-xs text-muted-foreground">إجمالي الوارد</p><p className="mt-1 font-black text-amber-800">{detailIncomingQuantity}</p></div><div className="rounded-xl bg-orange-50 p-3"><p className="text-xs text-muted-foreground">إجمالي المنصرف</p><p className="mt-1 font-black text-orange-800">{detailOutgoingQuantity}</p></div></div><div className="grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-emerald-50 p-3"><p className="text-xs text-muted-foreground">إجمالي تكلفة التوريد</p><p className="mt-1 font-black text-emerald-800">{formatMoney(detailPurchaseTotal)}</p></div><div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-muted-foreground">ملاحظات</p><p className="mt-1 font-bold text-slate-800">{detailItem.notes || "لا توجد ملاحظات"}</p></div></div><div className="rounded-2xl border border-teal-950/10"><div className="border-b border-teal-950/10 p-4"><h3 className="font-extrabold">سجل التوريد وتغير السعر</h3><p className="mt-1 text-xs text-muted-foreground">يعرض كل عملية وارد بسعرها وقت التوريد.</p></div>{detailMovements.filter(movement => movement.movementType === "incoming").length ? <div className="divide-y divide-teal-950/10">{detailMovements.filter(movement => movement.movementType === "incoming").map(movement => <div key={movement.id} className="grid gap-2 p-4 text-sm sm:grid-cols-4"><div><p className="text-xs text-muted-foreground">التاريخ</p><p className="font-bold">{formatDate(movement.movementDate)}</p></div><div><p className="text-xs text-muted-foreground">الكمية</p><p className="font-bold">{movement.quantity} قطعة</p></div><div><p className="text-xs text-muted-foreground">سعر الوحدة</p><p className="font-bold text-violet-800">{formatMoney(movement.unitCost ?? 0)}</p></div><div><p className="text-xs text-muted-foreground">الإجمالي</p><p className="font-bold text-emerald-800">{formatMoney((movement.unitCost ?? 0) * movement.quantity)}</p></div></div>)}</div> : <p className="p-5 text-center text-sm text-muted-foreground">لا توجد عمليات توريد مسجلة لهذا الصنف.</p>}</div><div className="rounded-2xl border border-teal-950/10"><div className="border-b border-teal-950/10 p-4"><h3 className="font-extrabold">سجل المنصرف</h3><p className="mt-1 text-xs text-muted-foreground">يعرض الكمية والتاريخ والفني أو المستلم والملاحظات.</p></div>{detailOutgoing.length ? <div className="divide-y divide-teal-950/10">{detailOutgoing.map(movement => <div key={movement.id} className="grid gap-2 p-4 text-sm sm:grid-cols-4"><div><p className="text-xs text-muted-foreground">التاريخ</p><p className="font-bold">{formatDate(movement.movementDate)}</p></div><div><p className="text-xs text-muted-foreground">الكمية</p><p className="font-bold text-orange-800">{movement.quantity} قطعة</p></div><div><p className="text-xs text-muted-foreground">الفني / المستلم</p><p className="font-bold">{movement.technicianName || "—"}</p></div><div><p className="text-xs text-muted-foreground">ملاحظات</p><p className="font-bold">{movement.notes || "—"}</p></div></div>)}</div> : <p className="p-5 text-center text-sm text-muted-foreground">لا توجد عمليات صرف مسجلة لهذا الصنف.</p>}</div></div> : null}</div></DialogContent></Dialog>
       <Dialog open={itemDialog} onOpenChange={setItemDialog}><DialogContent dir="rtl" className="flex max-h-[calc(100dvh-1rem)] min-h-0 flex-col overflow-hidden sm:max-w-2xl"><DialogHeader className="shrink-0"><DialogTitle>إضافة صنف جديد إلى المخزن</DialogTitle><DialogDescription>اكتب اسم الصنف والكمية، ثم احفظ. باقي البيانات اختيارية ويمكن تعديلها لاحقًا.</DialogDescription></DialogHeader><form onSubmit={submitItem} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain py-2 pl-1 pr-1"><div className="grid gap-4 sm:grid-cols-2"><label><span className="field-label">اسم الصنف</span><input className="field-input" value={itemName} onChange={event => { setItemName(event.target.value); clearItemError("itemName"); }} aria-invalid={Boolean(itemErrors.itemName)} aria-describedby={itemErrors.itemName ? "item-name-error" : undefined} placeholder="مثال: شمعة كربون أو فلتر جامبو" />{itemErrors.itemName ? <p id="item-name-error" role="alert" className="mt-1 text-xs font-semibold text-red-600">{itemErrors.itemName}</p> : null}</label><label><span className="field-label">نوع الصنف</span><select className="field-input" value={categoryOptions.includes(itemCategory) ? itemCategory : "أخرى"} onChange={event => setItemCategory(event.target.value === "أخرى" ? "" : event.target.value)}><option value="" disabled>اختر نوع الصنف</option>{categoryOptions.map(category => <option key={category} value={category}>{category}</option>)}</select>{(!itemCategory || !categoryOptions.includes(itemCategory)) ? <input className="field-input mt-2" value={itemCategory} onChange={event => { setItemCategory(event.target.value); clearItemError("itemCategory"); }} aria-invalid={Boolean(itemErrors.itemCategory)} aria-describedby={itemErrors.itemCategory ? "item-category-error" : undefined} placeholder="اكتب نوعًا مخصصًا" /> : null}</label><label><span className="field-label">وحدة القياس</span><input className="field-input" value={itemUnit} onChange={event => setItemUnit(event.target.value)} placeholder="قطعة" /></label><label><span className="field-label">الرصيد الافتتاحي</span><input type="number" min="0" className="field-input" value={openingQuantity} onChange={event => { setOpeningQuantity(event.target.value); clearItemError("openingQuantity"); }} aria-invalid={Boolean(itemErrors.openingQuantity)} aria-describedby={itemErrors.openingQuantity ? "opening-quantity-error" : undefined} />{itemErrors.openingQuantity ? <p id="opening-quantity-error" role="alert" className="mt-1 text-xs font-semibold text-red-600">{itemErrors.openingQuantity}</p> : null}</label><label><span className="field-label">الحد الأدنى للرصيد</span><input type="number" min="0" className="field-input" value={reorderLevel} onChange={event => setReorderLevel(event.target.value)} /><p className="mt-1 text-xs text-muted-foreground">يظهر تنبيه تلقائي عند وصول الرصيد إلى هذا الحد أو انخفاضه عنه.</p></label><label><span className="field-label">سعر شراء القطعة</span><input type="number" min="0" step="1" inputMode="numeric" className="field-input" value={defaultUnitCost} onChange={event => setDefaultUnitCost(event.target.value)} placeholder="0" /><p className="mt-1 text-xs text-muted-foreground">يُستخدم تلقائيًا عند تسجيل الوارد لخصم التكلفة من الخزينة.</p></label><label className="sm:col-span-2"><span className="field-label">ملاحظات</span><textarea className="field-textarea" value={itemNotes} onChange={event => setItemNotes(event.target.value)} placeholder="المقاس أو المورد أو أي ملاحظة مفيدة" /></label></div><div className="sticky bottom-0 flex justify-end gap-3 bg-background/95 pt-2 backdrop-blur-sm"><Button type="button" variant="outline" onClick={() => setItemDialog(false)} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={createItem.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">{createItem.isPending ? "جارٍ الحفظ…" : "إضافة الصنف"}</Button></div></form></DialogContent></Dialog>
       <Dialog open={Boolean(movementItem)} onOpenChange={open => !open && setMovementItem(null)}><DialogContent dir="rtl" className="flex max-h-[calc(100dvh-1rem)] min-h-0 flex-col overflow-hidden sm:max-w-2xl"><DialogHeader className="shrink-0"><DialogTitle>{movementType === "outgoing" ? "صرف صنف من المخزن" : "إضافة وارد للمخزن"}: {movementItem?.name}</DialogTitle><DialogDescription>سجّل نوع الحركة والكمية والتكلفة والتفاصيل اللازمة لحفظ حركة المخزن.</DialogDescription></DialogHeader><form onSubmit={submitMovement} className="min-h-0 flex-1 grid gap-4 overflow-y-auto overscroll-contain py-2 pl-1 pr-1 sm:grid-cols-2"><label><span className="field-label">نوع الحركة</span><select className="field-input" value={movementType} onChange={event => setMovementType(event.target.value as "incoming" | "outgoing")}><option value="incoming">وارد</option><option value="outgoing">منصرف</option></select></label><label><span className="field-label">الكمية</span><input type="number" min="1" className="field-input" value={quantity} onChange={event => { setQuantity(event.target.value); clearMovementError("quantity"); }} aria-invalid={Boolean(movementErrors.quantity)} aria-describedby={movementErrors.quantity ? "movement-quantity-error" : undefined} />{movementErrors.quantity ? <p id="movement-quantity-error" role="alert" className="mt-1 text-xs font-semibold text-red-600">{movementErrors.quantity}</p> : null}</label>{movementType === "incoming" ? <label><span className="field-label">سعر شراء القطعة</span><input type="number" min="0" step="1" inputMode="numeric" className="field-input" value={unitCost} onChange={event => { setUnitCost(event.target.value); clearMovementError("unitCost"); }} aria-invalid={Boolean(movementErrors.unitCost)} aria-describedby={movementErrors.unitCost ? "unit-cost-error" : undefined} />{movementErrors.unitCost ? <p id="unit-cost-error" role="alert" className="mt-1 text-xs font-semibold text-red-600">{movementErrors.unitCost}</p> : null}<p className="mt-1 text-xs text-muted-foreground">سيُخصم إجمالي الكمية × السعر من الخزينة تلقائيًا.</p><p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-extrabold text-emerald-800">إجمالي الخصم المتوقع: {formatMoney(Math.max(0, Number(quantity) || 0) * Math.max(0, Number(unitCost) || 0))}</p></label> : null}<label><span className="field-label">تاريخ الحركة</span><input type="datetime-local" className="field-input" value={movementDate} onChange={event => { setMovementDate(event.target.value); clearMovementError("movementDate"); }} aria-invalid={Boolean(movementErrors.movementDate)} aria-describedby={movementErrors.movementDate ? "movement-date-error" : undefined} />{movementErrors.movementDate ? <p id="movement-date-error" role="alert" className="mt-1 text-xs font-semibold text-red-600">{movementErrors.movementDate}</p> : null}</label><label><span className="field-label">اسم الفني المستلم</span><select aria-label="اسم الفني المستلم" className="field-input" value={technicianName} onChange={event => setTechnicianName(event.target.value)}><option value="">اختر الفني (اختياري للمنصرف)</option>{visibleTechnicians.map(technician => <option key={technician.id} value={technician.name ?? ""}>{technician.name ?? "فني بدون اسم"}</option>)}</select></label><label className="sm:col-span-2"><span className="field-label">ملاحظات</span><textarea className="field-textarea" value={movementNotes} onChange={event => setMovementNotes(event.target.value)} /></label><div className="sticky bottom-0 flex justify-end gap-3 bg-background/95 pt-2 backdrop-blur-sm sm:col-span-2"><Button type="button" variant="outline" onClick={() => setMovementItem(null)} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={createMovement.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">{createMovement.isPending ? "جارٍ الحفظ…" : "حفظ الحركة"}</Button></div></form></DialogContent></Dialog>

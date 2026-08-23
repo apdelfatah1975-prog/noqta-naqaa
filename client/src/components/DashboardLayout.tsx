@@ -76,7 +76,7 @@ const menuItems = [
   { icon: WalletCards, label: "كشف رواتب الفنيين", path: "/technician-payroll" },
   { icon: MapPinned, label: "خريطة الفنيين", path: "/technician-locations" },
   { icon: UserRoundPlus, label: "الحسابات المسموح بها", path: "/allowed-technicians" },
-  { icon: ClipboardCheck, label: "العمليات المعلقة", path: "/pending-operations" },
+  { icon: ClipboardCheck, label: "حالة المزامنة", path: "/pending-operations" },
   { icon: Settings, label: "الإعدادات", path: "/settings" },
 ];
 

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, FileText, Printer, RefreshCw, Save, UserPlus, WalletCards } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
-import { getOfflineCash, getOfflineSession, getOfflineVisits } from "@/lib/offlineSync";
 import { formatAppMoney, getAppSettings, saveAppSettings, type AppSettings, type SalesAgentCommissionMode, type SalesAgentProfile } from "@/lib/appSettings";
 import { printArabicPdf } from "@/lib/pdfExport";
 import { toast } from "sonner";
@@ -75,7 +74,6 @@ export function buildTechnicianMonthlyReportRows(row: PayrollRow) {
 
 
 export default function TechnicianPayroll() {
-  const owner = getOfflineSession();
   const [month, setMonth] = useState(currentMonth);
   const [technician, setTechnician] = useState("all");
   const [settings, setSettings] = useState<AppSettings>(() => getAppSettings());
@@ -87,7 +85,7 @@ export default function TechnicianPayroll() {
   const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 16));
   const [paymentNotes, setPaymentNotes] = useState("");
   const bounds = monthBounds(month);
-  const query = trpc.filters.cash.summary.useQuery({ startDate: bounds.from, endDate: bounds.to, technician: technician === "all" ? undefined : technician }, { retry: false, staleTime: 60_000 });
+  const query = trpc.filters.cash.summary.useQuery({ startDate: bounds.from, endDate: bounds.to, technician: technician === "all" ? undefined : technician }, { retry: false, staleTime: 5_000, refetchInterval: 8_000, refetchOnReconnect: true, refetchOnWindowFocus: false, networkMode: "online" });
   const utils = trpc.useUtils();
   const createTechnicianPayment = trpc.filters.cash.create.useMutation({
     onSuccess: () => {
@@ -100,11 +98,10 @@ export default function TechnicianPayroll() {
     },
     onError: error => toast.error(error.message || "تعذر تسجيل الدفعة.")
   });
-  const visitQuery = trpc.filters.visits.list.useQuery(undefined, { retry: false, staleTime: 60_000 });
-  const cached = getOfflineCash<CashData>(owner?.id ?? 0);
-  const source = (query.data ?? cached ?? { transactions: [] }) as CashData;
-  const transactions = source.transactions ?? [];
-  const visits = (visitQuery.data ?? (!navigator.onLine ? getOfflineVisits() : [])) as VisitRecord[];
+  const visitQuery = trpc.filters.visits.list.useQuery(undefined, { retry: false, staleTime: 5_000, refetchInterval: 8_000, refetchOnReconnect: true, refetchOnWindowFocus: false, networkMode: "online" });
+  const source = (query.data ?? { transactions: [] }) as CashData;
+  const transactions = Array.isArray(source.transactions) ? source.transactions : [];
+  const visits = Array.isArray(visitQuery.data) ? visitQuery.data as VisitRecord[] : [];
   useEffect(() => {
     const refresh = () => setSettings(getAppSettings());
     window.addEventListener("purepoint-settings-changed", refresh);

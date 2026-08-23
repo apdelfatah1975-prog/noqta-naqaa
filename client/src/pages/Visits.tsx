@@ -1,6 +1,5 @@
 import { CustomerContactActions } from "@/components/CustomerContactActions";
 import { PinVerificationDialog } from "@/components/PinVerificationDialog";
-import { cacheOfflineCustomers, cacheOfflineVisits, getOfflineCustomers, getOfflineSession, getOfflineVisits, getPendingVisits, queueOfflineDelete } from "@/lib/offlineSync";
 import { moveToTrash } from "@/lib/trashBin";
 import { formatDateTime, visitTypeLabels } from "@/lib/filterUi";
 import { downloadRowsAsExcel, visitExcelHeaders, visitRowsForExcel, withArabicHeaders } from "@/lib/excelExport";
@@ -23,27 +22,29 @@ type CustomerVisitGroup = {
 
 export default function Visits() {
   const input = useMemo(() => ({}), []);
-  const { data: customers } = trpc.filters.customers.list.useQuery(input);
-  const { data: visitList } = trpc.filters.visits.list.useQuery();
-  const offlineCustomers = getOfflineCustomers();
-  const offlineVisits = getOfflineVisits();
-  const offlineUser = getOfflineSession();
-  const online = navigator.onLine;
+  const customersQuery = trpc.filters.customers.list.useQuery(input, {
+    staleTime: 5_000,
+    refetchInterval: 8_000,
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: false,
+    networkMode: "online",
+  });
+  const visitsQuery = trpc.filters.visits.list.useQuery(undefined, {
+    staleTime: 5_000,
+    refetchInterval: 8_000,
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: false,
+    networkMode: "online",
+  });
+  const { data: customers } = customersQuery;
+  const { data: visitList } = visitsQuery;
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const normalizedCustomers = useMemo(() => extractArray<VisitRow>(customers), [customers]);
   const normalizedVisits = useMemo(() => normalizeVisitRows(visitList), [visitList]);
-  const offlineVisitRows = useMemo(() => normalizeVisitRows(offlineVisits), [offlineVisits]);
-  const visibleCustomers = useMemo(() => normalizedCustomers.length ? normalizedCustomers : !online ? extractArray<VisitRow>(offlineCustomers) : [], [normalizedCustomers, offlineCustomers, online]);
-  // Always expose a real array to the render tree. Invalid API/IndexedDB payloads become [] before any map/filter call.
-  const visits = useMemo<VisitRow[]>(() => {
-    if (normalizedVisits.length > 0) return normalizedVisits;
-    if (!online && offlineVisitRows.length > 0) return offlineVisitRows;
-    return [];
-  }, [normalizedVisits, offlineVisitRows, online]);
-  const pendingVisits = useMemo(() => {
-    if (!(!online && offlineUser)) return [];
-    const queued = getPendingVisits(offlineUser.id);
-    return extractArray(queued);
-  }, [offlineUser, online]);
+  const visibleCustomers = normalizedCustomers;
+  // The server response is the only operational source of truth; invalid or empty responses become [].
+  const visits = normalizedVisits;
+  const pendingVisits: VisitRow[] = [];
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -56,25 +57,28 @@ export default function Visits() {
   const deleteVisit = trpc.filters.visits.delete.useMutation({ onSuccess: () => { setDeleteId(null); toast.success("تم حذف الزيارة ونقل نسختها إلى سلة المحذوفات"); }, onError: error => toast.error(error.message || "تعذر حذف الزيارة.") });
   const updateVisit = trpc.filters.visits.updateDetails.useMutation({ onSuccess: async () => { setEditVisit(null); await utils.filters.visits.list.invalidate(); toast.success("تم تصحيح تسجيل الزيارة والخزينة"); }, onError: error => toast.error(error.message || "تعذر تصحيح تسجيل الزيارة.") });
 
-  useEffect(() => { if (normalizedCustomers.length > 0 || Array.isArray(customers)) cacheOfflineCustomers(normalizedCustomers); }, [customers, normalizedCustomers]);
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
   useEffect(() => {
     const onSettingsChange = (event: Event) => setCompactMobile(Boolean((event as CustomEvent<{ compactVisitsOnMobile?: boolean }>).detail?.compactVisitsOnMobile));
     window.addEventListener("purepoint-settings-changed", onSettingsChange);
     return () => window.removeEventListener("purepoint-settings-changed", onSettingsChange);
   }, []);
-  useEffect(() => {
-    if (normalizedVisits.length === 0 && !Array.isArray(visitList)) return;
-    cacheOfflineVisits(normalizedVisits.map(visit => ({ id: visit.id, customerId: visit.customerId, visitType: visit.visitType, visitDate: new Date(visit.visitDate).toISOString(), technicianName: visit.technicianName, visitResult: visit.visitResult, notes: visit.notes, collectedAmount: visit.collectedAmount, })));
-  }, [normalizedVisits, visitList]);
-
   const customerMap = useMemo(() => new Map(visibleCustomers.map(customer => [customer.id, customer])), [visibleCustomers]);
   const rows = useMemo(() => {
     const safeVisits = Array.isArray(visits) ? visits : [];
-    const safePendingVisits = Array.isArray(pendingVisits) ? pendingVisits : [];
-    return filterVisitRows([
-      ...safeVisits.map(visit => ({ ...visit, customer: ("customer" in visit ? visit.customer : undefined) ?? customerMap.get(visit.customerId) })),
-      ...safePendingVisits.map(visit => ({ ...visit, id: -Math.abs(String(visit.clientOperationId ?? visit.visitDate).length), customer: customerMap.get(visit.customerId) })),
-    ], { search, type: typeFilter, dateFrom, dateTo });
+    return filterVisitRows(
+      safeVisits.map(visit => ({ ...visit, customer: ("customer" in visit ? visit.customer : undefined) ?? customerMap.get(visit.customerId) })),
+      { search, type: typeFilter, dateFrom, dateTo },
+    );
   }, [customerMap, dateFrom, dateTo, pendingVisits, search, typeFilter, visits]);
   const clearFilters = () => { setSearch(""); setTypeFilter("all"); setDateFrom(""); setDateTo(""); };
   const selectedVisit: VisitRow | null = deleteId === null ? null : (rows.find(visit => visit.id === deleteId) ?? null);
@@ -96,7 +100,8 @@ export default function Visits() {
 
     <VisitHistory compactMobile={compactMobile} onToggleCompact={() => { const next = !compactMobile; setCompactMobile(next); saveAppSettings({ compactVisitsOnMobile: next }); }} rows={rows} search={search} onSearchChange={setSearch} typeFilter={typeFilter} onTypeFilterChange={setTypeFilter} dateFrom={dateFrom} onDateFromChange={setDateFrom} dateTo={dateTo} onDateToChange={setDateTo} onClearFilters={clearFilters} onOpenCustomer={customer => setLocation(`/customers/${customer.id}`)} onDelete={visit => setDeleteId(visit.id)} onEdit={visit => setEditVisit(visit)} />
     {editVisit ? <EditVisitDialog visit={editVisit} busy={updateVisit.isPending} onClose={() => setEditVisit(null)} onSubmit={values => updateVisit.mutate(values)} /> : null}
-    <PinVerificationDialog open={deleteId !== null} onOpenChange={open => { if (!open) setDeleteId(null); }} busy={deleteVisit.isPending} title="تأكيد حذف الزيارة" description="ستُنقل نسخة الزيارة إلى سلة المحذوفات قبل حذفها من السجل." onConfirm={pin => { if (!selectedVisit || !deleteId) return; moveToTrash({ entityType: "visit", entityLabel: `زيارة: ${selectedVisit.customer?.name ?? "عميل"}`, payload: selectedVisit }); if (!navigator.onLine && offlineUser) { queueOfflineDelete(offlineUser.id, { entity: "visit", id: deleteId, pin }); const cachedVisits = getOfflineVisits(); cacheOfflineVisits(extractArray(cachedVisits).filter(visit => visit.id !== deleteId)); setDeleteId(null); toast.success("تم حذف الزيارة محليًا ونقل نسختها إلى السلة"); } else { deleteVisit.mutate({ id: deleteId, pin }); } }} />
+    <PinVerificationDialog open={deleteId !== null} onOpenChange={open => { if (!open) setDeleteId(null); }} busy={deleteVisit.isPending} title="تأكيد حذف الزيارة" description="ستُنقل نسخة الزيارة إلى سلة المحذوفات قبل حذفها من السجل."     onConfirm={pin => { if (!selectedVisit || !deleteId) return; if (!navigator.onLine) { toast.error("حذف الزيارة يحتاج اتصالًا مباشرًا بالسيرفر المركزي."); return; } moveToTrash({ entityType: "visit", entityLabel: `زيارة: ${selectedVisit.customer?.name ?? "عميل"}`, payload: selectedVisit }); deleteVisit.mutate({ id: deleteId, pin }); }}
+ />
   </div>;
 }
 

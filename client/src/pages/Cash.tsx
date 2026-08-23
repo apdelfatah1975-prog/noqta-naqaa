@@ -10,7 +10,6 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { cacheOfflineCash, getOfflineCash, getOfflineSession, queueOfflineCash, queueOfflineDelete } from "@/lib/offlineSync";
 import { moveToTrash } from "@/lib/trashBin";
 import { formatAppMoney } from "@/lib/appSettings";
 import { extractArray } from "@/lib/dataNormalization";
@@ -57,9 +56,18 @@ export default function Cash() {
   const [search, setSearch] = useState("");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const cashQueryInput = useMemo(() => ({ incomeFilter, category: categoryFilter || undefined, technician: technicianFilter || undefined, partyType: partyTypeFilter, itemName: itemNameFilter || undefined, month: dateFilterMode === "month" ? selectedMonth || undefined : undefined, startDate: dateFilterMode === "range" ? startDate || undefined : undefined, endDate: dateFilterMode === "day" ? endDate || undefined : dateFilterMode === "range" ? endDate || undefined : undefined, search: search.trim() || undefined }), [incomeFilter, categoryFilter, technicianFilter, partyTypeFilter, itemNameFilter, dateFilterMode, selectedMonth, startDate, endDate, search]);
-  const owner = getOfflineSession();
-  const cashQuery = trpc.filters.cash.summary.useQuery(cashQueryInput, { retry: false, staleTime: 60_000 });
-  const cachedCash = getOfflineCash<typeof cashQuery.data>(owner?.id ?? 0);
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+  const cashQuery = trpc.filters.cash.summary.useQuery(cashQueryInput, { retry: false, staleTime: 5_000, refetchInterval: 8_000, refetchOnReconnect: true, refetchOnWindowFocus: false, networkMode: "online" });
   const emptyCash = {
     summaries: { SAR: { incomeTotal: 0, expenseTotal: 0, balance: 0 } },
     transactions: [],
@@ -80,16 +88,12 @@ export default function Cash() {
     availableItemNames: [],
     search: "",
   } as unknown as NonNullable<typeof cashQuery.data>;
-  const locallyFilteredCash = useMemo(() => cachedCash ? filterCashLocally(cachedCash, cashQueryInput) : null, [cachedCash, cashQueryInput]);
-  const data = cashQuery.data ?? locallyFilteredCash ?? emptyCash;
+  const data = cashQuery.data ?? emptyCash;
   const safeTransactions = extractArray<any>((data as any)?.transactions);
   const safeAvailableCategories = extractArray<string>((data as any)?.availableCategories);
   const safeAvailableTechnicians = extractArray<string>((data as any)?.availableTechnicians);
   const safeAvailableItemNames = extractArray<string>((data as any)?.availableItemNames);
-  const isLoading = cashQuery.isLoading && !cashQuery.data && !cachedCash;
-  useEffect(() => {
-    if (cashQuery.data && owner) cacheOfflineCash(owner.id, cashQuery.data);
-  }, [cashQuery.data, owner]);
+  const isLoading = cashQuery.isLoading && !cashQuery.data;
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<"income" | "expense">("expense");
@@ -152,25 +156,12 @@ export default function Cash() {
       recipientName: recipientName || null,
       notes: notes || null,
     };
-    if (!navigator.onLine && owner) {
-      queueOfflineCash(owner.id, { ...input, transactionDate: input.transactionDate.toISOString() });
-      const localTransaction = { ...input, id: -Date.now(), transactionDate: input.transactionDate.toISOString(), sourceVisitId: null, sourceInventoryMovementId: null, createdAt: new Date().toISOString() };
-      const current = data as any;
-      if (current) {
-        const sign = transactionType === "income" ? 1 : -1;
-        const currentSummary = current.summaries?.SAR ?? { incomeTotal: 0, expenseTotal: 0, balance: 0 };
-        const nextSummary = { ...currentSummary, incomeTotal: currentSummary.incomeTotal + (transactionType === "income" ? input.amount : 0), expenseTotal: currentSummary.expenseTotal + (transactionType === "expense" ? input.amount : 0), balance: currentSummary.balance + sign * input.amount };
-        cacheOfflineCash(owner.id, { ...current, transactions: [localTransaction, ...extractArray<any>(current.transactions)], incomeTotal: nextSummary.incomeTotal, expenseTotal: nextSummary.expenseTotal, balance: nextSummary.balance, summaries: { ...current.summaries, SAR: nextSummary } });
-      }
-      toast.success("تم حفظ العملية محليًا وستتم مزامنتها عند عودة الإنترنت");
-      setOpen(false); setAmount(""); setCategory(""); setRecipientName(""); setNotes("");
+    if (!online) {
+      toast.error("حفظ العملية المالية يحتاج اتصالًا مباشرًا بقاعدة البيانات المركزية.");
       return;
     }
     createTransaction.mutate(input);
   }
-
-  const showingLocalData = Boolean(!cashQuery.data && cachedCash);
-
 
   const summaries = data.summaries ?? { SAR: { incomeTotal: data.incomeTotal ?? 0, expenseTotal: data.expenseTotal ?? 0, balance: data.balance ?? 0 } };
   const emptyAnalytics = { installationIncome: 0, serviceIncome: 0, expenseByCategory: [], technicianExpenses: [] };
@@ -209,7 +200,7 @@ export default function Cash() {
       <div className="divide-y divide-teal-950/6 md:hidden">{safeTransactions.length ? safeTransactions.map((transaction: CashTransaction) => <CashCard key={transaction.id} transaction={transaction} onDelete={() => setDeleteId(transaction.id)} />) : <div className="p-12 text-center text-sm text-muted-foreground">{isLoading ? "جارٍ تحميل الخزينة…" : "لا توجد عمليات مالية حتى الآن."}</div>}</div>
     </section>
 
-    <PinVerificationDialog open={deleteId !== null} onOpenChange={openState => { if (!openState) setDeleteId(null); }} busy={deleteTransaction.isPending} title="تأكيد حذف العملية المالية" description="سيتم حذف العملية نهائيًا من سجل الخزينة، وقد يؤثر ذلك في الملخصات." onConfirm={pin => { if (deleteId !== null && !navigator.onLine && owner) { const transaction = safeTransactions.find((item: CashTransaction) => item.id === deleteId); if (transaction) moveToTrash({ entityType: "cash", entityLabel: `عملية خزينة: ${transaction.category}`, payload: transaction }); queueOfflineDelete(owner.id, { entity: "cash", id: deleteId, pin }); const current = data as any; if (current) cacheOfflineCash(owner.id, { ...current, transactions: extractArray<any>(current.transactions).filter((item: any) => item.id !== deleteId) }); setDeleteId(null); toast.success("تم حذف العملية محليًا وستتم مزامنة الحذف عند عودة الإنترنت"); } else if (deleteId !== null) { const transaction = safeTransactions.find((item: CashTransaction) => item.id === deleteId); if (transaction) moveToTrash({ entityType: "cash", entityLabel: `عملية خزينة: ${transaction.category}`, payload: transaction }); deleteTransaction.mutate({ id: deleteId, pin }); } }} />
+    <PinVerificationDialog open={deleteId !== null} onOpenChange={openState => { if (!openState) setDeleteId(null); }} busy={deleteTransaction.isPending} title="تأكيد حذف العملية المالية" description="سيتم حذف العملية نهائيًا من سجل الخزينة، وقد يؤثر ذلك في الملخصات." onConfirm={pin => { if (deleteId === null) return; if (!online) { toast.error("حذف العملية المالية يحتاج اتصالًا مباشرًا بقاعدة البيانات المركزية."); return; } const transaction = safeTransactions.find((item: CashTransaction) => item.id === deleteId); if (transaction) moveToTrash({ entityType: "cash", entityLabel: `عملية خزينة: ${transaction.category}`, payload: transaction }); deleteTransaction.mutate({ id: deleteId, pin }); }} />
     <Dialog open={open} onOpenChange={setOpen}><DialogContent dir="rtl" className="flex max-h-[calc(100dvh-1rem)] min-h-0 flex-col overflow-hidden sm:max-w-2xl"><DialogHeader className="shrink-0"><DialogTitle>تسجيل عملية مالية</DialogTitle></DialogHeader><form onSubmit={submit} className="min-h-0 flex-1 grid gap-4 overflow-y-auto overscroll-contain py-2 pl-1 pr-1 sm:grid-cols-2"><label><span className="field-label">نوع العملية</span><select className="field-input" value={transactionType} onChange={event => setTransactionType(event.target.value as "income" | "expense")}><option value="expense">مصروف</option><option value="income">إيراد</option></select></label><label><span className="field-label">المبلغ</span><input id="cash-amount" type="number" min="0" step="1" inputMode="numeric" className="field-input" value={amount} onChange={event => { setAmount(event.target.value); clearCashError("amount"); }} aria-invalid={Boolean(cashErrors.amount)} aria-describedby={cashErrors.amount ? "cash-amount-error" : undefined} required placeholder="مثال: 250" /><FieldError field="amount" /></label><label><span className="field-label">التصنيف</span><select id="cash-category" className="field-input" value={category} onChange={event => { setCategory(event.target.value); clearCashError("category"); }} aria-invalid={Boolean(cashErrors.category)} aria-describedby={cashErrors.category ? "cash-category-error" : undefined} required><option value="">اختر التصنيف</option>{transactionType === "income" ? <><option value="تحصيل تركيب">تحصيل تركيب</option><option value="تحصيل صيانة">تحصيل صيانة</option><option value="تحصيل تغيير شمعات">تحصيل تغيير شمعات</option><option value="نقدية خارج إيرادات العمل">نقدية خارج إيرادات العمل</option></> : <><option value="راتب فني">راتب فني</option><option value="مستحق فني">مستحق فني</option><option value="سلفة فني">سلفة فني</option><option value="بنزين">بنزين</option><option value="شراء بضاعة">شراء بضاعة</option><option value="مصروف عام">مصروف عام</option></>}<option value="أخرى">أخرى</option></select><FieldError field="category" /></label><label><span className="field-label">التاريخ والوقت</span><input id="cash-transactionDate" type="datetime-local" className="field-input" value={transactionDate} onChange={event => { setTransactionDate(event.target.value); clearCashError("transactionDate"); }} aria-invalid={Boolean(cashErrors.transactionDate)} aria-describedby={cashErrors.transactionDate ? "cash-transactionDate-error" : undefined} required /><FieldError field="transactionDate" /></label><label><span className="field-label">الفني أو الجهة المستلمة</span><input className="field-input" value={recipientName} onChange={event => setRecipientName(event.target.value)} placeholder="اختياري" /></label><label className="sm:col-span-2"><span className="field-label">ملاحظات</span><textarea className="field-textarea" value={notes} onChange={event => setNotes(event.target.value)} placeholder="تفاصيل إضافية عن العملية" /></label><div className="sticky bottom-0 flex justify-end gap-3 bg-background/95 pt-2 backdrop-blur-sm sm:col-span-2"><Button type="button" variant="outline" onClick={() => setOpen(false)} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={createTransaction.isPending} className="rounded-xl bg-teal-700 hover:bg-teal-800">{createTransaction.isPending ? "جارٍ الحفظ…" : "حفظ العملية"}</Button></div></form></DialogContent></Dialog>
   </div>;
 }
