@@ -157,14 +157,14 @@ describe("ترابط تعديل بيانات العميل", () => {
     mocks.visitUseMutation.mockReturnValue({ mutate, isPending: false });
     render(<Customers />);
     fireEvent.click(screen.getAllByRole("button", { name: "زيارة" })[0]);
-    fireEvent.change(screen.getByLabelText("اسم الفني"), { target: { value: "أحمد" } });
+    fireEvent.change(screen.getByLabelText("اسم الفني"), { target: { value: "7" } });
     fireEvent.change(screen.getByLabelText("نتيجة الزيارة"), { target: { value: "تم تغيير الشمعات" } });
     expect(screen.getByLabelText("اسم الفني")).toBeTruthy();
     expect(screen.getByLabelText("المبلغ المحصل")).toBeTruthy();
     expect(screen.queryByText(/ريال سعودي|ر\.س/)).toBeNull();
     fireEvent.change(screen.getByLabelText("المبلغ المحصل"), { target: { value: "250" } });
     fireEvent.click(screen.getByRole("button", { name: "حفظ الزيارة" }));
-    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ customerId: 12, technicianName: "أحمد", visitResult: "تم تغيير الشمعات", collectedAmount: 250 }));
+    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ customerId: 12, assignedTechnicianId: 7, technicianName: "أحمد", visitResult: "تم تغيير الشمعات", collectedAmount: 250 }));
   });
 
   it("يحدّث ملخص المخزن بعد نجاح تسجيل الزيارة", () => {

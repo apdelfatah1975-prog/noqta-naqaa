@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { cashTransactions, customers, inventoryItems, inventoryMovements, notificationSettings, reminders, visits, serviceTypes, serviceTypeItems, visitItems, workOrderProofs, technicianLocations } from "../drizzle/schema";
+import { allowedTechnicianAccounts, cashTransactions, customers, inventoryItems, inventoryMovements, notificationSettings, reminders, visits, serviceTypes, serviceTypeItems, users, visitItems, workOrderProofs, technicianLocations } from "../drizzle/schema";
 import { appRouter } from "./routers";
 import { classifyCashParty } from "./routers/filterManagement";
 import { getDb } from "./db";
@@ -69,7 +69,12 @@ describe("واجهات إدارة فلاتر المياه", () => {
   it("ينشئ العميل وأول زيارة والفني والتذكير وإيراد التركيب تلقائيًا", async () => {
     const insertCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
     const db = {
-      select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }),
+      select: () => ({
+        from: (table: unknown) => ({
+          innerJoin: table === users ? () => ({ where: () => ({ limit: async () => [{ id: 9, name: "أحمد", displayName: "أحمد" }] }) }) : undefined,
+          where: () => ({ limit: async () => [] }),
+        }),
+      }),
       insert: (table: unknown) => ({ values: async (values: Record<string, unknown>) => { insertCalls.push({ table, values }); return [{ insertId: table === customers ? 77 : table === visits ? 88 : 0 }]; } }),
       update: () => ({ set: () => ({ where: async () => undefined }) }),
     };
@@ -79,7 +84,7 @@ describe("واجهات إدارة فلاتر المياه", () => {
 
     await expect(caller.filters.customers.create({ name: "عميل جديد", phone: "01000000000", manualCode: "م-١٢", firstVisitType: "installation", firstVisitDate: visitDate, firstTechnicianName: "أحمد", firstCollectedAmount: 12500, firstCollectedCurrency: "SAR" })).resolves.toMatchObject({ id: 77, firstVisitCreated: true, reminderCreated: true });
     expect(insertCalls.find(call => call.table === customers)?.values).toMatchObject({ manualCode: "م-١٢" });
-    expect(insertCalls.find(call => call.table === visits)?.values).toMatchObject({ customerId: 77, visitType: "installation", technicianName: "أحمد", visitDate });
+    expect(insertCalls.find(call => call.table === visits)?.values).toMatchObject({ customerId: 77, visitType: "installation", assignedTechnicianId: 9, technicianName: "أحمد", visitDate });
     expect(insertCalls.find(call => call.table === cashTransactions)?.values).toMatchObject({ sourceVisitId: 88, amount: 12500, currency: "SAR", category: "تحصيل تركيب" });
     expect(insertCalls.filter(call => call.table === reminders)).toHaveLength(1);
   });
@@ -511,7 +516,12 @@ describe("واجهات إدارة فلاتر المياه", () => {
     const insertCalls: Array<{ table: unknown; values: Record<string, unknown> }> = [];
     const customer = { id: 7, ownerId: 1, name: "عميل التحصيل" };
     const db = {
-      select: () => ({ from: (table: unknown) => ({ where: () => ({ limit: async () => table === customers ? [customer] : [] }) }) }),
+      select: () => ({
+        from: (table: unknown) => ({
+          innerJoin: table === users ? () => ({ where: () => ({ limit: async () => [{ id: 15, name: "الفني أحمد", displayName: "الفني أحمد" }] }) }) : undefined,
+          where: () => ({ limit: async () => table === customers ? [customer] : [] }),
+        }),
+      }),
       insert: (table: unknown) => ({ values: async (values: Record<string, unknown>) => { insertCalls.push({ table, values }); return [{ insertId: table === visits ? 123 : 456 }]; } }),
       update: () => ({ set: () => ({ where: async () => undefined }) }),
     };
@@ -697,12 +707,98 @@ describe("المخزن ومنع تكرار الأصناف", () => {
 });
 
 describe("صلاحيات الفني والإدارة", () => {
-  function createTechnicianContext(): TrpcContext {
+  function createTechnicianContext(id = 9): TrpcContext {
     return {
       ...createContext(),
-      user: { ...createContext().user!, role: "user" },
+      user: { ...createContext().user!, id, role: "user" },
     };
   }
+
+  it("يربط تسجيل زيارة الفني بمالك الشركة ومعرف حسابه المركزي", async () => {
+    let storedVisit: Record<string, unknown> | undefined;
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          innerJoin: table === users ? () => ({ where: () => ({ limit: async () => [{ id: 9, name: "فني الاختبار", displayName: "فني الاختبار" }] }) }) : undefined,
+          where: () => ({
+            limit: async () => table === users
+              ? [{ id: 9, role: "user", name: "فني الاختبار" }]
+              : table === allowedTechnicianAccounts
+                ? [{ ownerId: 1 }]
+                : table === customers
+                  ? [{ id: 7, ownerId: 1, name: "عميل الشركة" }]
+                  : [],
+          }),
+        }),
+      }),
+      insert: (table: unknown) => ({
+        values: async (values: Record<string, unknown>) => {
+          if (table === visits) storedVisit = values;
+          return [{ insertId: table === visits ? 101 : 0 }];
+        },
+      }),
+      update: () => ({ set: () => ({ where: async () => undefined }) }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createTechnicianContext());
+
+    await expect(caller.filters.visits.create({
+      customerId: 7,
+      visitType: "follow_up",
+      visitDate: new Date("2026-08-23T09:00:00.000Z"),
+      assignedTechnicianId: 9,
+      visitResult: "تمت المتابعة",
+    })).resolves.toMatchObject({ id: 101, reminderCreated: false, alreadySynced: false });
+
+    expect(storedVisit).toMatchObject({ ownerId: 1, customerId: 7, assignedTechnicianId: 9, technicianName: "فني الاختبار" });
+  });
+
+  it("يرفض إنشاء زيارة عند تمرير فني غير مرتبط بالشركة", async () => {
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          innerJoin: table === users ? () => ({ where: () => ({ limit: async () => [] }) }) : undefined,
+          where: () => ({ limit: async () => table === customers ? [{ id: 7, ownerId: 1, name: "عميل الشركة" }] : [] }),
+        }),
+      }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createContext());
+
+    await expect(caller.filters.visits.create({
+      customerId: 7,
+      visitType: "follow_up",
+      visitDate: new Date("2026-08-23T09:00:00.000Z"),
+      assignedTechnicianId: 999,
+    })).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("يعيد أمر الشركة المسند إلى الفني في قائمة جهازه", async () => {
+    const assignedOrder = {
+      id: 101,
+      ownerId: 1,
+      customerId: 7,
+      assignedTechnicianId: 9,
+      technicianName: "فني الاختبار",
+      visitType: "maintenance",
+      visitDate: new Date("2026-08-23T09:00:00.000Z"),
+      status: "assigned",
+    };
+    const db = {
+      select: () => ({
+        from: (table: unknown) => {
+          if (table === visits || table === workOrderProofs) {
+            return { where: () => ({ orderBy: async () => table === visits ? [assignedOrder] : [] }) };
+          }
+          return { where: async () => table === customers ? [{ id: 7, ownerId: 1, name: "عميل الشركة", phone: "01000000000", address: "العنوان" }] : [] };
+        },
+      }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    const caller = appRouter.createCaller(createTechnicianContext());
+
+    await expect(caller.filters.workOrders.list()).resolves.toMatchObject([{ id: 101, assignedTechnicianId: 9, customer: { id: 7, name: "عميل الشركة" } }]);
+  });
 
   it("يمنع الفني من تصحيح تسجيل زيارة العميل", async () => {
     const caller = appRouter.createCaller(createTechnicianContext());

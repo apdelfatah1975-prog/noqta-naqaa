@@ -79,6 +79,7 @@ const customerCreateInput = customerInput.extend({
   firstVisitType: z.enum(visitTypes).optional(),
   firstVisitDate: z.date().optional(),
   firstTechnicianName: z.string().trim().max(160).optional().nullable(),
+  firstTechnicianId: z.number().int().positive().optional().nullable(),
   firstSalesAgentName: z.string().trim().max(160).optional().nullable(),
   firstFilterCount: z.number().int().positive().max(1000).optional().default(1),
   firstVisitNotes: z.string().trim().max(2000).optional().nullable(),
@@ -130,6 +131,7 @@ const visitInput = z.object({
   visitDate: z.date(),
   nextVisitDate: z.date().optional().nullable(),
   technicianName: z.string().trim().max(160).optional().nullable(),
+  assignedTechnicianId: z.number().int().positive().optional().nullable(),
   salesAgentName: z.string().trim().max(160).optional().nullable(),
   filterCount: z.number().int().positive().max(1000).optional().default(1),
   tdsIn: z.number().int().nonnegative().max(100000).optional().nullable(),
@@ -280,6 +282,49 @@ async function getOwnedCustomer(ownerId: number, customerId: number) {
     throw new TRPCError({ code: "NOT_FOUND", message: "لم يتم العثور على العميل." });
   }
   return customer[0];
+}
+
+async function getCompanyOwnerId(userId: number, role?: string) {
+  if (role === "admin") return userId;
+  const db = await databaseOrThrow();
+  const currentUser = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
+  if (currentUser[0]?.role === "admin") return userId;
+  const account = await db
+    .select({ ownerId: allowedTechnicianAccounts.ownerId })
+    .from(allowedTechnicianAccounts)
+    .where(and(eq(allowedTechnicianAccounts.linkedUserId, userId), eq(allowedTechnicianAccounts.isActive, true)))
+    .limit(1);
+  if (!account[0]) throw new TRPCError({ code: "FORBIDDEN", message: "حساب الفني غير مرتبط بشركة فعالة." });
+  return account[0].ownerId;
+}
+
+type OwnedTechnician = { id: number; name: string | null; displayName: string };
+
+async function findOwnedTechnician(ownerId: number, technicianId?: number | null, technicianName?: string | null): Promise<OwnedTechnician | null> {
+  if (!technicianId && !technicianName?.trim()) return null;
+  const db = await databaseOrThrow();
+  const name = technicianName?.trim();
+  const match = await db
+    .select({ id: users.id, name: users.name, displayName: allowedTechnicianAccounts.displayName })
+    .from(users)
+    .innerJoin(allowedTechnicianAccounts, eq(allowedTechnicianAccounts.linkedUserId, users.id))
+    .where(and(
+      eq(allowedTechnicianAccounts.ownerId, ownerId),
+      eq(allowedTechnicianAccounts.isActive, true),
+      eq(users.role, "user"),
+      technicianId ? eq(users.id, technicianId) : or(eq(users.name, name!), eq(allowedTechnicianAccounts.displayName, name!)),
+    ))
+    .limit(1);
+  return match[0] ?? null;
+}
+
+async function resolveAssignedTechnician(ownerId: number, currentUserId: number | null, technicianId?: number | null, technicianName?: string | null) {
+  const requested = await findOwnedTechnician(ownerId, technicianId, technicianName);
+  if (requested) return { id: requested.id, name: requested.name || requested.displayName };
+  if (technicianId || technicianName?.trim()) throw new TRPCError({ code: "NOT_FOUND", message: "الفني غير موجود أو غير مرتبط بحساب الشركة." });
+  if (!currentUserId) return null;
+  const current = await findOwnedTechnician(ownerId, currentUserId);
+  return current ? { id: current.id, name: current.name || current.displayName } : null;
 }
 
 function withCustomerFollowUp(
@@ -719,14 +764,15 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
       sortBy: z.enum(["created_desc", "next_asc", "next_desc", "status", "collected_desc", "collected_asc"]).default("created_desc"),
     })).query(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
-      const ownerFilter = eq(customers.ownerId, ctx.user.id);
+      const ownerId = await getCompanyOwnerId(ctx.user.id, ctx.user.role);
+      const ownerFilter = eq(customers.ownerId, ownerId);
       const [customerRows, ownerVisits] = await Promise.all([
         db.select().from(customers).where(ownerFilter).orderBy(desc(customers.createdAt)),
-        db.select().from(visits).where(eq(visits.ownerId, ctx.user.id)).orderBy(desc(visits.visitDate)),
+        db.select().from(visits).where(eq(visits.ownerId, ownerId)).orderBy(desc(visits.visitDate)),
       ]);
       const visitIds = ownerVisits.map(visit => visit.id);
       const ownerIncome = visitIds.length
-        ? await db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.transactionType, "income"), inArray(cashTransactions.sourceVisitId, visitIds)))
+        ? await db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ownerId), eq(cashTransactions.transactionType, "income"), inArray(cashTransactions.sourceVisitId, visitIds)))
         : [];
       const customerNumbers = customerNumberMap([...customerRows].sort(compareCustomersByCreation));
       const visitsByCustomer = new Map<number, Array<typeof visits.$inferSelect>>();
@@ -792,70 +838,75 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
     }),
     get: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
-      const customer = await getOwnedCustomer(ctx.user.id, input.id);
-      const allCustomers = await db.select().from(customers).where(eq(customers.ownerId, ctx.user.id));
+      const ownerId = await getCompanyOwnerId(ctx.user.id, ctx.user.role);
+      const customer = await getOwnedCustomer(ownerId, input.id);
+      const allCustomers = await db.select().from(customers).where(eq(customers.ownerId, ownerId));
       const customerNumbers = customerNumberMap((Array.isArray(allCustomers) ? allCustomers : [customer]).slice().sort(compareCustomersByCreation));
       const [customerVisits, customerReminders] = await Promise.all([
-        db.select().from(visits).where(and(eq(visits.ownerId, ctx.user.id), eq(visits.customerId, input.id))).orderBy(desc(visits.visitDate)),
-        db.select().from(reminders).where(and(eq(reminders.ownerId, ctx.user.id), eq(reminders.customerId, input.id))).orderBy(desc(reminders.reminderDate)),
+        db.select().from(visits).where(and(eq(visits.ownerId, ownerId), eq(visits.customerId, input.id))).orderBy(desc(visits.visitDate)),
+        db.select().from(reminders).where(and(eq(reminders.ownerId, ownerId), eq(reminders.customerId, input.id))).orderBy(desc(reminders.reminderDate)),
       ]);
       return { customer: withCustomerFollowUp(customer, customerVisits, customerNumbers.get(customer.id) ?? customer.id), visits: customerVisits, reminders: customerReminders };
     }),
     create: protectedProcedure.input(customerCreateInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
+      const ownerId = await getCompanyOwnerId(ctx.user.id, ctx.user.role);
       if (input.clientOperationId) {
         const existing = await db.select().from(customers).where(and(
-          eq(customers.ownerId, ctx.user.id),
+          eq(customers.ownerId, ownerId),
           eq(customers.clientOperationId, input.clientOperationId),
         )).limit(1);
         if (existing[0]) return { id: existing[0].id, alreadySynced: true };
       }
-      const { clientOperationId, firstVisitType, firstVisitDate, firstTechnicianName, firstSalesAgentName, firstFilterCount, firstVisitResult, firstVisitNotes, firstCollectedAmount, firstCollectedCurrency, items, ...data } = input;
-      const existingNames = await db.select({ id: customers.id, name: customers.name }).from(customers).where(eq(customers.ownerId, ctx.user.id)).limit(100000);
+      const { clientOperationId, firstVisitType, firstVisitDate, firstTechnicianName, firstTechnicianId, firstSalesAgentName, firstFilterCount, firstVisitResult, firstVisitNotes, firstCollectedAmount, firstCollectedCurrency, items, ...data } = input;
+      const assignedTechnician = await resolveAssignedTechnician(ownerId, ctx.user.role === "user" ? ctx.user.id : null, firstTechnicianId, firstTechnicianName);
+      const storedTechnicianName = assignedTechnician?.name ?? firstTechnicianName ?? null;
+      const existingNames = await db.select({ id: customers.id, name: customers.name }).from(customers).where(eq(customers.ownerId, ownerId)).limit(100000);
       if (existingNames.some(customer => normalizeCustomerName(customer.name) === normalizeCustomerName(data.name))) {
         throw new TRPCError({ code: "CONFLICT", message: "اسم العميل موجود بالفعل، استخدم اسمًا مختلفًا." });
       }
       if (data.manualCode) {
-        const duplicate = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.ownerId, ctx.user.id), eq(customers.manualCode, data.manualCode))).limit(1);
+        const duplicate = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.ownerId, ownerId), eq(customers.manualCode, data.manualCode))).limit(1);
         if (duplicate[0]) throw new TRPCError({ code: "CONFLICT", message: "كود العميل مستخدم بالفعل، اختر كودًا مختلفًا." });
       }
-      const result = await db.insert(customers).values({ ...data, clientOperationId, ownerId: ctx.user.id });
+      const result = await db.insert(customers).values({ ...data, clientOperationId, ownerId });
       const customerId = Number(result[0].insertId);
       if (!firstVisitType) {
-        await refreshOwnerBackup(ctx.user.id);
+        await refreshOwnerBackup(ownerId);
         return { id: customerId, alreadySynced: false, firstVisitCreated: false };
       }
       const visitDate = firstVisitDate ?? new Date();
-      const visitResult = await db.insert(visits).values({ customerId, ownerId: ctx.user.id, visitType: firstVisitType, visitDate, technicianName: firstTechnicianName ?? null, salesAgentName: firstSalesAgentName ?? null, filterCount: firstFilterCount, visitResult: firstVisitResult ?? null, notes: firstVisitNotes ?? null });
+      const visitResult = await db.insert(visits).values({ customerId, ownerId, visitType: firstVisitType, visitDate, technicianName: storedTechnicianName, assignedTechnicianId: assignedTechnician?.id ?? null, salesAgentName: firstSalesAgentName ?? null, filterCount: firstFilterCount, visitResult: firstVisitResult ?? null, notes: firstVisitNotes ?? null });
       const visitId = Number(visitResult[0].insertId);
-      const inventoryRows = items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ctx.user.id), inArray(inventoryItems.id, items.map(item => item.inventoryItemId)))) : [];
+      const inventoryRows = items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ownerId), inArray(inventoryItems.id, items.map(item => item.inventoryItemId)))) : [];
       const inventoryById = new Map(inventoryRows.map(item => [item.id, item]));
       for (const requested of items) {
         const inventoryItem = inventoryById.get(requested.inventoryItemId);
         if (!inventoryItem) throw new TRPCError({ code: "NOT_FOUND", message: "لم يتم العثور على أحد الأصناف المستخدمة." });
-        const movements = await db.select().from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ctx.user.id), eq(inventoryMovements.inventoryItemId, requested.inventoryItemId)));
+        const movements = await db.select().from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ownerId), eq(inventoryMovements.inventoryItemId, requested.inventoryItemId)));
         const balance = calculateStockBalance(inventoryItem.openingQuantity, movements);
         if (requested.quantity > balance) throw new TRPCError({ code: "BAD_REQUEST", message: `الرصيد غير كافٍ من صنف ${inventoryItem.name}؛ المتاح ${balance} والمطلوب ${requested.quantity}.` });
       }
       for (const requested of items) {
         const inventoryItem = inventoryById.get(requested.inventoryItemId)!;
         const operationId = clientOperationId ? `${clientOperationId}:${requested.inventoryItemId}`.slice(0, 64) : undefined;
-        await db.insert(visitItems).values({ ownerId: ctx.user.id, visitId, inventoryItemId: inventoryItem.id, itemNameSnapshot: inventoryItem.name, unitSnapshot: inventoryItem.unit, quantity: requested.quantity, source: requested.source, clientOperationId: operationId });
-        await db.insert(inventoryMovements).values({ ownerId: ctx.user.id, inventoryItemId: inventoryItem.id, movementType: "outgoing", quantity: requested.quantity, unitCost: inventoryItem.defaultUnitCost, currency: "SAR", movementDate: visitDate, technicianName: firstTechnicianName ?? null, notes: `منصرف تلقائي من أول زيارة للعميل ${input.name}`, clientOperationId: operationId });
+        await db.insert(visitItems).values({ ownerId, visitId, inventoryItemId: inventoryItem.id, itemNameSnapshot: inventoryItem.name, unitSnapshot: inventoryItem.unit, quantity: requested.quantity, source: requested.source, clientOperationId: operationId });
+        await db.insert(inventoryMovements).values({ ownerId, inventoryItemId: inventoryItem.id, movementType: "outgoing", quantity: requested.quantity, unitCost: inventoryItem.defaultUnitCost, currency: "SAR", movementDate: visitDate, technicianName: storedTechnicianName, notes: `منصرف تلقائي من أول زيارة للعميل ${input.name}`, clientOperationId: operationId });
       }
       if (needsAutomaticReminder(firstVisitType)) {
-        await db.insert(reminders).values({ customerId, visitId, ownerId: ctx.user.id, reminderDate: followUpDate(visitDate) });
+        await db.insert(reminders).values({ customerId, visitId, ownerId, reminderDate: followUpDate(visitDate) });
       }
       if (firstCollectedAmount > 0) {
         const category = firstVisitType === "installation" ? "تحصيل تركيب" : firstVisitType === "maintenance" ? "تحصيل صيانة" : firstVisitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-        await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: firstCollectedCurrency, amount: firstCollectedAmount, category, transactionDate: visitDate, sourceVisitId: visitId, recipientName: firstTechnicianName ?? null, notes: firstTechnicianName ? `العميل: ${input.name} | إيراد أُنشئ تلقائيًا من أول زيارة بواسطة ${firstTechnicianName}` : `العميل: ${input.name} | إيراد أُنشئ تلقائيًا من أول زيارة` });
+        await db.insert(cashTransactions).values({ ownerId, transactionType: "income", currency: firstCollectedCurrency, amount: firstCollectedAmount, category, transactionDate: visitDate, sourceVisitId: visitId, recipientName: storedTechnicianName, notes: storedTechnicianName ? `العميل: ${input.name} | إيراد أُنشئ تلقائيًا من أول زيارة بواسطة ${storedTechnicianName}` : `العميل: ${input.name} | إيراد أُنشئ تلقائيًا من أول زيارة` });
       }
-      await refreshOwnerBackup(ctx.user.id);
+      await refreshOwnerBackup(ownerId);
       return { id: customerId, alreadySynced: false, firstVisitCreated: true, reminderCreated: needsAutomaticReminder(firstVisitType) };
     }),
     importBulk: protectedProcedure.input(z.object({ rows: z.array(customerImportRowInput).min(1).max(1000) })).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
-      const existingRows = await db.select({ id: customers.id, name: customers.name, phone: customers.phone, manualCode: customers.manualCode }).from(customers).where(eq(customers.ownerId, ctx.user.id));
+      const ownerId = await getCompanyOwnerId(ctx.user.id, ctx.user.role);
+      const existingRows = await db.select({ id: customers.id, name: customers.name, phone: customers.phone, manualCode: customers.manualCode }).from(customers).where(eq(customers.ownerId, ownerId));
       const names = new Set(existingRows.map(row => normalizeCustomerName(row.name)));
       const phones = new Set(existingRows.map(row => row.phone.trim()));
       const codes = new Set(existingRows.map(row => row.manualCode?.trim()).filter(Boolean) as string[]);
@@ -873,11 +924,23 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         const normalizedName = normalizeCustomerName(name);
         const linkedCustomerId = manualCode ? customerByCode.get(manualCode) : customerByPhone.get(phone);
         if (!linkedCustomerId && names.has(normalizedName)) { rejected.push({ rowNumber: row.rowNumber, reason: "اسم العميل موجود بالفعل مع رقم مختلف — استخدم كود العميل أو راجع الصف قبل الاستيراد" }); continue; }
+        let assignedTechnician: Awaited<ReturnType<typeof resolveAssignedTechnician>> = null;
+        if (row.visitType && row.visitDate && row.technicianName?.trim()) {
+          try {
+            assignedTechnician = await resolveAssignedTechnician(ownerId, ctx.user.role === "user" ? ctx.user.id : null, null, row.technicianName);
+          } catch (error) {
+            if (error instanceof TRPCError && error.code === "NOT_FOUND") {
+              rejected.push({ rowNumber: row.rowNumber, reason: "الفني المستورد غير مرتبط بحساب فني نشط في الشركة" });
+              continue;
+            }
+            throw error;
+          }
+        }
         if (manualCode && codes.has(manualCode) && !linkedCustomerId) { rejected.push({ rowNumber: row.rowNumber, reason: "كود العميل مستخدم بالفعل" }); continue; }
         if (row.visitType && !row.visitDate) { rejected.push({ rowNumber: row.rowNumber, reason: "لا يمكن إنشاء الزيارة دون تاريخ" }); continue; }
         const location = row.location?.trim() || "";
         const coordinates = location.match(/(-?\\d+(?:\\.\\d+)?)\\s*[,،]\\s*(-?\\d+(?:\\.\\d+)?)/);
-        const customerId = linkedCustomerId ?? Number((await db.insert(customers).values({ ownerId: ctx.user.id, name, phone, manualCode, address: row.address?.trim() || null, latitude: coordinates?.[1] || null, longitude: coordinates?.[2] || null, notes: row.notes?.trim() || null }))[0].insertId);
+        const customerId = linkedCustomerId ?? Number((await db.insert(customers).values({ ownerId, name, phone, manualCode, address: row.address?.trim() || null, latitude: coordinates?.[1] || null, longitude: coordinates?.[2] || null, notes: row.notes?.trim() || null }))[0].insertId);
         if (linkedCustomerId) linked += 1;
         if (!linkedCustomerId) {
           added += 1;
@@ -886,36 +949,36 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         }
         if (row.visitType && row.visitDate) {
           const operationId = `excel-import-${row.rowNumber}`.slice(0, 64);
-          const existingVisit = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), eq(visits.clientOperationId, operationId))).limit(1);
+          const existingVisit = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ownerId), eq(visits.clientOperationId, operationId))).limit(1);
           let visitId = existingVisit[0]?.id;
           let visitWasCreated = false;
           if (!visitId) {
             try {
-              visitId = Number((await db.insert(visits).values({ ownerId: ctx.user.id, customerId, visitType: row.visitType, visitDate: row.visitDate, technicianName: row.technicianName?.trim() || null, status: "completed", notes: row.notes?.trim() || null, clientOperationId: operationId }))[0].insertId);
+              visitId = Number((await db.insert(visits).values({ ownerId, customerId, visitType: row.visitType, visitDate: row.visitDate, technicianName: assignedTechnician?.name ?? row.technicianName?.trim() ?? null, assignedTechnicianId: assignedTechnician?.id ?? null, status: "completed", notes: row.notes?.trim() || null, clientOperationId: operationId }))[0].insertId);
               visitWasCreated = true;
             } catch (error) {
-              const concurrentVisit = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ctx.user.id), eq(visits.clientOperationId, operationId))).limit(1);
+              const concurrentVisit = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ownerId), eq(visits.clientOperationId, operationId))).limit(1);
               if (!concurrentVisit[0]) throw error;
               visitId = concurrentVisit[0].id;
             }
           }
           if (visitWasCreated) {
             visitsAdded += 1;
-            if (needsAutomaticReminder(row.visitType)) await db.insert(reminders).values({ customerId, visitId, ownerId: ctx.user.id, reminderDate: followUpDate(row.visitDate) });
+            if (needsAutomaticReminder(row.visitType)) await db.insert(reminders).values({ customerId, visitId, ownerId, reminderDate: followUpDate(row.visitDate) });
           }
           const amount = Math.round(row.collectedAmount || 0);
           const incomeOperationId = `${operationId}:income`.slice(0, 64);
           if (amount > 0) {
-            const existingIncome = await db.select({ id: cashTransactions.id }).from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.clientOperationId, incomeOperationId))).limit(1);
+            const existingIncome = await db.select({ id: cashTransactions.id }).from(cashTransactions).where(and(eq(cashTransactions.ownerId, ownerId), eq(cashTransactions.clientOperationId, incomeOperationId))).limit(1);
             if (!existingIncome[0]) {
               const category = row.visitType === "installation" ? "تحصيل تركيب" : row.visitType === "maintenance" ? "تحصيل صيانة" : row.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-              await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: "SAR", amount, category, transactionDate: row.visitDate, sourceVisitId: visitId, recipientName: row.technicianName?.trim() || null, clientOperationId: incomeOperationId, notes: `العميل: ${name} | إيراد مستورد من Excel` });
+              await db.insert(cashTransactions).values({ ownerId, transactionType: "income", currency: "SAR", amount, category, transactionDate: row.visitDate, sourceVisitId: visitId, recipientName: assignedTechnician?.name ?? row.technicianName?.trim() ?? null, clientOperationId: incomeOperationId, notes: `العميل: ${name} | إيراد مستورد من Excel` });
               incomeAdded += 1;
             }
           }
         }
       }
-      if (added) await refreshOwnerBackup(ctx.user.id);
+      if (added) await refreshOwnerBackup(ownerId);
       return { added, linked, visitsAdded, incomeAdded, rejected, total: input.rows.length, processed: added + linked + rejected.length };
     }),
     seedPerformanceCustomers: protectedProcedure.mutation(async ({ ctx }) => {
@@ -1086,10 +1149,11 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
   visits: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       const db = await databaseOrThrow();
+      const ownerId = await getCompanyOwnerId(ctx.user.id, ctx.user.role);
       const [visitRows, customerRows, incomeRows] = await Promise.all([
-        db.select().from(visits).where(eq(visits.ownerId, ctx.user.id)).orderBy(desc(visits.visitDate)),
-        db.select().from(customers).where(eq(customers.ownerId, ctx.user.id)),
-        db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.transactionType, "income"))),
+        db.select().from(visits).where(eq(visits.ownerId, ownerId)).orderBy(desc(visits.visitDate)),
+        db.select().from(customers).where(eq(customers.ownerId, ownerId)),
+        db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ownerId), eq(cashTransactions.transactionType, "income"))),
       ]);
       const customerById = new Map(customerRows.map(customer => [customer.id, customer]));
       const incomeByVisit = new Map(incomeRows.filter(row => row.sourceVisitId).map(row => [row.sourceVisitId!, row]));
@@ -1106,9 +1170,10 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
     }),
     create: protectedProcedure.input(visitInput).mutation(async ({ ctx, input }) => {
       const db = await databaseOrThrow();
+      const ownerId = await getCompanyOwnerId(ctx.user.id, ctx.user.role);
       if (input.clientOperationId) {
         const existing = await db.select().from(visits).where(and(
-          eq(visits.ownerId, ctx.user.id),
+          eq(visits.ownerId, ownerId),
           eq(visits.clientOperationId, input.clientOperationId),
         )).limit(1);
         if (existing[0]) {
@@ -1119,30 +1184,32 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
           };
         }
       }
-      const customer = await getOwnedCustomer(ctx.user.id, input.customerId);
-      const { clientOperationId, collectedAmount, collectedCurrency, items, phone: _phone, ...visitData } = input;
-      const inventoryRows = items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ctx.user.id), inArray(inventoryItems.id, items.map(item => item.inventoryItemId)))) : [];
+      const customer = await getOwnedCustomer(ownerId, input.customerId);
+      const { clientOperationId, collectedAmount, collectedCurrency, items, phone: _phone, technicianName: inputTechnicianName, assignedTechnicianId: requestedTechnicianId, ...visitData } = input;
+      const assignedTechnician = await resolveAssignedTechnician(ownerId, ctx.user.role === "user" ? ctx.user.id : null, requestedTechnicianId, inputTechnicianName);
+      const storedTechnicianName = assignedTechnician?.name ?? inputTechnicianName ?? null;
+      const inventoryRows = items.length ? await db.select().from(inventoryItems).where(and(eq(inventoryItems.ownerId, ownerId), inArray(inventoryItems.id, items.map(item => item.inventoryItemId)))) : [];
       const inventoryById = new Map(inventoryRows.map(item => [item.id, item]));
       for (const requested of items) {
         const inventoryItem = inventoryById.get(requested.inventoryItemId);
         if (!inventoryItem) throw new TRPCError({ code: "NOT_FOUND", message: "لم يتم العثور على أحد الأصناف المستخدمة." });
-        const movements = await db.select().from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ctx.user.id), eq(inventoryMovements.inventoryItemId, requested.inventoryItemId)));
+        const movements = await db.select().from(inventoryMovements).where(and(eq(inventoryMovements.ownerId, ownerId), eq(inventoryMovements.inventoryItemId, requested.inventoryItemId)));
         const balance = calculateStockBalance(inventoryItem.openingQuantity, movements);
         if (requested.quantity > balance) throw new TRPCError({ code: "BAD_REQUEST", message: `الرصيد غير كافٍ من صنف ${inventoryItem.name}؛ المتاح ${balance} والمطلوب ${requested.quantity}.` });
       }
-      const visitResult = await db.insert(visits).values({ ...visitData, ownerId: ctx.user.id, clientOperationId });
+      const visitResult = await db.insert(visits).values({ ...visitData, ownerId, technicianName: storedTechnicianName, assignedTechnicianId: assignedTechnician?.id ?? null, clientOperationId });
       const visitId = Number(visitResult[0].insertId);
       for (const requested of items) {
         const inventoryItem = inventoryById.get(requested.inventoryItemId)!;
         const operationId = clientOperationId ? `${clientOperationId}:${requested.inventoryItemId}`.slice(0, 64) : undefined;
-        await db.insert(visitItems).values({ ownerId: ctx.user.id, visitId, inventoryItemId: inventoryItem.id, itemNameSnapshot: inventoryItem.name, unitSnapshot: inventoryItem.unit, quantity: requested.quantity, source: requested.source, clientOperationId: operationId });
-        await db.insert(inventoryMovements).values({ ownerId: ctx.user.id, inventoryItemId: inventoryItem.id, movementType: "outgoing", quantity: requested.quantity, unitCost: inventoryItem.defaultUnitCost, currency: "SAR", movementDate: input.visitDate, technicianName: input.technicianName ?? null, notes: `منصرف تلقائي من زيارة العميل ${customer.name}`, clientOperationId: operationId });
+        await db.insert(visitItems).values({ ownerId, visitId, inventoryItemId: inventoryItem.id, itemNameSnapshot: inventoryItem.name, unitSnapshot: inventoryItem.unit, quantity: requested.quantity, source: requested.source, clientOperationId: operationId });
+        await db.insert(inventoryMovements).values({ ownerId, inventoryItemId: inventoryItem.id, movementType: "outgoing", quantity: requested.quantity, unitCost: inventoryItem.defaultUnitCost, currency: "SAR", movementDate: input.visitDate, technicianName: storedTechnicianName, notes: `منصرف تلقائي من زيارة العميل ${customer.name}`, clientOperationId: operationId });
       }
       // تسجيل الزيارة يعني أن متابعة العميل تمت؛ لا نُبقي أي تذكير سابق معلقًا.
       await db.update(reminders)
         .set({ status: "completed" })
         .where(and(
-          eq(reminders.ownerId, ctx.user.id),
+          eq(reminders.ownerId, ownerId),
           eq(reminders.customerId, input.customerId),
           eq(reminders.status, "pending"),
         ));
@@ -1150,18 +1217,18 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         await db.insert(reminders).values({
           customerId: input.customerId,
           visitId,
-          ownerId: ctx.user.id,
+          ownerId,
           reminderDate: input.nextVisitDate ?? followUpDate(input.visitDate),
         });
       }
       if (collectedAmount && collectedAmount > 0) {
-        const existingIncome = await db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ctx.user.id), eq(cashTransactions.sourceVisitId, visitId))).limit(1);
+        const existingIncome = await db.select().from(cashTransactions).where(and(eq(cashTransactions.ownerId, ownerId), eq(cashTransactions.sourceVisitId, visitId))).limit(1);
         if (!existingIncome[0]) {
           const category = input.visitType === "installation" ? "تحصيل تركيب" : input.visitType === "maintenance" ? "تحصيل صيانة" : input.visitType === "cartridge_change" ? "تحصيل تغيير شمعات" : "تحصيل زيارة";
-          await db.insert(cashTransactions).values({ ownerId: ctx.user.id, transactionType: "income", currency: collectedCurrency, amount: collectedAmount, category, transactionDate: input.visitDate, sourceVisitId: visitId, recipientName: input.technicianName ?? null, notes: input.technicianName ? `العميل: ${customer.name} | إيراد أُنشئ تلقائيًا من تسجيل الزيارة بواسطة ${input.technicianName}` : `العميل: ${customer.name} | إيراد أُنشئ تلقائيًا من تسجيل الزيارة` });
+          await db.insert(cashTransactions).values({ ownerId, transactionType: "income", currency: collectedCurrency, amount: collectedAmount, category, transactionDate: input.visitDate, sourceVisitId: visitId, recipientName: storedTechnicianName, notes: storedTechnicianName ? `العميل: ${customer.name} | إيراد أُنشئ تلقائيًا من تسجيل الزيارة بواسطة ${storedTechnicianName}` : `العميل: ${customer.name} | إيراد أُنشئ تلقائيًا من تسجيل الزيارة` });
         }
       }
-      await refreshOwnerBackup(ctx.user.id);
+      await refreshOwnerBackup(ownerId);
       return { id: visitId, reminderCreated: needsAutomaticReminder(input.visitType), alreadySynced: false };
     }),
     updateDetails: adminProcedure.input(z.object({
@@ -1537,7 +1604,8 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
   technicians: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       const db = await databaseOrThrow();
-      const accounts = await db.select({ linkedUserId: allowedTechnicianAccounts.linkedUserId, email: allowedTechnicianAccounts.email, displayName: allowedTechnicianAccounts.displayName }).from(allowedTechnicianAccounts).where(and(eq(allowedTechnicianAccounts.ownerId, ctx.user.id), eq(allowedTechnicianAccounts.isActive, true)));
+      const ownerId = await getCompanyOwnerId(ctx.user.id, ctx.user.role);
+      const accounts = await db.select({ linkedUserId: allowedTechnicianAccounts.linkedUserId, email: allowedTechnicianAccounts.email, displayName: allowedTechnicianAccounts.displayName }).from(allowedTechnicianAccounts).where(and(eq(allowedTechnicianAccounts.ownerId, ownerId), eq(allowedTechnicianAccounts.isActive, true)));
       const technicians: Array<{ id: number; name: string | null; role: "admin" | "user" }> = [];
       for (const account of accounts) {
         const match = account.linkedUserId
