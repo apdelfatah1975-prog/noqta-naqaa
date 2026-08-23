@@ -200,21 +200,23 @@ export default function Customers() {
   }, [statusCustomers, displayedCustomers]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const pathname = window.location.pathname.replace(/\/$/, "");
-    const requestedStatus = params.get("followUpStatus");
+    const requestedStatus = new URLSearchParams(window.location.search).get("followUpStatus");
     const validStatuses = ["all", "overdue", "today", "within_5_days", "more_than_5_days", "upcoming", "regular"] as const;
     if (validStatuses.includes(requestedStatus as (typeof validStatuses)[number]) && requestedStatus !== followUpStatus) {
       setFollowUpStatus(requestedStatus as (typeof validStatuses)[number]);
     }
+  }, [location, followUpStatus]);
 
-    const queryRequestsNew = params.get("new") === "1" || pathname === "/customers/new" || location.includes("new=1");
-    const queryRequestsVisit = params.get("visit") === "1" || pathname === "/customers/visit" || location.includes("visit=1");
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pathname = window.location.pathname.replace(/\/$/, "");
+    const queryRequestsNew = params.get("new") === "1" || pathname === "/customers/new";
+    const queryRequestsVisit = params.get("visit") === "1" || pathname === "/customers/visit";
     const requestedCustomerId = params.get("customerId") || "";
     const requestKey = queryRequestsNew ? "new" : queryRequestsVisit ? `visit:${requestedCustomerId}` : null;
 
-    // A route alias mounts this page and then resolves to /customers. Keep the
-    // request idempotent so a history/router update cannot reopen/reset a modal.
+    // Route aliases are one-shot commands. Clean the browser URL directly;
+    // calling setLocation here can synchronously retrigger this effect in wouter.
     if (!requestKey) {
       handledRouteRequest.current = null;
       return;
@@ -224,20 +226,21 @@ export default function Customers() {
 
     if (queryRequestsNew) {
       setForm({ ...emptyCustomer, firstVisitItems: getDefaultVisitItems("installation") });
-      setDialogOpen(current => current === true ? current : true);
+      setDialogOpen(true);
     } else {
-      const requestedCustomer = requestedCustomerId ? displayedCustomers?.find(item => String(item.id) === requestedCustomerId) : null;
+      const requestedCustomer = requestedCustomerId ? displayedCustomers.find(item => String(item.id) === requestedCustomerId) : null;
       if (requestedCustomer) {
         openVisit(requestedCustomer);
-        setVisitPickerOpen(current => current === false ? current : false);
+        setVisitPickerOpen(false);
       } else {
         setVisitPickerCustomerId(requestedCustomerId);
         setVisitPickerSearch("");
-        setVisitPickerOpen(current => current === true ? current : true);
+        setVisitPickerOpen(true);
       }
     }
-    setLocation("/customers");
-  }, [location, followUpStatus]);
+
+    window.history.replaceState({}, "", "/customers");
+  }, [location, displayedCustomers]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sharedValue = params.get("url") || params.get("text");

@@ -137,9 +137,9 @@ describe("بطاقة رصيد الخزينة في لوحة التحكم", () => 
     expect(customerButton.hasAttribute("disabled")).toBe(false);
     expect(visitButton.hasAttribute("disabled")).toBe(false);
     fireEvent.click(customerButton);
-    expect(mocks.setLocation).toHaveBeenCalledWith("/customers?new=1");
+    expect(mocks.setLocation).toHaveBeenCalledWith("/customers/new");
     fireEvent.click(visitButton);
-    expect(mocks.setLocation).toHaveBeenCalledWith("/customers?visit=1");
+    expect(mocks.setLocation).toHaveBeenCalledWith("/customers/visit");
   });
 
   it("تنبه المستخدم تلقائيًا عند وصول صنف إلى الحد الأدنى", () => {

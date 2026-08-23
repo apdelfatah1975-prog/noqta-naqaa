@@ -86,6 +86,7 @@ describe("ترابط تعديل بيانات العميل", () => {
 
   afterEach(() => {
     cleanup();
+    window.history.replaceState({}, "", "/customers");
     vi.clearAllMocks();
     mocks.updateOptions = null;
     mocks.visitOptions = null;
@@ -106,6 +107,23 @@ describe("ترابط تعديل بيانات العميل", () => {
     expect(screen.getByLabelText("فلترة حالة العميل: اليوم")).toBeTruthy();
     expect(screen.getByLabelText("فلترة حالة العميل: خلال ٥ أيام")).toBeTruthy();
     expect(screen.getByLabelText("فلترة حالة العميل: متأخر")).toBeTruthy();
+  });
+
+  it("يفتح alias تسجيل العميل مرة واحدة وينظف المسار دون إعادة توجيه تكراري", () => {
+    window.history.replaceState({}, "", "/customers/new");
+    render(<Customers />);
+    expect(screen.getByText("إضافة عميل جديد")).toBeTruthy();
+    expect(window.location.pathname).toBe("/customers");
+    expect(mocks.location).not.toHaveBeenCalled();
+  });
+
+  it("يفتح alias تسجيل الزيارة دون الدخول في حلقة تحديث", () => {
+    window.history.replaceState({}, "", "/customers/visit");
+    render(<Customers />);
+    expect(screen.getByText("تسجيل زيارة جديدة")).toBeTruthy();
+    expect(screen.getByText("اختر العميل لفتح بطاقة التسجيل وإضافة الفني والمبلغ المحصل.")).toBeTruthy();
+    expect(window.location.pathname).toBe("/customers");
+    expect(mocks.location).not.toHaveBeenCalled();
   });
 
   it("يعرض قسم قطع الغيار المستخدمة داخل حوار تسجيل عميل جديد", () => {
