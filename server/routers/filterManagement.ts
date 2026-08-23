@@ -795,6 +795,8 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
             ...shaped,
             lastVisitDate: latestVisit?.visitDate ?? null,
             latestTechnicianName: latestVisit?.technicianName ?? null,
+            latestTdsIn: latestVisit?.tdsIn ?? null,
+            latestTdsOut: latestVisit?.tdsOut ?? null,
             collectedAmount: latestIncome?.amount ?? 0,
             totalCollectedAmount: totalIncomeByCustomer.get(customer.id) ?? 0,
             collectedCurrency: latestIncome?.currency ?? "SAR",
@@ -941,7 +943,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
         if (row.visitType && !row.visitDate) { rejected.push({ rowNumber: row.rowNumber, reason: "لا يمكن إنشاء الزيارة دون تاريخ" }); continue; }
         const location = row.location?.trim() || "";
         const coordinates = location.match(/(-?\\d+(?:\\.\\d+)?)\\s*[,،]\\s*(-?\\d+(?:\\.\\d+)?)/);
-        const customerId = linkedCustomerId ?? Number((await db.insert(customers).values({ ownerId, name, phone, manualCode, address: row.address?.trim() || null, latitude: coordinates?.[1] || null, longitude: coordinates?.[2] || null, notes: row.notes?.trim() || null }))[0].insertId);
+        const customerId = linkedCustomerId || Number((await db.insert(customers).values({ ownerId, name, phone, manualCode, address: row.address?.trim() || null, latitude: coordinates?.[1] || null, longitude: coordinates?.[2] || null, notes: row.notes?.trim() || null }))[0].insertId);
         if (linkedCustomerId) linked += 1;
         if (!linkedCustomerId) {
           added += 1;
@@ -955,7 +957,7 @@ db.select({ id: customers.id, createdAt: customers.createdAt }).from(customers).
           let visitWasCreated = false;
           if (!visitId) {
             try {
-              visitId = Number((await db.insert(visits).values({ ownerId, customerId, visitType: row.visitType, visitDate: row.visitDate, technicianName: assignedTechnician?.name ?? row.technicianName?.trim() ?? null, assignedTechnicianId: assignedTechnician?.id ?? null, status: "completed", notes: row.notes?.trim() || null, clientOperationId: operationId }))[0].insertId);
+              visitId = Number((await db.insert(visits).values({ ownerId, customerId, visitType: row.visitType, visitDate: row.visitDate, technicianName: assignedTechnician?.name || row.technicianName?.trim() || null, assignedTechnicianId: assignedTechnician?.id || null, status: "completed", notes: row.notes?.trim() || null, clientOperationId: operationId }))[0].insertId);
               visitWasCreated = true;
             } catch (error) {
               const concurrentVisit = await db.select({ id: visits.id }).from(visits).where(and(eq(visits.ownerId, ownerId), eq(visits.clientOperationId, operationId))).limit(1);

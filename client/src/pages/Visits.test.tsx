@@ -3,7 +3,7 @@ import { filterVisitRows, normalizeVisitRows } from "./Visits";
 
 describe("filterVisitRows", () => {
   const rows = [
-    { visitDate: "2026-08-01T09:00:00.000Z", visitType: "maintenance", technicianName: "أحمد", notes: "تم تغيير الشمعات وتنظيف الجهاز", customer: { name: "عميل ألف", manualCode: "12", phone: "01000000000" } },
+    { visitDate: "2026-08-01T09:00:00.000Z", visitType: "maintenance", technicianName: "أحمد", notes: "تم تغيير الشمعات وتنظيف الجهاز", tdsIn: 240, tdsOut: 35, customer: { name: "عميل ألف", manualCode: "12", phone: "01000000000" } },
     { visitDate: "2026-08-10T09:00:00.000Z", visitType: "installation", technicianName: "محمود", customer: { name: "عميل باء", manualCode: "13", phone: "01100000000" } },
   ];
 
@@ -23,6 +23,12 @@ describe("filterVisitRows", () => {
 
   it("returns all rows when filters are empty", () => {
     expect(filterVisitRows(rows, { type: "all" })).toHaveLength(2);
+  });
+
+  it("keeps the before and after TDS readings attached to the visit row", () => {
+    const result = filterVisitRows(rows, { search: "ألف" })[0] as { tdsIn?: number; tdsOut?: number };
+    expect(result.tdsIn).toBe(240);
+    expect(result.tdsOut).toBe(35);
   });
 
   it("does not crash when visits data is null or a non-array object", () => {
