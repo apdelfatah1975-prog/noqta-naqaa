@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterVisitRows } from "./Visits";
+import { filterVisitRows, normalizeVisitRows } from "./Visits";
 
 describe("filterVisitRows", () => {
   const rows = [
@@ -26,6 +26,8 @@ describe("filterVisitRows", () => {
   });
 
   it("does not crash when visits data is null or a non-array object", () => {
+    expect(normalizeVisitRows(null)).toEqual([]);
+    expect(normalizeVisitRows({ unexpected: rows })).toEqual([]);
     expect(filterVisitRows(null as unknown as any[], {})).toEqual([]);
     expect(filterVisitRows({ items: rows } as unknown as any[], {})).toEqual([]);
   });

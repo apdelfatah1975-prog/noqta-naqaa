@@ -30,9 +30,15 @@ export default function Visits() {
   const offlineUser = getOfflineSession();
   const online = navigator.onLine;
   const normalizedCustomers = useMemo(() => extractArray<VisitRow>(customers), [customers]);
-  const normalizedVisits = useMemo(() => extractArray<VisitRow>(visitList), [visitList]);
+  const normalizedVisits = useMemo(() => normalizeVisitRows(visitList), [visitList]);
+  const offlineVisitRows = useMemo(() => normalizeVisitRows(offlineVisits), [offlineVisits]);
   const visibleCustomers = useMemo(() => normalizedCustomers.length ? normalizedCustomers : !online ? extractArray<VisitRow>(offlineCustomers) : [], [normalizedCustomers, offlineCustomers, online]);
-  const visits = useMemo(() => normalizedVisits.length ? normalizedVisits : !online ? extractArray<VisitRow>(offlineVisits) : [], [normalizedVisits, offlineVisits, online]);
+  // Always expose a real array to the render tree. Invalid API/IndexedDB payloads become [] before any map/filter call.
+  const visits = useMemo<VisitRow[]>(() => {
+    if (normalizedVisits.length > 0) return normalizedVisits;
+    if (!online && offlineVisitRows.length > 0) return offlineVisitRows;
+    return [];
+  }, [normalizedVisits, offlineVisitRows, online]);
   const pendingVisits = useMemo(() => {
     if (!(!online && offlineUser)) return [];
     const queued = getPendingVisits(offlineUser.id);
@@ -62,10 +68,14 @@ export default function Visits() {
   }, [normalizedVisits, visitList]);
 
   const customerMap = useMemo(() => new Map(visibleCustomers.map(customer => [customer.id, customer])), [visibleCustomers]);
-  const rows = useMemo(() => filterVisitRows([
-    ...visits.map(visit => ({ ...visit, customer: ("customer" in visit ? visit.customer : undefined) ?? customerMap.get(visit.customerId) })),
-    ...pendingVisits.map(visit => ({ ...visit, id: -Math.abs(String(visit.clientOperationId ?? visit.visitDate).length), customer: customerMap.get(visit.customerId) })),
-  ], { search, type: typeFilter, dateFrom, dateTo }), [customerMap, dateFrom, dateTo, pendingVisits, search, typeFilter, visits]);
+  const rows = useMemo(() => {
+    const safeVisits = Array.isArray(visits) ? visits : [];
+    const safePendingVisits = Array.isArray(pendingVisits) ? pendingVisits : [];
+    return filterVisitRows([
+      ...safeVisits.map(visit => ({ ...visit, customer: ("customer" in visit ? visit.customer : undefined) ?? customerMap.get(visit.customerId) })),
+      ...safePendingVisits.map(visit => ({ ...visit, id: -Math.abs(String(visit.clientOperationId ?? visit.visitDate).length), customer: customerMap.get(visit.customerId) })),
+    ], { search, type: typeFilter, dateFrom, dateTo });
+  }, [customerMap, dateFrom, dateTo, pendingVisits, search, typeFilter, visits]);
   const clearFilters = () => { setSearch(""); setTypeFilter("all"); setDateFrom(""); setDateTo(""); };
   const selectedVisit: VisitRow | null = deleteId === null ? null : (rows.find(visit => visit.id === deleteId) ?? null);
   const exportVisits = () => {
@@ -88,6 +98,10 @@ export default function Visits() {
     {editVisit ? <EditVisitDialog visit={editVisit} busy={updateVisit.isPending} onClose={() => setEditVisit(null)} onSubmit={values => updateVisit.mutate(values)} /> : null}
     <PinVerificationDialog open={deleteId !== null} onOpenChange={open => { if (!open) setDeleteId(null); }} busy={deleteVisit.isPending} title="تأكيد حذف الزيارة" description="ستُنقل نسخة الزيارة إلى سلة المحذوفات قبل حذفها من السجل." onConfirm={pin => { if (!selectedVisit || !deleteId) return; moveToTrash({ entityType: "visit", entityLabel: `زيارة: ${selectedVisit.customer?.name ?? "عميل"}`, payload: selectedVisit }); if (!navigator.onLine && offlineUser) { queueOfflineDelete(offlineUser.id, { entity: "visit", id: deleteId, pin }); const cachedVisits = getOfflineVisits(); cacheOfflineVisits(extractArray(cachedVisits).filter(visit => visit.id !== deleteId)); setDeleteId(null); toast.success("تم حذف الزيارة محليًا ونقل نسختها إلى السلة"); } else { deleteVisit.mutate({ id: deleteId, pin }); } }} />
   </div>;
+}
+
+export function normalizeVisitRows(response: unknown): VisitRow[] {
+  return extractArray<VisitRow>(response);
 }
 
 export function filterVisitRows(rows: VisitRow[], filters: { search?: string; type?: string; dateFrom?: string; dateTo?: string }) {
